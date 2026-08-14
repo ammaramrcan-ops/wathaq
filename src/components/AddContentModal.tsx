@@ -1,6 +1,7 @@
 import React, { useState, useEffect, FormEvent } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { X, Plus, Link as LinkIcon, FileText, Video, Layers, Share2, HardDrive, CheckCircle2 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 interface AddContentModalProps {
   isOpen: boolean;
@@ -19,12 +20,14 @@ export function AddContentModal({
   defaultSubject = "physics",
   lockType = false
 }: AddContentModalProps) {
+  const { user } = useAuth();
   const [contentType, setContentType] = useState<"book" | "video" | "flashcards" | "mindmaps">(defaultContentType);
   const [title, setTitle] = useState("");
   const [subject, setSubject] = useState(defaultSubject);
   const [linkUrl, setLinkUrl] = useState("");
   const [description, setDescription] = useState("");
   const [success, setSuccess] = useState(false);
+  const [submittedStatus, setSubmittedStatus] = useState<"approved" | "pending">("approved");
 
   useEffect(() => {
     if (isOpen) {
@@ -39,6 +42,11 @@ export function AddContentModal({
     e.preventDefault();
     if (!title || !linkUrl) return;
 
+    // Check if user is the authorized admin email "ammaramrcan@gmail.com" or on admin page
+    const isUserAdmin = user?.email === "ammaramrcan@gmail.com" || window.location.pathname.includes("admin");
+    const status: "approved" | "pending" = isUserAdmin ? "approved" : "pending";
+    setSubmittedStatus(status);
+
     const newContentItem = {
       id: "user-item-" + Date.now(),
       title,
@@ -46,6 +54,8 @@ export function AddContentModal({
       contentType,
       linkUrl,
       description,
+      status, // "approved" | "pending"
+      uploaderName: isUserAdmin ? "أدمن المنصة" : "طالب مسجل",
       createdAt: new Date().toLocaleDateString("ar-SA")
     };
 
@@ -66,7 +76,7 @@ export function AddContentModal({
       setLinkUrl("");
       setDescription("");
       onClose();
-    }, 1500);
+    }, 2000);
   };
 
   const getLinkFieldLabel = () => {
@@ -130,8 +140,17 @@ export function AddContentModal({
           {success ? (
             <div className="py-12 flex flex-col items-center justify-center text-center gap-3">
               <CheckCircle2 className="w-16 h-16 text-primary animate-bounce" />
-              <h3 className="text-headline-md text-on-surface">تمت إضافة المحتوى بنجاح!</h3>
-              <p className="text-body-md text-on-surface-variant">تم حفظ الرابط وسيكون متاحاً لجميع الطلاب.</p>
+              {submittedStatus === "approved" ? (
+                <>
+                  <h3 className="text-headline-md text-on-surface">تم النشر والموافقة الفورية!</h3>
+                  <p className="text-body-md text-on-surface-variant">تم حفظ ونشر المحتوى بنجاح لجميع الطلاب.</p>
+                </>
+              ) : (
+                <>
+                  <h3 className="text-headline-md text-on-surface">تمت إضافة الطلب بنجاح!</h3>
+                  <p className="text-body-md text-on-surface-variant">تم إرسال محتواك إلى قائمة مراجعة الأدمن، وسيتم نشره فور اعتماده.</p>
+                </>
+              )}
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
