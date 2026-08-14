@@ -6,9 +6,11 @@ import {
   signOut,
   updateProfile,
   GoogleAuthProvider,
-  signInWithPopup
+  signInWithPopup,
+  signInAnonymously
 } from "firebase/auth";
-import { auth, isFirebaseConfigured } from "@/lib/firebase";
+import { doc, setDoc } from "firebase/firestore";
+import { auth, db, isFirebaseConfigured } from "@/lib/firebase";
 
 interface AuthUser {
   uid: string;
@@ -53,14 +55,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Listen for Firebase auth state changes
-    const unsubscribe = onAuthStateChanged(auth, (fbUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       if (fbUser) {
-        setUser({
+        const u = {
           uid: fbUser.uid,
           email: fbUser.email,
           displayName: fbUser.displayName || fbUser.email?.split("@")[0] || "طالب وثاق",
           photoURL: fbUser.photoURL
-        });
+        };
+        setUser(u);
+
+        // Record user in Firestore, IndexedDB & LocalStorage
+        if (fbUser.email) {
+          const userRec = {
+            uid: fbUser.uid,
+            displayName: fbUser.displayName || fbUser.email.split("@")[0],
+            email: fbUser.email,
+            photoURL: fbUser.photoURL || null,
+            provider: "Google",
+            lastLogin: new Date().toLocaleDateString("ar-SA")
+          };
+          try {
+            const saved = JSON.parse(localStorage.getItem("wathaq_registered_google_users") || "[]");
+            const filtered = saved.filter((item: any) => item.email !== fbUser.email);
+            localStorage.setItem("wathaq_registered_google_users", JSON.stringify([userRec, ...filtered]));
+            await saveIDBUser(userRec);
+            await setDoc(doc(db, "google_registered_users", fbUser.uid), userRec, { merge: true });
+            await setDoc(doc(db, "users", fbUser.uid), userRec, { merge: true });
+          } catch (e) {}
+        }
+      } else {
+        // Auto-authenticate guest user anonymously so Firestore write/read operations succeed
+        try {
+          await signInAnonymously(auth);
+        } catch (anonErr) {
+          console.warn("Anonymous auth initialization warning:", anonErr);
+        }
       }
       setLoading(false);
     });
@@ -71,19 +101,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, pass: string) => {
     try {
       const res = await signInWithEmailAndPassword(auth, email, pass);
-      setUser({
+      const u = {
         uid: res.user.uid,
         email: res.user.email,
         displayName: res.user.displayName || res.user.email?.split("@")[0] || "طالب وثاق",
         photoURL: res.user.photoURL
-      });
+      };
+      setUser(u);
+
+      if (res.user.email) {
+        const userRec = {
+          uid: res.user.uid,
+          displayName: res.user.displayName || res.user.email.split("@")[0],
+          email: res.user.email,
+          photoURL: res.user.photoURL || null,
+          provider: "البريد الإلكتروني",
+          lastLogin: new Date().toLocaleDateString("ar-SA")
+        };
+        const saved = JSON.parse(localStorage.getItem("wathaq_registered_google_users") || "[]");
+        const filtered = saved.filter((item: any) => item.email !== res.user.email);
+        localStorage.setItem("wathaq_registered_google_users", JSON.stringify([userRec, ...filtered]));
+        await saveIDBUser(userRec);
+        await setDoc(doc(db, "users", res.user.uid), userRec, { merge: true });
+      }
     } catch (err: any) {
       console.warn("Firebase Auth Error, using local demo fallback:", err.message);
-      setUser({
+      const u = {
         uid: "user-" + Date.now(),
         email: email,
         displayName: email.split("@")[0] || "طالب وثاق",
-      });
+      };
+      setUser(u);
+      const userRec = {
+        uid: u.uid,
+        displayName: u.displayName,
+        email: u.email,
+        provider: "سيرفر محلي",
+        lastLogin: new Date().toLocaleDateString("ar-SA")
+      };
+      const saved = JSON.parse(localStorage.getItem("wathaq_registered_google_users") || "[]");
+      const filtered = saved.filter((item: any) => item.email !== email);
+      localStorage.setItem("wathaq_registered_google_users", JSON.stringify([userRec, ...filtered]));
+      saveIDBUser(userRec);
     }
   };
 
@@ -91,20 +150,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const provider = new GoogleAuthProvider();
       const res = await signInWithPopup(auth, provider);
-      setUser({
+      const u = {
         uid: res.user.uid,
         email: res.user.email,
         displayName: res.user.displayName || "طالب وثاق (Google)",
         photoURL: res.user.photoURL
-      });
+      };
+      setUser(u);
+
+      if (res.user.email) {
+        const userRec = {
+          uid: res.user.uid,
+          displayName: res.user.displayName || res.user.email.split("@")[0],
+          email: res.user.email,
+          photoURL: res.user.photoURL || null,
+          provider: "Google",
+          lastLogin: new Date().toLocaleDateString("ar-SA")
+        };
+        try {
+          const saved = JSON.parse(localStorage.getItem("wathaq_registered_google_users") || "[]");
+          const filtered = saved.filter((item: any) => item.email !== res.user.email);
+          localStorage.setItem("wathaq_registered_google_users", JSON.stringify([userRec, ...filtered]));
+          await saveIDBUser(userRec);
+          await setDoc(doc(db, "google_registered_users", res.user.uid), userRec, { merge: true });
+          await setDoc(doc(db, "users", res.user.uid), userRec, { merge: true });
+        } catch (e) {}
+      }
     } catch (err: any) {
       console.warn("Google Auth Warning / Fallback:", err.message);
-      setUser({
-        uid: "google-user-" + Date.now(),
-        email: "student@gmail.com",
-        displayName: "طالب وثاق (Google)",
-        photoURL: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200&auto=format&fit=crop"
-      });
     }
   };
 

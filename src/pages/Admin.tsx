@@ -7,6 +7,7 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { AddContentModal } from "@/components/AddContentModal";
 import { getStoredCurriculum, saveStoredCurriculum } from "@/lib/subjectsData";
+import { AdminGoogleUsersTab } from "@/components/admin/AdminGoogleUsersTab";
 
 interface AdminUser {
   id: string;
@@ -124,6 +125,8 @@ export default function Admin() {
     loadData();
   }, []);
 
+  const [processingId, setProcessingId] = useState<string | null>(null);
+
   const handleDeleteContent = (id: string) => {
     const updated = contentList.filter((c) => c.id !== id);
     setContentList(updated);
@@ -131,9 +134,12 @@ export default function Admin() {
   };
 
   const handleApproveContent = (id: string) => {
+    if (processingId === id) return;
+    setProcessingId(id);
     const updated = contentList.map((c) => (c.id === id ? { ...c, status: "approved" as const } : c));
     setContentList(updated);
     localStorage.setItem("wathaq_custom_content", JSON.stringify(updated));
+    setTimeout(() => setProcessingId(null), 1000);
   };
 
   const handleDeleteTeacher = (id: string) => {
@@ -234,13 +240,10 @@ export default function Admin() {
           </div>
 
           <div>
-            <h1 className="text-headline-lg font-headline-lg text-on-surface mb-2">تسجيل دخول الأدمن المصرح</h1>
+            <h1 className="text-headline-lg font-headline-lg text-on-surface mb-2">تسجيل دخول الأدمن المصرح له</h1>
             <p className="text-body-md text-on-surface-variant font-light leading-relaxed">
-              هذه لوحة التحكم الإدارية الخاصة بمنصة وثاق. يرجى تسجيل الدخول بحساب جوجل المعتمد:
+              هذه لوحة التحكم الإدارية الخاصة بمنصة وثاق. يرجى تسجيل الدخول بحساب Google المعتمد الخاص بإدارة المنصة.
             </p>
-            <span className="mt-2 inline-block font-mono text-sm bg-primary/10 text-primary border border-primary/20 px-3 py-1 rounded-full dir-ltr">
-              ammaramrcan@gmail.com
-            </span>
           </div>
 
           {user && user.email !== ADMIN_EMAIL && (
@@ -337,6 +340,32 @@ export default function Admin() {
           <span>نظرة عامة والزيارات</span>
         </button>
 
+        {/* 2nd Option: Published Content (المحتوى المنشور) */}
+        <button
+          onClick={() => setActiveTab("content")}
+          className={`px-4 sm:px-5 py-2.5 rounded-lg text-label-sm font-medium transition-all flex items-center gap-2 border whitespace-nowrap cursor-pointer ${
+            activeTab === "content"
+              ? "bg-primary text-on-primary border-primary"
+              : "bg-surface-container-low text-on-surface-variant border-outline-variant/30 hover:border-primary/50"
+          }`}
+        >
+          <HardDrive className="w-4 h-4 text-emerald-400" />
+          <span>المحتوى المنشور ({approvedContent.length})</span>
+        </button>
+
+        {/* 3rd Option: Google Registered Users (المستخدمون المسجلون بـ Google) */}
+        <button
+          onClick={() => setActiveTab("users")}
+          className={`px-4 sm:px-5 py-2.5 rounded-lg text-label-sm font-medium transition-all flex items-center gap-2 border whitespace-nowrap cursor-pointer ${
+            activeTab === "users"
+              ? "bg-primary text-on-primary border-primary"
+              : "bg-surface-container-low text-on-surface-variant border-outline-variant/30 hover:border-primary/50"
+          }`}
+        >
+          <Users className="w-4 h-4 text-blue-400" />
+          <span>المستخدمون المسجلون بـ Google 🔵</span>
+        </button>
+
         <button
           onClick={() => setActiveTab("subjects")}
           className={`px-4 sm:px-5 py-2.5 rounded-lg text-label-sm font-medium transition-all flex items-center gap-2 border whitespace-nowrap cursor-pointer ${
@@ -346,7 +375,7 @@ export default function Admin() {
           }`}
         >
           <GraduationCap className="w-4 h-4 text-primary" />
-          <span>إدارة مناهج الأزهر والعام حسب الشعبة</span>
+          <span>إدارة مناهج الأزهر والعام</span>
         </button>
 
         <button
@@ -372,19 +401,10 @@ export default function Admin() {
           <Award className="w-4 h-4 text-amber-400" />
           <span>إدارة المدرسين ({teachers.length})</span>
         </button>
-
-        <button
-          onClick={() => setActiveTab("content")}
-          className={`px-4 sm:px-5 py-2.5 rounded-lg text-label-sm font-medium transition-all flex items-center gap-2 border whitespace-nowrap cursor-pointer ${
-            activeTab === "content"
-              ? "bg-primary text-on-primary border-primary"
-              : "bg-surface-container-low text-on-surface-variant border-outline-variant/30 hover:border-primary/50"
-          }`}
-        >
-          <HardDrive className="w-4 h-4" />
-          <span>المحتوى المنشور ({approvedContent.length})</span>
-        </button>
       </div>
+
+      {/* GOOGLE USERS TAB VIEW */}
+      {activeTab === "users" && <AdminGoogleUsersTab />}
 
       {/* DEEP HIERARCHICAL SUBJECTS & CURRICULUM MANAGEMENT TAB */}
       {activeTab === "subjects" && (
@@ -661,10 +681,11 @@ export default function Admin() {
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => handleApproveContent(c.id)}
-                          className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500 hover:text-white px-3 py-1.5 rounded-lg text-label-sm font-medium transition-colors flex items-center gap-1 cursor-pointer"
+                          disabled={processingId === c.id}
+                          className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed px-3 py-1.5 rounded-lg text-label-sm font-medium transition-colors flex items-center gap-1 cursor-pointer"
                         >
                           <CheckCircle className="w-4 h-4" />
-                          <span>موافقة ونشر</span>
+                          <span>{processingId === c.id ? "جاري الاعتماد..." : "موافقة ونشر"}</span>
                         </button>
                         <button
                           onClick={() => handleDeleteContent(c.id)}

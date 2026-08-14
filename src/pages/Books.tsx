@@ -1,9 +1,11 @@
-import { BookOpen, FileText, LayoutList, Share2, Layers, Plus, ExternalLink, Trash2 } from "lucide-react";
+import { BookOpen, FileText, LayoutList, Share2, Layers, Plus, ExternalLink, Trash2, ArrowRight } from "lucide-react";
 import { motion } from "motion/react";
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import Flashcards from "@/pages/Flashcards";
 import { useAuth } from "@/context/AuthContext";
 import { AddContentModal } from "@/components/AddContentModal";
+import { subscribeDeletedItems, subscribeCustomContent, markItemAsDeleted, getLocalDeletedIds, CustomContentItem } from "@/lib/contentService";
 
 const filters = [
   { id: "school", label: "كتب مدرسية", icon: BookOpen },
@@ -44,44 +46,35 @@ export default function Books() {
   const { user } = useAuth();
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [customBooks, setCustomBooks] = useState<any[]>([]);
+  const [customBooks, setCustomBooks] = useState<CustomContentItem[]>([]);
   const [deletedBookIds, setDeletedBookIds] = useState<string[]>([]);
 
-  // Load custom content approved
-  const loadBooks = () => {
-    try {
-      const saved = JSON.parse(localStorage.getItem("wathaq_custom_content") || "[]");
-      const approved = saved.filter((item: any) => item.status !== "pending" && (item.contentType === "book" || item.contentType === "mindmaps"));
-      setCustomBooks(approved);
-
-      const deleted = JSON.parse(localStorage.getItem("wathaq_deleted_books") || "[]");
-      setDeletedBookIds(deleted);
-    } catch (e) {}
-  };
-
   useEffect(() => {
-    loadBooks();
-  }, []);
+    const unsubDeleted = subscribeDeletedItems("book", user?.uid, (ids) => {
+      setDeletedBookIds(ids);
+    });
 
-  const handleDeleteBook = (id: string, e: any) => {
+    const unsubCustom = subscribeCustomContent(user?.uid, (items) => {
+      const approved = items.filter(
+        (item) => item.status !== "pending" && (item.contentType === "book" || item.contentType === "mindmaps")
+      );
+      setCustomBooks(approved);
+    });
+
+    return () => {
+      unsubDeleted();
+      unsubCustom();
+    };
+  }, [user?.uid]);
+
+  const handleDeleteBook = async (id: string, e: any) => {
     e.preventDefault();
     e.stopPropagation();
 
-    if (window.confirm("هل أنت تأكد من رغبتك في حذف هذا الكتاب/الملزمة مباشرة؟")) {
-      try {
-        const updatedDeleted = [...deletedBookIds, id];
-        setDeletedBookIds(updatedDeleted);
-        localStorage.setItem("wathaq_deleted_books", JSON.stringify(updatedDeleted));
-
-        const savedCustom = JSON.parse(localStorage.getItem("wathaq_custom_content") || "[]");
-        const updatedCustom = savedCustom.filter((item: any) => item.id !== id);
-        setCustomBooks(updatedCustom.filter((item: any) => item.status !== "pending" && (item.contentType === "book" || item.contentType === "mindmaps")));
-        localStorage.setItem("wathaq_custom_content", JSON.stringify(updatedCustom));
-      } catch (err) {}
+    if (window.confirm("هل أنت تأكد من رغبتك في حذف هذا الكتاب/الملزمة نهائياً؟")) {
+      await markItemAsDeleted(id, "book", user?.uid, true);
     }
   };
-
-  const isAdmin = user?.email === "ammaramrcan@gmail.com";
 
   if (!activeFilter) {
     return (
@@ -92,18 +85,16 @@ export default function Books() {
           <div className="w-12 h-0.5 bg-primary/30 mx-auto mt-4"></div>
         </div>
 
-        {/* Admin Add Button inside Page */}
-        {isAdmin && (
-          <div className="mb-4">
-            <button
-              onClick={() => setIsAddModalOpen(true)}
-              className="bg-primary text-on-primary hover:bg-primary/90 px-5 py-2.5 rounded-xl text-label-sm font-medium flex items-center gap-2 shadow-lg shadow-primary/10 cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>إضافة كتاب / ملزمة جديدة (كـ أدمن)</span>
-            </button>
-          </div>
-        )}
+        {/* Add Button inside Page for All Users */}
+        <div className="mb-4">
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="bg-primary text-on-primary hover:bg-primary/90 px-5 py-2.5 rounded-xl text-label-sm font-medium flex items-center gap-2 shadow-lg shadow-primary/10 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>إضافة كتاب / ملزمة / مصدر جديد</span>
+          </button>
+        </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-gutter w-full max-w-4xl">
           {filters.map((filter) => {
@@ -111,7 +102,7 @@ export default function Books() {
             return (
               <button
                 key={filter.id}
-                onClick={() => setActiveFilter(filter.id)}
+                onClick={() => handleSelectFilter(filter.id)}
                 className="group flex flex-col items-center justify-center p-stack-lg rounded-2xl bg-surface-container-low border border-outline-variant/30 hover:border-primary hover:bg-surface-container transition-all duration-300 gap-stack-sm cursor-pointer shadow-lg"
               >
                 <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center border border-primary/20 group-hover:scale-110 transition-transform">
@@ -129,7 +120,6 @@ export default function Books() {
           isOpen={isAddModalOpen}
           onClose={() => {
             setIsAddModalOpen(false);
-            loadBooks();
           }}
           defaultContentType="book"
         />
@@ -142,20 +132,18 @@ export default function Books() {
       <div className="flex flex-col gap-6">
         <div className="flex justify-between items-center border-b border-outline-variant/10 pb-4">
           <button
-            onClick={() => setActiveFilter(null)}
+            onClick={() => handleSelectFilter(null)}
             className="text-label-sm text-on-surface-variant hover:text-primary border border-outline-variant/30 px-3 py-1.5 rounded-lg"
           >
             ← العودة لأقسام الكتب
           </button>
-          {isAdmin && (
-            <button
-              onClick={() => setIsAddModalOpen(true)}
-              className="bg-primary text-on-primary px-4 py-2 rounded-lg text-label-sm font-medium flex items-center gap-1.5"
-            >
-              <Plus className="w-4 h-4" />
-              <span>إضافة بطاقة فلاش كارد جديدة</span>
-            </button>
-          )}
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="bg-primary text-on-primary px-4 py-2 rounded-lg text-label-sm font-medium flex items-center gap-1.5"
+          >
+            <Plus className="w-4 h-4" />
+            <span>إضافة بطاقة فلاش كارد جديدة</span>
+          </button>
         </div>
         <Flashcards />
         <AddContentModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} defaultContentType="flashcards" />
@@ -179,21 +167,19 @@ export default function Books() {
     <div className="flex flex-col gap-stack-lg">
       <div className="flex justify-between items-center border-b border-outline-variant/10 pb-4">
         <button
-          onClick={() => setActiveFilter(null)}
+          onClick={() => handleSelectFilter(null)}
           className="text-label-sm text-on-surface-variant hover:text-primary border border-outline-variant/30 px-3 py-1.5 rounded-lg cursor-pointer"
         >
           ← الرجوع للأقسام الرئيسية
         </button>
 
-        {isAdmin && (
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="bg-primary text-on-primary px-4 py-2 rounded-lg text-label-sm font-medium flex items-center gap-1.5 cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>إضافة كتاب / ملزمة جديدة</span>
-          </button>
-        )}
+        <button
+          onClick={() => setIsAddModalOpen(true)}
+          className="bg-primary text-on-primary px-4 py-2 rounded-lg text-label-sm font-medium flex items-center gap-1.5 cursor-pointer shadow-lg shadow-primary/10"
+        >
+          <Plus className="w-4 h-4" />
+          <span>إضافة كتاب / ملزمة جديدة</span>
+        </button>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-gutter">
@@ -218,16 +204,14 @@ export default function Books() {
                 <ExternalLink className="w-3.5 h-3.5" /> Google Drive
               </span>
 
-              {/* Direct Admin Delete Button */}
-              {isAdmin && (
-                <button
-                  onClick={(e) => handleDeleteBook(book.id, e)}
-                  className="absolute top-3 right-3 bg-error/90 text-white p-2 rounded-xl shadow-lg hover:bg-error transition-all z-20 cursor-pointer"
-                  title="حذف هذا الكتاب مباشرة كـ أدمن"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              )}
+              {/* Direct Delete Button for All Users */}
+              <button
+                onClick={(e) => handleDeleteBook(book.id, e)}
+                className="absolute top-3 right-3 bg-error/90 text-white p-2 rounded-xl shadow-lg hover:bg-error transition-all z-20 cursor-pointer"
+                title="حذف هذا الكتاب أو الملزمة نهائياً"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
             </div>
 
             <div className="p-stack-md flex flex-col gap-1 text-right">

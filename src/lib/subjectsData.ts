@@ -2,7 +2,8 @@ export type SystemType = "azhar" | "general";
 
 export interface StudentAcademicProfile {
   system: SystemType;
-  branch: string; // "azhar_scientific" | "azhar_literary" | "general_science" | "general_math" | "general_literary"
+  branch: string; // "scientific" | "literary" | "science" | "math"
+  grade?: string; // "3rd" | "2nd" | "1st"
 }
 
 export const DEFAULT_CURRICULUM: Record<string, string[]> = {
@@ -60,11 +61,19 @@ export function getSubjectsForProfile(profile: StudentAcademicProfile | null): s
 
 export function getProfileLabel(profile: StudentAcademicProfile | null): string {
   if (!profile) return "ثانوي عام (علمي علوم)";
+
+  let gradeLabel = "";
+  if (profile.grade === "3rd") gradeLabel = " (الصف الثالث الثانوي)";
+  else if (profile.grade === "2nd") gradeLabel = " (الصف الثاني الثانوي)";
+  else if (profile.grade === "1st") gradeLabel = " (الصف الأول الثانوي)";
+
   if (profile.system === "azhar") {
-    return profile.branch === "literary" ? "أزهري - قسم أدبي 🕌" : "أزهري - قسم علمي 🕌";
+    const base = profile.branch === "literary" ? "أزهري - قسم أدبي 🕌" : "أزهري - قسم علمي 🕌";
+    return `${base}${gradeLabel}`;
   } else {
-    if (profile.branch === "math") return "ثانوي عام - علمي رياضة 🎓";
-    if (profile.branch === "literary") return "ثانوي عام - قسم أدبي 🎓";
-    return "ثانوي عام - علمي علوم 🎓";
+    let base = "ثانوي عام - علمي علوم 🎓";
+    if (profile.branch === "math") base = "ثانوي عام - علمي رياضة 🎓";
+    else if (profile.branch === "literary") base = "ثانوي عام - قسم أدبي 🎓";
+    return `${base}${gradeLabel}`;
   }
 }

@@ -7,6 +7,15 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { AddContentModal } from "@/components/AddContentModal";
+import { extractYouTubeThumbnail } from "@/lib/utils";
+import { 
+  subscribeDeletedItems, 
+  subscribeCustomContent, 
+  markItemAsDeleted, 
+  getLocalDeletedIds,
+  getLocalCustomContent,
+  CustomContentItem 
+} from "@/lib/contentService";
 
 // Interfaces
 interface MainCategory {
@@ -45,7 +54,6 @@ interface VideoResource {
   lessonsList?: { title: string; duration: string }[];
 }
 
-// Data Definitions
 const mainCategories: MainCategory[] = [
   {
     id: "scientific",
@@ -71,18 +79,13 @@ const mainCategories: MainCategory[] = [
 ];
 
 const subjects: SubjectItem[] = [
-  // العلمية
   { id: "physics", title: "الفيزياء", categoryId: "scientific", description: "الميكانيكا، الكهربية، والفيزياء الحديثة", icon: Atom },
   { id: "chemistry", title: "الكيمياء", categoryId: "scientific", description: "الكيمياء العضوية والتحليلية والحرارية", icon: Atom },
   { id: "biology", title: "الأحياء", categoryId: "scientific", description: "الوراثة، الأحياء الخلوية، وأجهزة الجسم", icon: Atom },
   { id: "math", title: "الرياضيات", categoryId: "scientific", description: "التفاضل والتكامل، الهندسة، والاحتمالات", icon: Atom },
-
-  // العربية
   { id: "grammar", title: "النحو والصرف", categoryId: "arabic", description: "قواعد الإعراب والإحكام الصرفي", icon: BookOpen },
   { id: "literature", title: "الأدب والنصوص", categoryId: "arabic", description: "العصور الأدبية وتحليل النصوص الشعرية", icon: BookOpen },
   { id: "rhetoric", title: "البلاغة والتعبير", categoryId: "arabic", description: "البيان، البديع، والمعاني", icon: BookOpen },
-
-  // الشرعية
   { id: "tawheed", title: "التوحيد والعقيدة", categoryId: "islamic", description: "أركان الإيمان وأصول العقيدة الإسلامية", icon: Compass },
   { id: "fiqh", title: "الفقه وأصوله", categoryId: "islamic", description: "أحكام العبادات والمعاملات الشرعية", icon: Compass },
   { id: "tafseer", title: "التفسير وعلوم القرآن", categoryId: "islamic", description: "تدبر الآيات وعلوم نزول القرآن", icon: Compass },
@@ -94,8 +97,7 @@ const contentTypes: ContentType[] = [
   { id: "video", title: "فيديو شرح لدرس معين", subtitle: "شرح مركز ومباشر لمفهوم أو درس مخصص في المنهج", icon: PlayCircle }
 ];
 
-// Mock Videos DB
-const videoResourcesData: VideoResource[] = [
+const defaultVideoResources: VideoResource[] = [
   {
     id: "v1",
     title: "سلسلة شروحات الفيزياء الحديثة المتكاملة",
@@ -190,108 +192,167 @@ export default function Videos() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  // Stepper State (1: Category, 2: Subject, 3: Type (Playlist vs Video), 4: Results)
   const [step, setStep] = useState<number>(1);
   const [selectedCategory, setSelectedCategory] = useState<MainCategory | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<SubjectItem | null>(null);
   const [selectedContentType, setSelectedContentType] = useState<ContentType | null>(null);
   const [activeVideo, setActiveVideo] = useState<VideoResource | null>(null);
 
-  // Auto-detect Subject or Category from URL searchParams
+  // Cloud & Local Synced States (Synchronously initialized to eliminate initial render flash)
+  const [deletedVideoIds, setDeletedVideoIds] = useState<string[]>(() => getLocalDeletedIds("video"));
+  const [customItems, setCustomItems] = useState<CustomContentItem[]>(() => getLocalCustomContent());
+  const [isDeletedLoaded, setIsDeletedLoaded] = useState(false);
+
+  // Subscribe to cloud synced deleted items and custom content
   useEffect(() => {
-    const subjectParam = searchParams.get("subject");
+    const unsubDeleted = subscribeDeletedItems("video", user?.uid, (ids) => {
+      setDeletedVideoIds(ids);
+      setIsDeletedLoaded(true);
+    });
+
+    const unsubCustom = subscribeCustomContent(user?.uid, (items) => {
+      setCustomItems(items);
+    });
+
+    return () => {
+      unsubDeleted();
+      unsubCustom();
+    };
+  }, [user?.uid]);
+
+  // Convert approved custom video items to VideoResource interface
+  const userCustomVideos: VideoResource[] = customItems
+    .filter((item) => item.status !== "pending" && item.contentType === "video")
+    .map((item) => {
+      const ytThumb = extractYouTubeThumbnail(item.linkUrl);
+      return {
+        id: item.id,
+        title: item.title,
+        subjectId: item.subject,
+        type: "single" as any,
+        author: item.uploaderName || "مساهمة من الطالب",
+        description: item.description || "فيديو شرح مخصص",
+        videoUrl: item.linkUrl,
+        image: ytThumb || item.image || ""
+      };
+    });
+
+  // Combine custom & default resources, excluding deleted video IDs
+  const allVideos = [...userCustomVideos, ...defaultVideoResources].filter(
+    (v) => !deletedVideoIds.includes(v.id)
+  );
+
+  // Deep Link URL Query <-> State Synchronization
+  useEffect(() => {
     const categoryParam = searchParams.get("category");
+    const subjectParam = searchParams.get("subject");
+    const typeParam = searchParams.get("type");
+    const videoParam = searchParams.get("video");
+
+    let cat: MainCategory | null = null;
+    let sub: SubjectItem | null = null;
+    let typeItem: ContentType | null = null;
+    let vid: VideoResource | null = null;
 
     if (subjectParam) {
-      const foundSub = subjects.find((s) => s.id === subjectParam);
-      if (foundSub) {
-        const foundCat = mainCategories.find((c) => c.id === foundSub.categoryId);
-        if (foundCat) setSelectedCategory(foundCat);
-        setSelectedSubject(foundSub);
-        setStep(3);
+      sub = subjects.find((s) => s.id === subjectParam) || null;
+      if (sub) {
+        cat = mainCategories.find((c) => c.id === sub!.categoryId) || null;
       }
     } else if (categoryParam) {
-      const foundCat = mainCategories.find((c) => c.id === categoryParam);
-      if (foundCat) {
-        setSelectedCategory(foundCat);
-        setStep(2);
-      }
+      cat = mainCategories.find((c) => c.id === categoryParam) || null;
     }
-  }, [searchParams]);
 
-  // Available subjects for category
+    if (typeParam) {
+      typeItem = contentTypes.find((t) => t.id === typeParam) || null;
+    }
+
+    if (videoParam) {
+      vid = allVideos.find((v) => v.id === videoParam) || null;
+    }
+
+    setSelectedCategory(cat);
+    setSelectedSubject(sub);
+    setSelectedContentType(typeItem);
+    setActiveVideo(vid);
+
+    if (sub && typeItem) {
+      setStep(4);
+    } else if (sub) {
+      setStep(3);
+    } else if (cat) {
+      setStep(2);
+    } else {
+      setStep(1);
+    }
+  }, [searchParams, allVideos]);
+
   const availableSubjects = subjects.filter(
     (s) => s.categoryId === selectedCategory?.id
   );
 
+  const handleSelectCategory = (cat: MainCategory) => {
+    setSearchParams({ category: cat.id });
+  };
+
+  const handleSelectSubject = (sub: SubjectItem) => {
+    setSearchParams({ category: sub.categoryId, subject: sub.id });
+  };
+
+  const handleSelectType = (typeItem: ContentType) => {
+    if (!selectedSubject) return;
+    setSearchParams({
+      category: selectedSubject.categoryId,
+      subject: selectedSubject.id,
+      type: typeItem.id
+    });
+  };
+
+  const handleSelectVideo = (vid: VideoResource) => {
+    const targetUrl = vid.videoUrl || (vid as any).linkUrl || `https://www.youtube.com/results?search_query=${encodeURIComponent(vid.title)}`;
+    window.open(targetUrl, "_blank", "noopener,noreferrer");
+  };
+
+  const handleCloseVideo = () => {
+    const params: Record<string, string> = {};
+    if (selectedCategory) params.category = selectedCategory.id;
+    if (selectedSubject) params.subject = selectedSubject.id;
+    if (selectedContentType) params.type = selectedContentType.id;
+    setSearchParams(params);
+  };
+
   const handleGoBack = () => {
     if (activeVideo) {
-      setActiveVideo(null);
+      handleCloseVideo();
       return;
     }
-    if (step > 1) {
-      setStep((prev) => prev - 1);
+    if (step === 4) {
+      setSearchParams({
+        category: selectedCategory?.id || "",
+        subject: selectedSubject?.id || ""
+      });
+    } else if (step === 3) {
+      setSearchParams({ category: selectedCategory?.id || "" });
+    } else if (step === 2) {
+      setSearchParams({});
     }
   };
 
   const handleResetAll = () => {
-    setStep(1);
-    setSelectedCategory(null);
-    setSelectedSubject(null);
-    setSelectedContentType(null);
-    setActiveVideo(null);
+    setSearchParams({});
   };
 
-  const [videoList, setVideoList] = useState<VideoResource[]>(videoResourcesData);
-
-  useEffect(() => {
-    try {
-      const savedCustom = JSON.parse(localStorage.getItem("wathaq_custom_content") || "[]");
-      const customVids = savedCustom
-        .filter((item: any) => item.status !== "pending" && item.contentType === "video")
-        .map((item: any) => ({
-          id: item.id,
-          title: item.title,
-          subjectId: item.subject,
-          type: "single",
-          videoUrl: item.linkUrl,
-          author: item.uploaderName || "مساهمة من الطالب",
-          description: item.description || "فيديو شرح مخصص",
-          image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=800&auto=format&fit=crop"
-        }));
-
-      const deletedIds = JSON.parse(localStorage.getItem("wathaq_deleted_videos") || "[]");
-      const filteredDefaults = videoResourcesData.filter((v) => !deletedIds.includes(v.id));
-
-      setVideoList([...customVids, ...filteredDefaults]);
-    } catch (e) {
-      setVideoList(videoResourcesData);
-    }
-  }, []);
-
-  const handleDeleteVideo = (id: string) => {
-    if (window.confirm("هل أنت تأكد من رغبتك في حذف هذا الفيديو مباشرة؟")) {
-      const updated = videoList.filter((v) => v.id !== id);
-      setVideoList(updated);
-
-      // Track deleted defaults
-      try {
-        const deletedIds = JSON.parse(localStorage.getItem("wathaq_deleted_videos") || "[]");
-        localStorage.setItem("wathaq_deleted_videos", JSON.stringify([...deletedIds, id]));
-
-        // Remove from custom content
-        const savedCustom = JSON.parse(localStorage.getItem("wathaq_custom_content") || "[]");
-        const updatedCustom = savedCustom.filter((item: any) => item.id !== id);
-        localStorage.setItem("wathaq_custom_content", JSON.stringify(updatedCustom));
-      } catch (err) {}
+  const handleDeleteVideo = async (id: string) => {
+    if (window.confirm("هل أنت تأكد من رغبتك في حذف هذا الفيديو أو قائمة التشغيل نهائياً؟")) {
+      await markItemAsDeleted(id, "video", user?.uid, true);
+      if (activeVideo?.id === id) handleCloseVideo();
     }
   };
 
-  // Filtered Video Resources
-  const finalVideos = videoList.filter(
+  const finalVideos = allVideos.filter(
     (v) =>
       v.subjectId === selectedSubject?.id &&
-      v.type === selectedContentType?.id
+      (v.type === selectedContentType?.id || v.type === "single")
   );
 
   return (
@@ -303,7 +364,7 @@ export default function Videos() {
             {step > 1 && (
               <button
                 onClick={handleGoBack}
-                className="p-2 rounded-lg bg-surface-container hover:bg-surface-container-high border border-outline-variant/30 text-on-surface-variant hover:text-primary transition-all"
+                className="p-2 rounded-lg bg-surface-container hover:bg-surface-container-high border border-outline-variant/30 text-on-surface-variant hover:text-primary transition-all cursor-pointer"
               >
                 <ArrowRight className="w-5 h-5 rotate-180" />
               </button>
@@ -322,15 +383,13 @@ export default function Videos() {
           </div>
 
           <div className="flex items-center gap-3">
-            {user?.email === "ammaramrcan@gmail.com" && (
-              <button
-                onClick={() => setIsAddModalOpen(true)}
-                className="bg-primary text-on-primary hover:bg-primary/90 px-4 py-2 rounded-lg text-label-sm font-medium flex items-center gap-1.5 cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span>إضافة فيديو جديد</span>
-              </button>
-            )}
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="bg-primary text-on-primary hover:bg-primary/90 px-4 py-2 rounded-lg text-label-sm font-medium flex items-center gap-1.5 cursor-pointer shadow-lg shadow-primary/10"
+            >
+              <Plus className="w-4 h-4" />
+              <span>إضافة فيديو / قائمة تشغيل جديدة</span>
+            </button>
 
             {step > 1 && (
               <button
@@ -345,9 +404,8 @@ export default function Videos() {
 
         {/* Stepper Progress Badges */}
         <div className="flex items-center gap-2 mt-4 overflow-x-auto pb-2">
-          {/* Step 1 Badge */}
           <div
-            onClick={() => setStep(1)}
+            onClick={() => handleResetAll()}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-label-sm cursor-pointer transition-all border ${
               step === 1
                 ? "bg-primary text-on-primary border-primary font-medium"
@@ -362,9 +420,8 @@ export default function Videos() {
 
           <ChevronLeft className="w-4 h-4 text-on-surface-variant/40" />
 
-          {/* Step 2 Badge */}
           <div
-            onClick={() => selectedCategory && setStep(2)}
+            onClick={() => selectedCategory && setSearchParams({ category: selectedCategory.id })}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-label-sm transition-all border ${
               step === 2
                 ? "bg-primary text-on-primary border-primary font-medium cursor-pointer"
@@ -379,9 +436,8 @@ export default function Videos() {
 
           <ChevronLeft className="w-4 h-4 text-on-surface-variant/40" />
 
-          {/* Step 3 Badge */}
           <div
-            onClick={() => selectedSubject && setStep(3)}
+            onClick={() => selectedSubject && setSearchParams({ category: selectedCategory?.id || "", subject: selectedSubject.id })}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-label-sm transition-all border ${
               step === 3
                 ? "bg-primary text-on-primary border-primary font-medium cursor-pointer"
@@ -408,10 +464,7 @@ export default function Videos() {
             return (
               <button
                 key={cat.id}
-                onClick={() => {
-                  setSelectedCategory(cat);
-                  setStep(2);
-                }}
+                onClick={() => handleSelectCategory(cat)}
                 className={`group text-right p-8 rounded-2xl bg-gradient-to-b border transition-all duration-300 hover:scale-[1.02] flex flex-col justify-between h-[240px] cursor-pointer ${cat.color}`}
               >
                 <div className="w-14 h-14 rounded-xl bg-surface-container/80 flex items-center justify-center border border-outline-variant/20 mb-4 group-hover:scale-110 transition-transform">
@@ -444,10 +497,7 @@ export default function Videos() {
             return (
               <button
                 key={sub.id}
-                onClick={() => {
-                  setSelectedSubject(sub);
-                  setStep(3);
-                }}
+                onClick={() => handleSelectSubject(sub)}
                 className="group text-right p-6 rounded-xl bg-surface-container-low border border-outline-variant/30 hover:border-primary hover:bg-surface-container transition-all duration-300 flex flex-col justify-between h-[200px] cursor-pointer"
               >
                 <div className="w-12 h-12 rounded-lg bg-surface-container-high flex items-center justify-center text-primary mb-3 group-hover:scale-110 transition-transform">
@@ -480,10 +530,7 @@ export default function Videos() {
             return (
               <button
                 key={type.id}
-                onClick={() => {
-                  setSelectedContentType(type);
-                  setStep(4);
-                }}
+                onClick={() => handleSelectType(type)}
                 className="group text-right p-8 rounded-2xl bg-surface-container-low border border-outline-variant/30 hover:border-primary hover:bg-surface-container transition-all duration-300 flex flex-col gap-4 cursor-pointer"
               >
                 <div className="w-14 h-14 rounded-xl bg-primary/10 text-primary flex items-center justify-center border border-primary/20 group-hover:scale-110 transition-transform">
@@ -520,14 +567,13 @@ export default function Videos() {
                   <span>{activeVideo.title}</span>
                 </h3>
                 <button
-                  onClick={() => setActiveVideo(null)}
-                  className="text-label-sm text-on-surface-variant hover:text-primary px-3 py-1 rounded bg-surface-container"
+                  onClick={handleCloseVideo}
+                  className="text-label-sm text-on-surface-variant hover:text-primary px-3 py-1 rounded bg-surface-container cursor-pointer"
                 >
                   إغلاق المشغل ✕
                 </button>
               </div>
 
-              {/* Mock Player */}
               <div className="aspect-video w-full bg-black rounded-xl overflow-hidden relative flex items-center justify-center border border-outline-variant/20 group">
                 <img
                   src={activeVideo.image}
@@ -551,8 +597,14 @@ export default function Videos() {
             </div>
           )}
 
-          {/* Videos Grid */}
-          {finalVideos.length > 0 ? (
+          {/* Videos Grid with Skeleton Loader to eliminate initial render flash */}
+          {!isDeletedLoaded ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-stack-lg animate-pulse">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="bg-surface-container-low h-64 rounded-2xl border border-outline-variant/20"></div>
+              ))}
+            </div>
+          ) : finalVideos.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-stack-lg">
               {finalVideos.map((vid) => (
                 <div
@@ -560,32 +612,40 @@ export default function Videos() {
                   className="group flex flex-col bg-surface-container-low rounded-2xl border border-outline-variant/30 overflow-hidden hover:border-primary transition-all duration-300"
                 >
                   <div className="aspect-video w-full relative overflow-hidden bg-surface flex items-center justify-center">
-                    <img
-                      src={vid.image}
-                      alt={vid.title}
-                      className="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity duration-500"
-                    />
+                    {vid.image ? (
+                      <img
+                        src={vid.image}
+                        alt={vid.title}
+                        className="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity duration-500"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-surface-container-high via-surface-container to-surface flex flex-col items-center justify-center text-primary/60 gap-2">
+                        <PlayCircle className="w-10 h-10 opacity-70" />
+                        <span className="text-label-sm text-on-surface-variant font-light">فيديو دراسي</span>
+                      </div>
+                    )}
                     <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-transparent to-transparent"></div>
 
                     <button
-                      onClick={() => setActiveVideo(vid)}
-                      className="absolute w-12 h-12 rounded-full bg-primary text-on-primary flex items-center justify-center hover:scale-110 transition-transform shadow-lg"
+                      onClick={() => handleSelectVideo(vid)}
+                      className="absolute w-12 h-12 rounded-full bg-primary text-on-primary flex items-center justify-center hover:scale-110 transition-transform shadow-lg cursor-pointer"
                     >
                       <Play className="w-6 h-6 translate-x-[-1px]" />
                     </button>
 
-                    {user?.email === "ammaramrcan@gmail.com" && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteVideo(vid.id);
-                        }}
-                        className="absolute top-3 left-3 bg-error/90 text-white p-2 rounded-xl shadow-lg hover:bg-error transition-all z-20 cursor-pointer"
-                        title="حذف هذا الفيديو مباشرة كـ أدمن"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteVideo(vid.id);
+                      }}
+                      className="absolute top-3 left-3 bg-error/90 text-white p-2 rounded-xl shadow-lg hover:bg-error transition-all z-20 cursor-pointer"
+                      title="حذف هذا الفيديو أو قائمة التشغيل"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
 
                     {vid.duration && (
                       <span className="absolute bottom-3 right-3 bg-black/80 px-2.5 py-1 rounded text-[11px] text-white flex items-center gap-1">
@@ -619,8 +679,8 @@ export default function Videos() {
                     <div className="mt-4 pt-3 border-t border-outline-variant/10 flex justify-between items-center text-label-sm text-on-surface-variant">
                       <span>{vid.author}</span>
                       <button
-                        onClick={() => setActiveVideo(vid)}
-                        className="text-primary hover:underline text-label-sm font-medium"
+                        onClick={() => handleSelectVideo(vid)}
+                        className="text-primary hover:underline text-label-sm font-medium cursor-pointer"
                       >
                         تشغيل الشرح ←
                       </button>
@@ -637,8 +697,8 @@ export default function Videos() {
                 جرّب اختيار مادة أخرى أو التبديل بين قائمة التشغيل والشرح المباشر.
               </p>
               <button
-                onClick={() => setStep(2)}
-                className="mt-2 px-6 py-2.5 rounded-lg border border-primary text-primary hover:bg-primary hover:text-on-primary transition-colors text-label-sm font-medium"
+                onClick={() => setSearchParams({ category: selectedCategory?.id || "" })}
+                className="mt-2 px-6 py-2.5 rounded-lg border border-primary text-primary hover:bg-primary hover:text-on-primary transition-colors text-label-sm font-medium cursor-pointer"
               >
                 تغيير المادة أو خيارات الفيديو
               </button>
@@ -647,11 +707,12 @@ export default function Videos() {
         </motion.div>
       )}
 
-      {/* Admin Add Video Modal */}
+      {/* Add Content Modal */}
       <AddContentModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         defaultContentType="video"
+        defaultSubject={selectedSubject?.id || "physics"}
       />
     </div>
   );

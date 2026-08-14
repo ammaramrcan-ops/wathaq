@@ -1,7 +1,11 @@
 import React, { useState, useEffect, FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { X, Plus, Link as LinkIcon, FileText, Video, Layers, Share2, HardDrive, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { addCustomContent } from "@/lib/contentService";
+
+import { extractYouTubeThumbnail } from "@/lib/utils";
 
 interface AddContentModalProps {
   isOpen: boolean;
@@ -21,6 +25,7 @@ export function AddContentModal({
   lockType = false
 }: AddContentModalProps) {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [contentType, setContentType] = useState<"book" | "video" | "flashcards" | "mindmaps">(defaultContentType);
   const [title, setTitle] = useState("");
   const [subject, setSubject] = useState(defaultSubject);
@@ -28,55 +33,82 @@ export function AddContentModal({
   const [description, setDescription] = useState("");
   const [success, setSuccess] = useState(false);
   const [submittedStatus, setSubmittedStatus] = useState<"approved" | "pending">("approved");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
-      setContentType(defaultContentType);
-      setSubject(defaultSubject);
+      // Auto-detect Subject from URL searchParams or props
+      const urlSubject = searchParams.get("subject");
+      if (urlSubject) {
+        setSubject(urlSubject);
+      } else {
+        setSubject(defaultSubject);
+      }
+
+      // Auto-detect ContentType from URL searchParams or props
+      const urlType = searchParams.get("type");
+      const urlFilter = searchParams.get("filter");
+
+      if (urlType === "video" || urlType === "playlist") {
+        setContentType("video");
+      } else if (urlFilter === "mindmaps") {
+        setContentType("mindmaps");
+      } else if (urlFilter === "flashcards") {
+        setContentType("flashcards");
+      } else if (urlFilter === "school" || urlFilter === "notes" || urlFilter === "summaries") {
+        setContentType("book");
+      } else {
+        setContentType(defaultContentType);
+      }
     }
-  }, [isOpen, defaultContentType, defaultSubject]);
+  }, [isOpen, defaultContentType, defaultSubject, searchParams]);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!title || !linkUrl) return;
+    if (isSubmitting || !title || !linkUrl) return;
 
-    // Check if user is the authorized admin email "ammaramrcan@gmail.com" or on admin page
-    const isUserAdmin = user?.email === "ammaramrcan@gmail.com" || window.location.pathname.includes("admin");
-    const status: "approved" | "pending" = isUserAdmin ? "approved" : "pending";
-    setSubmittedStatus(status);
-
-    const newContentItem = {
-      id: "user-item-" + Date.now(),
-      title,
-      subject,
-      contentType,
-      linkUrl,
-      description,
-      status, // "approved" | "pending"
-      uploaderName: isUserAdmin ? "أدمن المنصة" : "طالب مسجل",
-      createdAt: new Date().toLocaleDateString("ar-SA")
-    };
-
-    // Save to local storage for persistence across pages
+    setIsSubmitting(true);
     try {
-      const existing = JSON.parse(localStorage.getItem("wathaq_custom_content") || "[]");
-      localStorage.setItem("wathaq_custom_content", JSON.stringify([newContentItem, ...existing]));
+      // Check if user is the authorized admin email "ammaramrcan@gmail.com" or on admin page
+      const isUserAdmin = user?.email === "ammaramrcan@gmail.com" || window.location.pathname.includes("admin");
+      const status: "approved" | "pending" = isUserAdmin ? "approved" : "pending";
+      setSubmittedStatus(status);
+
+      const ytThumb = contentType === "video" ? extractYouTubeThumbnail(linkUrl) : null;
+
+      const newContentItem = {
+        id: "user-item-" + Date.now(),
+        title,
+        subject,
+        contentType,
+        linkUrl,
+        image: ytThumb || "",
+        description,
+        status, // "approved" | "pending"
+        uploaderName: isUserAdmin ? "أدمن المنصة" : "طالب مسجل",
+        createdAt: new Date().toLocaleDateString("ar-SA")
+      };
+
+      // Save to LocalStorage & Firestore cloud database
+      await addCustomContent(newContentItem, user?.uid);
+
+      setSuccess(true);
+      if (onSuccess) onSuccess(newContentItem);
+
+      setTimeout(() => {
+        setSuccess(false);
+        setTitle("");
+        setLinkUrl("");
+        setDescription("");
+        onClose();
+      }, 2000);
     } catch (err) {
-      console.error("LocalStorage error:", err);
+      console.error("Content creation error:", err);
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setSuccess(true);
-    if (onSuccess) onSuccess(newContentItem);
-
-    setTimeout(() => {
-      setSuccess(false);
-      setTitle("");
-      setLinkUrl("");
-      setDescription("");
-      onClose();
-    }, 2000);
   };
 
   const getLinkFieldLabel = () => {
@@ -297,10 +329,20 @@ export function AddContentModal({
               {/* Submit */}
               <button
                 type="submit"
-                className="mt-2 py-3 rounded-xl bg-primary text-on-primary hover:bg-primary/90 transition-colors text-body-md font-medium flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-primary/10"
+                disabled={isSubmitting}
+                className="mt-2 py-3 rounded-xl bg-primary text-on-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-body-md font-medium flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-primary/10"
               >
-                <Plus className="w-5 h-5" />
-                <span>حفظ ونشر المحتوى</span>
+                {isSubmitting ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-on-primary border-t-transparent rounded-full animate-spin"></div>
+                    <span>جاري الحفظ والنشر...</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-5 h-5" />
+                    <span>حفظ ونشر المحتوى</span>
+                  </>
+                )}
               </button>
             </form>
           )}

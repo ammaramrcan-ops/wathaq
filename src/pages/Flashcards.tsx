@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { motion } from "motion/react";
 import { RotateCw, CheckCircle2, XCircle, Sparkles, Layers, RefreshCw } from "lucide-react";
 
@@ -49,52 +50,52 @@ const sampleDecks: Deck[] = [
       {
         id: "c4",
         category: "الفيزياء",
-        question: "ما المقصود بالقصور الذاتي؟",
-        answer: "خاصية مقاومة الجسم للتغيير في حالته الحركية من السكون أو الحركة في خط مستقيم وبسرعة ثابتة.",
-        hint: "قانون نيوتن الأول."
+        question: "ما هو قانون حفظ الطاقة؟",
+        answer: "الطاقة لا تفنى ولا تستحدث من العدم، ولكن تتحول من شكل إلى آخر.",
+        hint: "مبدأ فيزيائي أساسي في الديناميكا."
       },
       {
         id: "c5",
         category: "الفيزياء",
-        question: "ما هي الطاقة الحركية وكيف تُحسب؟",
-        answer: "هي الطاقة التي يمتلكها الجسم بسبب حركته، وتُحسب بالقانون: KE = ½ × m × v².",
-        hint: "تعتمد على النصف والكتلة ومربع السرعة."
+        question: "ما هي الصيغة الرياضية لطاقة الحركة؟",
+        answer: "KE = ½ × m × v² (حيث m الكتلة و v السرعة).",
+        hint: "تعتمد على مربع السرعة."
       }
     ]
   },
   {
-    id: "chem-1",
-    title: "أساسيات الكيمياء العضوية",
-    subject: "الكيمياء",
+    id: "grammar-1",
+    title: "قواعد الإعراب والمرفوعات",
+    subject: "النحو",
     count: 4,
     cards: [
       {
-        id: "ch1",
-        category: "الكيمياء",
-        question: "ما هي الألكانات وما صيغتها العامة؟",
-        answer: "هيدروكربونات مشبعة تحتوي على روابط أحادية فقط، وصيغتها العامة CₙH₂ₙ₊₂.",
-        hint: "أبسط مثال عليها هو الميثان CH₄."
+        id: "g1",
+        category: "النحو",
+        question: "ما هي علامة رفع الفاعل الأصلي؟",
+        answer: "الضمة (الظاهرة أو المقدرة).",
+        hint: "الحركة الأساسية للرفع."
       },
       {
-        id: "ch2",
-        category: "الكيمياء",
-        question: "ما هي المجموعة الوظيفية المميزة للكحولات؟",
-        answer: "مجموعة الهيدروكسيل (-OH).",
-        hint: "تتكون من الأكسجين والهيدروجين."
+        id: "g2",
+        category: "النحو",
+        question: "ما هي علامة رفع الأسماء الخمسة؟",
+        answer: "الواو (مثال: جاء أبوك).",
+        hint: "علامة فرعية وليست أصلية."
       },
       {
-        id: "ch3",
-        category: "الكيمياء",
-        question: "ما الفرق بين الألكينات والألكاينات؟",
-        answer: "الألكينات تحتوي على رابطة ثنائية (C=C)، بينما الألكاينات تحتوي على رابطة ثلاثية (C≡C).",
-        hint: "الفرق في عدد الروابط بين ذرات الكربون."
+        id: "g3",
+        category: "النحو",
+        question: "متى يرفع الفعل المضارع؟",
+        answer: "يرفع إذا لم يسبقه ناصب ولا جازم.",
+        hint: "الحالة الأصلية للمضارع."
       },
       {
-        id: "ch4",
-        category: "الكيمياء",
-        question: "ما هي الصيغة البنائية للبنزين العطري؟",
-        answer: "حلقة سداسية كربونية متبادلة الروابط الأحادية والثنائية C₆H₆.",
-        hint: "حلقة كيكولي المشهورة."
+        id: "g4",
+        category: "النحو",
+        question: "ما هي علامة رفع المثنى؟",
+        answer: "الألف (مثال: نجح الطالبان).",
+        hint: "حرف وليس حركة."
       }
     ]
   },
@@ -137,7 +138,17 @@ const sampleDecks: Deck[] = [
 ];
 
 export default function Flashcards() {
-  const [selectedDeck, setSelectedDeck] = useState<Deck>(sampleDecks[0]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const deckParam = searchParams.get("deck");
+
+  const [selectedDeck, setSelectedDeck] = useState<Deck>(() => {
+    if (deckParam) {
+      const found = sampleDecks.find((d) => d.id === deckParam);
+      if (found) return found;
+    }
+    return sampleDecks[0];
+  });
+
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [isFlipped, setIsFlipped] = useState<boolean>(false);
   const [knownCount, setKnownCount] = useState<number>(0);

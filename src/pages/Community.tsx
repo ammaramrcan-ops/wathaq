@@ -1,4 +1,5 @@
-import { useState, FormEvent } from "react";
+import { useState, useEffect, FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   MessageSquare, User, Plus, Sparkles, Lightbulb, 
@@ -62,11 +63,39 @@ const initialDiscussions: Discussion[] = [
 ];
 
 export default function Community() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [mode, setMode] = useState<"select" | "advice" | "question_wizard" | "teachers">("select");
   const [wizardStep, setWizardStep] = useState<number>(1);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   const [discussions, setDiscussions] = useState<Discussion[]>(initialDiscussions);
+
+  useEffect(() => {
+    const modeParam = searchParams.get("mode") as any;
+    const catParam = searchParams.get("category");
+    const subParam = searchParams.get("subject");
+
+    if (modeParam && ["select", "advice", "question_wizard", "teachers"].includes(modeParam)) {
+      setMode(modeParam);
+    } else {
+      setMode("select");
+    }
+
+    if (catParam) setSelectedCategory(catParam);
+    if (subParam) {
+      setSelectedSubject(subParam);
+      setWizardStep(3);
+    }
+  }, [searchParams]);
+
+  const updateUrlMode = (newMode: "select" | "advice" | "question_wizard" | "teachers", extraParams?: Record<string, string>) => {
+    setMode(newMode);
+    if (newMode === "select") {
+      setSearchParams({});
+    } else {
+      setSearchParams({ mode: newMode, ...extraParams });
+    }
+  };
 
   // New Question Form State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -159,7 +188,7 @@ export default function Community() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-stack-md w-full max-w-5xl">
             {/* Option 1: Advice & General Discussion */}
             <button
-              onClick={() => setMode("advice")}
+              onClick={() => updateUrlMode("advice")}
               className="group text-right p-6 sm:p-8 rounded-3xl bg-surface-container-low border border-outline-variant/30 hover:border-amber-400 hover:bg-surface-container transition-all duration-300 flex flex-col justify-between h-[250px] cursor-pointer shadow-xl"
             >
               <div className="w-14 h-14 rounded-2xl bg-amber-500/10 text-amber-400 flex items-center justify-center border border-amber-500/20 group-hover:scale-110 transition-transform mb-4">
@@ -179,7 +208,7 @@ export default function Community() {
             {/* Option 2: Subject & Lesson Questions */}
             <button
               onClick={() => {
-                setMode("question_wizard");
+                updateUrlMode("question_wizard");
                 setWizardStep(1);
               }}
               className="group text-right p-6 sm:p-8 rounded-3xl bg-surface-container-low border border-outline-variant/30 hover:border-primary hover:bg-surface-container transition-all duration-300 flex flex-col justify-between h-[250px] cursor-pointer shadow-xl"
@@ -200,7 +229,7 @@ export default function Community() {
 
             {/* Option 3: Dedicated Teachers Evaluation Directory */}
             <button
-              onClick={() => setMode("teachers")}
+              onClick={() => updateUrlMode("teachers")}
               className="group text-right p-6 sm:p-8 rounded-3xl bg-surface-container-low border border-outline-variant/30 hover:border-emerald-400 hover:bg-surface-container transition-all duration-300 flex flex-col justify-between h-[250px] cursor-pointer shadow-xl"
             >
               <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center border border-emerald-500/20 group-hover:scale-110 transition-transform mb-4">

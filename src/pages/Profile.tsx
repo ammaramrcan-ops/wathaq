@@ -12,6 +12,7 @@ import {
   getSubjectsForProfile, 
   getProfileLabel 
 } from "@/lib/subjectsData";
+import { StageWizardModal } from "@/components/StageWizardModal";
 
 interface UserContribution {
   id: string;
@@ -32,20 +33,20 @@ export default function Profile() {
   const [myContent, setMyContent] = useState<UserContribution[]>([]);
   const [isEditingName, setIsEditingName] = useState(false);
   const [newName, setNewName] = useState(user?.displayName || "");
+  const [isWizardOpen, setIsWizardOpen] = useState(false);
 
   // Academic Profile State (Azhar vs General & Branch Selection)
   const [academicProfile, setAcademicProfile] = useState<StudentAcademicProfile>(() => {
     try {
       const saved = localStorage.getItem("wathaq_student_academic_profile");
-      return saved ? JSON.parse(saved) : { system: "general", branch: "science" };
+      return saved ? JSON.parse(saved) : { system: "general", branch: "science", grade: "3rd" };
     } catch (e) {
-      return { system: "general", branch: "science" };
+      return { system: "general", branch: "science", grade: "3rd" };
     }
   });
 
-  // Save academic profile to localStorage
-  const handleUpdateAcademicProfile = (newSystem: "azhar" | "general", newBranch: string) => {
-    const updated = { system: newSystem, branch: newBranch };
+  // Save academic profile
+  const handleSaveAcademicProfile = (updated: StudentAcademicProfile) => {
     setAcademicProfile(updated);
     localStorage.setItem("wathaq_student_academic_profile", JSON.stringify(updated));
   };
@@ -186,125 +187,48 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* Academic Curriculum Specification Selector */}
-      <div className="bg-surface-container-low border border-primary/30 rounded-3xl p-6 sm:p-8 flex flex-col gap-6 shadow-xl">
+      {/* Interactive Academic Stage Selector Card & Button */}
+      <div className="bg-surface-container-low border border-primary/30 rounded-3xl p-6 sm:p-8 flex flex-col gap-6 shadow-xl relative overflow-hidden">
         <div className="flex justify-between items-center flex-wrap gap-4 border-b border-outline-variant/10 pb-4">
           <div>
             <h2 className="text-headline-md font-bold text-on-surface flex items-center gap-2">
               <GraduationCap className="w-6 h-6 text-primary" />
-              <span>تحديد قسم المنهج وشعبة الطالب (أزهري أم ثانوي عام)</span>
+              <span>تحديد المرحلة والتخصص الأكاديمي</span>
             </h2>
             <p className="text-label-sm text-on-surface-variant mt-1">
-              اختر نوع تعليمك والشعبة لتظهر لك المواد الرسمية الخاصة بمنهجك بدقة.
+              انقر على الزر لتحديد أو تغيير شعبتك ومرحلتك الدراسية عبر معالج تفاعلي بـ 3 أسئلة.
             </p>
           </div>
-          <span className="bg-primary/10 text-primary border border-primary/20 px-3 py-1 rounded-full text-xs font-bold">
-            مُفعل حالياً: {getProfileLabel(academicProfile)}
-          </span>
+
+          <button
+            onClick={() => setIsWizardOpen(true)}
+            className="bg-primary text-on-primary hover:bg-primary/90 px-5 py-3 rounded-2xl font-bold text-label-md flex items-center gap-2 shadow-lg shadow-primary/20 transition-all hover:scale-105 cursor-pointer"
+          >
+            <Sparkles className="w-5 h-5 text-amber-300" />
+            <span>تغيير المرحلة بـ 3 أسئلة تفاعلية</span>
+          </button>
         </div>
 
-        {/* Step 1: System Selection (Azhar vs General) */}
-        <div className="flex flex-col gap-3">
-          <label className="text-label-sm font-bold text-on-surface">1. اختر نوع التعليم:</label>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <button
-              onClick={() => handleUpdateAcademicProfile("azhar", "scientific")}
-              className={`p-5 rounded-2xl border transition-all flex items-center justify-between cursor-pointer ${
-                academicProfile.system === "azhar"
-                  ? "bg-primary/10 border-primary text-primary shadow-lg"
-                  : "bg-surface-container border-outline-variant/30 text-on-surface hover:border-primary/50"
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">🕌</span>
-                <div className="text-right">
-                  <h3 className="font-bold text-body-lg">تعليم أزهري شريف</h3>
-                  <p className="text-xs opacity-75">المواد الشرعية والعلوم العربية والعلمية</p>
-                </div>
-              </div>
-              {academicProfile.system === "azhar" && <Check className="w-5 h-5 text-primary" />}
-            </button>
-
-            <button
-              onClick={() => handleUpdateAcademicProfile("general", "science")}
-              className={`p-5 rounded-2xl border transition-all flex items-center justify-between cursor-pointer ${
-                academicProfile.system === "general"
-                  ? "bg-primary/10 border-primary text-primary shadow-lg"
-                  : "bg-surface-container border-outline-variant/30 text-on-surface hover:border-primary/50"
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">🎓</span>
-                <div className="text-right">
-                  <h3 className="font-bold text-body-lg">ثانوي عام (تربية وتعليم)</h3>
-                  <p className="text-xs opacity-75">علمي علوم / علمي رياضة / أدبي</p>
-                </div>
-              </div>
-              {academicProfile.system === "general" && <Check className="w-5 h-5 text-primary" />}
-            </button>
+        {/* Current Active Stage Display */}
+        <div className="bg-gradient-to-r from-primary/10 via-surface-container to-surface-container border border-primary/40 rounded-2xl p-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-primary/20 text-primary flex items-center justify-center text-2xl border border-primary/30">
+              {academicProfile.system === "azhar" ? "🕌" : "🎓"}
+            </div>
+            <div>
+              <span className="text-xs text-on-surface-variant block mb-0.5">مرحلتك الحالية المفعلة:</span>
+              <h3 className="text-headline-md font-extrabold text-primary">
+                {getProfileLabel(academicProfile)}
+              </h3>
+            </div>
           </div>
-        </div>
 
-        {/* Step 2: Branch Selection */}
-        <div className="flex flex-col gap-3 pt-3 border-t border-outline-variant/10">
-          <label className="text-label-sm font-bold text-on-surface">2. اختر القسم والشعبة الخاصة بك:</label>
-          {academicProfile.system === "azhar" ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <button
-                onClick={() => handleUpdateAcademicProfile("azhar", "scientific")}
-                className={`p-4 rounded-xl border text-center font-bold transition-all cursor-pointer ${
-                  academicProfile.branch === "scientific"
-                    ? "bg-primary text-on-primary border-primary shadow-md"
-                    : "bg-surface-container text-on-surface border-outline-variant/30 hover:border-primary/50"
-                }`}
-              >
-                قسم علمي أزهري (14 مادة)
-              </button>
-              <button
-                onClick={() => handleUpdateAcademicProfile("azhar", "literary")}
-                className={`p-4 rounded-xl border text-center font-bold transition-all cursor-pointer ${
-                  academicProfile.branch === "literary"
-                    ? "bg-primary text-on-primary border-primary shadow-md"
-                    : "bg-surface-container text-on-surface border-outline-variant/30 hover:border-primary/50"
-                }`}
-              >
-                قسم أدبي أزهري (14 مادة)
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <button
-                onClick={() => handleUpdateAcademicProfile("general", "science")}
-                className={`p-4 rounded-xl border text-center font-bold transition-all cursor-pointer ${
-                  academicProfile.branch === "science"
-                    ? "bg-primary text-on-primary border-primary shadow-md"
-                    : "bg-surface-container text-on-surface border-outline-variant/30 hover:border-primary/50"
-                }`}
-              >
-                علمي علوم (5 مواد)
-              </button>
-              <button
-                onClick={() => handleUpdateAcademicProfile("general", "math")}
-                className={`p-4 rounded-xl border text-center font-bold transition-all cursor-pointer ${
-                  academicProfile.branch === "math"
-                    ? "bg-primary text-on-primary border-primary shadow-md"
-                    : "bg-surface-container text-on-surface border-outline-variant/30 hover:border-primary/50"
-                }`}
-              >
-                علمي رياضة (5 مواد)
-              </button>
-              <button
-                onClick={() => handleUpdateAcademicProfile("general", "literary")}
-                className={`p-4 rounded-xl border text-center font-bold transition-all cursor-pointer ${
-                  academicProfile.branch === "literary"
-                    ? "bg-primary text-on-primary border-primary shadow-md"
-                    : "bg-surface-container text-on-surface border-outline-variant/30 hover:border-primary/50"
-                }`}
-              >
-                قسم أدبي (5 مواد)
-              </button>
-            </div>
-          )}
+          <button
+            onClick={() => setIsWizardOpen(true)}
+            className="text-label-sm text-primary hover:underline border border-primary/30 px-4 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high transition-colors cursor-pointer"
+          >
+            إعادة التحديد أو التبديل ←
+          </button>
         </div>
 
         {/* Display Current Track Subjects */}
@@ -457,6 +381,14 @@ export default function Profile() {
           </Link>
         </div>
       )}
+
+      {/* Stage Wizard 3-Questions Modal */}
+      <StageWizardModal
+        isOpen={isWizardOpen}
+        onClose={() => setIsWizardOpen(false)}
+        currentProfile={academicProfile}
+        onSaveProfile={handleSaveAcademicProfile}
+      />
     </div>
   );
 }
