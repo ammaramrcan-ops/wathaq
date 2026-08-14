@@ -4,6 +4,7 @@ import {
   Users, UserCheck, Eye, RefreshCw, HardDrive, Video, Layers, 
   Trash2, ExternalLink, Plus, ShieldCheck, BarChart3, TrendingUp, CheckCircle, Clock, Lock, Award, Star, BookOpen, FolderPlus, GraduationCap, Check, Edit3, Save
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { AddContentModal } from "@/components/AddContentModal";
 import { getStoredCurriculum, saveStoredCurriculum } from "@/lib/subjectsData";
@@ -757,17 +758,32 @@ export default function Admin() {
                     </p>
                   )}
 
-                  <div className="flex justify-between items-center pt-2 border-t border-outline-variant/10 text-xs">
-                    <span className="text-on-surface-variant font-light">المرفِع: {item.uploaderName || "طالب مسجل"}</span>
-                    <a
-                      href={item.linkUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="bg-primary/10 text-primary border border-primary/20 hover:bg-primary hover:text-on-primary px-3 py-1.5 rounded-lg font-bold inline-flex items-center gap-1 transition-all"
-                    >
-                      <span>فتح الرابط</span>
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </a>
+                  <div className="flex justify-between items-center pt-2 border-t border-outline-variant/10 text-xs gap-2 flex-wrap">
+                    <span className="text-on-surface-variant font-light truncate">المرفِع: {item.uploaderName || "طالب مسجل"}</span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Link
+                        to={
+                          item.contentType === "video"
+                            ? `/videos?subject=${item.subject}&type=video`
+                            : item.contentType === "flashcards"
+                            ? "/flashcards"
+                            : `/books`
+                        }
+                        className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500 hover:text-white px-2.5 py-1.5 rounded-lg font-bold inline-flex items-center gap-1 transition-all cursor-pointer"
+                      >
+                        <span>الانتقال للمادة ↗</span>
+                      </Link>
+
+                      <a
+                        href={item.linkUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="bg-primary/10 text-primary border border-primary/20 hover:bg-primary hover:text-on-primary px-2.5 py-1.5 rounded-lg font-bold inline-flex items-center gap-1 transition-all cursor-pointer"
+                      >
+                        <span>فتح الرابط</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
                   </div>
                 </div>
               ))}

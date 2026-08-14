@@ -225,12 +225,13 @@ export default function Videos() {
     .filter((item) => item.status !== "pending" && item.contentType === "video")
     .map((item) => {
       const ytThumb = extractYouTubeThumbnail(item.linkUrl);
+      const isPlaylist = item.linkUrl.includes("playlist") || item.linkUrl.includes("list=");
       return {
         id: item.id,
         title: item.title,
         subjectId: item.subject,
-        type: "single" as any,
-        author: item.uploaderName || "مساهمة من الطالب",
+        type: isPlaylist ? ("playlist" as any) : ("video" as any),
+        author: item.uploaderName || "مساهمة معتمدة من وثاق",
         description: item.description || "فيديو شرح مخصص",
         videoUrl: item.linkUrl,
         image: ytThumb || item.image || ""
@@ -349,11 +350,28 @@ export default function Videos() {
     }
   };
 
-  const finalVideos = allVideos.filter(
-    (v) =>
-      v.subjectId === selectedSubject?.id &&
-      ((v.type as string) === selectedContentType?.id || (v.type as string) === "video")
-  );
+  const finalVideos = allVideos.filter((v) => {
+    // Subject Match (checks English ID e.g. "physics" or Arabic title e.g. "الفيزياء")
+    const matchesSubject =
+      !selectedSubject ||
+      v.subjectId === selectedSubject.id ||
+      v.subjectId === selectedSubject.title ||
+      (selectedSubject.id === "physics" && (v.subjectId === "الفيزياء" || v.subjectId === "physics")) ||
+      (selectedSubject.id === "chemistry" && (v.subjectId === "الكيمياء" || v.subjectId === "chemistry")) ||
+      (selectedSubject.id === "math" && (v.subjectId === "الرياضيات" || v.subjectId === "math")) ||
+      (selectedSubject.id === "biology" && (v.subjectId === "الأحياء" || v.subjectId === "biology")) ||
+      (selectedSubject.id === "grammar" && (v.subjectId === "النحو" || v.subjectId === "grammar"));
+
+    // Type Match (checks video vs playlist vs single)
+    const matchesType =
+      !selectedContentType ||
+      v.type === selectedContentType.id ||
+      (v.type as string) === "single" ||
+      (selectedContentType.id === "video" && (v.type === "video" || (v as any).type === "single")) ||
+      (selectedContentType.id === "playlist" && v.type === "playlist");
+
+    return matchesSubject && matchesType;
+  });
 
   return (
     <div className="flex flex-col gap-stack-lg min-h-[75vh]">
