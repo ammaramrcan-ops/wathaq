@@ -1,0 +1,93 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-ibm-plex-arabic: "IBM Plex Sans Arabic", sans-serif;
+
+  --color-background: #0F1115;
+  --color-surface: #111317;
+  --color-surface-dim: #111317;
+  --color-surface-bright: #37393e;
+  --color-surface-container-lowest: #0c0e12;
+  --color-surface-container-low: #1a1c20;
+  --color-surface-container: #1e2024;
+  --color-surface-container-high: #282a2e;
+  --color-surface-container-highest: #333539;
+  --color-on-surface: #e2e2e8;
+  --color-on-surface-variant: #c3c8c0;
+  --color-inverse-surface: #e2e2e8;
+  --color-inverse-on-surface: #2f3035;
+  --color-outline: #8d928b;
+  --color-outline-variant: #434842;
+  --color-primary: #b5cdb6;
+  --color-on-primary: #213525;
+  --color-primary-container: #8fa691;
+  --color-on-primary-container: #273c2b;
+  --color-inverse-primary: #4e6451;
+  --color-secondary: #b1cadf;
+  --color-on-secondary: #1b3344;
+  --color-secondary-container: #344c5d;
+  --color-on-secondary-container: #a3bbd0;
+  --color-tertiary: #c0c7d4;
+  --color-on-tertiary: #2a313b;
+  --color-tertiary-container: #9aa1ad;
+  --color-on-tertiary-container: #313842;
+  --color-error: #ffb4ab;
+  --color-on-error: #690005;
+  --color-error-container: #93000a;
+  --color-on-error-container: #ffdad6;
+
+  --spacing-container-max: 1000px;
+  --spacing-gutter: 2rem;
+  --spacing-section-padding: 5rem;
+  --spacing-stack-sm: 0.5rem;
+  --spacing-stack-md: 1.5rem;
+  --spacing-stack-lg: 3rem;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-on-surface font-ibm-plex-arabic antialiased;
+    direction: rtl;
+  }
+}
+
+@layer utilities {
+  .text-display-ar {
+    font-size: 42px;
+    font-weight: 500;
+    line-height: 1.2;
+    letter-spacing: 0;
+  }
+  .text-headline-lg {
+    font-size: 28px;
+    font-weight: 500;
+    line-height: 1.4;
+    letter-spacing: 0;
+  }
+  .text-headline-md {
+    font-size: 22px;
+    font-weight: 400;
+    line-height: 1.4;
+    letter-spacing: 0;
+  }
+  .text-body-lg {
+    font-size: 18px;
+    font-weight: 300;
+    line-height: 1.8;
+    letter-spacing: 0;
+  }
+  .text-body-md {
+    font-size: 16px;
+    font-weight: 300;
+    line-height: 1.7;
+    letter-spacing: 0;
+  }
+  .text-label-sm {
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1;
+    letter-spacing: 0.05em;
+  }
+}
+

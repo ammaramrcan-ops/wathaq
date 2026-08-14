@@ -1,0 +1,8 @@
+{
+  "name": "وثاق",
+  "description": "منصة تعليمية تهدف إلى التميز الصامت والتركيز الأكاديمي العميق لطلاب المرحلة الثانوية.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
