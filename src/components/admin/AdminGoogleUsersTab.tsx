@@ -2,8 +2,15 @@ import React, { useState, useEffect } from "react";
 import { Users, Search, CheckCircle2, UserCheck, RefreshCw, Trash2, ShieldCheck, Zap, Lock, Unlock } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot, doc, deleteDoc, setDoc } from "firebase/firestore";
-import { loadIDBUsers, saveIDBUser } from "@/lib/contentService";
-import { getUserPermissions, updateUserPermissions, UserPermissions } from "@/lib/userPermissionsService";
+import { loadIDBUsers, saveIDBUser, deleteIDBUser } from "@/lib/contentService";
+import { 
+  getUserPermissions, 
+  updateUserPermissions, 
+  UserPermissions, 
+  getPermissionsMap, 
+  savePermissionsMap,
+  loadIDBPermissions 
+} from "@/lib/userPermissionsService";
 
 export interface GoogleRegisteredUser {
   uid: string;
@@ -14,17 +21,39 @@ export interface GoogleRegisteredUser {
   lastLogin?: string;
 }
 
+const LOCAL_STORAGE_DELETED_USERS = "wathaq_deleted_user_emails";
+
+export function getLocalDeletedUserEmails(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(LOCAL_STORAGE_DELETED_USERS) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+export function markUserEmailAsDeleted(email: string): void {
+  try {
+    const deleted = getLocalDeletedUserEmails();
+    const key = email.toLowerCase();
+    if (!deleted.includes(key)) {
+      const updated = [...deleted, key];
+      localStorage.setItem(LOCAL_STORAGE_DELETED_USERS, JSON.stringify(updated));
+    }
+  } catch {}
+}
+
 export function AdminGoogleUsersTab() {
   const [googleUsers, setGoogleUsers] = useState<GoogleRegisteredUser[]>(() => {
     try {
-      const saved = localStorage.getItem("wathaq_registered_google_users");
-      return saved ? JSON.parse(saved) : [];
+      const saved: GoogleRegisteredUser[] = JSON.parse(localStorage.getItem("wathaq_registered_google_users") || "[]");
+      const deleted = getLocalDeletedUserEmails();
+      return saved.filter((u) => u.email && !deleted.includes(u.email.toLowerCase()));
     } catch {
       return [];
     }
   });
 
-  const [permissionsMap, setPermissionsMap] = useState<Record<string, UserPermissions>>({});
+  const [permissionsMap, setPermissionsMap] = useState<Record<string, UserPermissions>>(getPermissionsMap());
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState<boolean>(true);
   const [newEmailInput, setNewEmailInput] = useState("");
@@ -32,6 +61,7 @@ export function AdminGoogleUsersTab() {
 
   useEffect(() => {
     const userMap = new Map<string, GoogleRegisteredUser>();
+    const cloudPermissionsMap: Record<string, UserPermissions> = {};
 
     const firebaseConsoleAccounts: GoogleRegisteredUser[] = [
       {
@@ -57,28 +87,53 @@ export function AdminGoogleUsersTab() {
       }
     ];
 
+    const deletedEmails = getLocalDeletedUserEmails();
+
     firebaseConsoleAccounts.forEach((u) => {
-      userMap.set(u.email.toLowerCase(), u);
-      try {
-        setDoc(doc(db, "global_registered_users", u.uid), u, { merge: true });
-        setDoc(doc(db, "google_registered_users", u.uid), u, { merge: true });
-        setDoc(doc(db, "users", u.uid), u, { merge: true });
-        saveIDBUser(u);
-      } catch {}
+      const key = u.email.toLowerCase();
+      if (!deletedEmails.includes(key)) {
+        userMap.set(key, u);
+        try {
+          setDoc(doc(db, "global_registered_users", u.uid), u, { merge: true });
+          setDoc(doc(db, "google_registered_users", u.uid), u, { merge: true });
+          setDoc(doc(db, "users", u.uid), u, { merge: true });
+          saveIDBUser(u);
+        } catch {}
+      }
     });
 
     try {
       const saved = JSON.parse(localStorage.getItem("wathaq_registered_google_users") || "[]");
       saved.forEach((u: GoogleRegisteredUser) => {
-        if (u.email) userMap.set(u.email.toLowerCase(), u);
+        if (u.email && !deletedEmails.includes(u.email.toLowerCase())) {
+          userMap.set(u.email.toLowerCase(), u);
+        }
       });
     } catch {}
 
+    // Restore durable IndexedDB backups if LocalStorage was cleared
+    loadIDBPermissions().then((idbPerms) => {
+      const currentMap = getPermissionsMap();
+      let changed = false;
+      Object.keys(idbPerms).forEach((key) => {
+        if (!currentMap[key]) {
+          currentMap[key] = idbPerms[key];
+          changed = true;
+        }
+      });
+      if (changed) {
+        savePermissionsMap(currentMap);
+        setPermissionsMap({ ...currentMap });
+      }
+    });
+
     loadIDBUsers().then((idbUsers) => {
       let changed = false;
+      const currentDeleted = getLocalDeletedUserEmails();
       idbUsers.forEach((u) => {
-        if (u.email && !userMap.has(u.email.toLowerCase())) {
-          userMap.set(u.email.toLowerCase(), u);
+        const key = u.email ? u.email.toLowerCase() : "";
+        if (key && !currentDeleted.includes(key) && !userMap.has(key)) {
+          userMap.set(key, u);
           changed = true;
         }
       });
@@ -86,16 +141,23 @@ export function AdminGoogleUsersTab() {
     });
 
     const updateUserList = () => {
-      const list = Array.from(userMap.values());
+      const currentDeleted = getLocalDeletedUserEmails();
+      const list = Array.from(userMap.values()).filter((u) => u.email && !currentDeleted.includes(u.email.toLowerCase()));
       setGoogleUsers(list);
 
-      // Load permissions
-      const pMap: Record<string, UserPermissions> = {};
+      // Load merged permissions
+      const localMap = getPermissionsMap();
+      const pMap: Record<string, UserPermissions> = { ...localMap, ...cloudPermissionsMap };
       list.forEach((u) => {
         if (u.email) {
-          pMap[u.email.toLowerCase()] = getUserPermissions(u.uid, u.email);
+          const key = u.email.toLowerCase();
+          if (!pMap[key]) {
+            pMap[key] = getUserPermissions(u.uid, u.email);
+          }
         }
       });
+
+      savePermissionsMap(pMap);
       setPermissionsMap(pMap);
 
       try {
@@ -103,7 +165,7 @@ export function AdminGoogleUsersTab() {
       } catch {}
 
       list.forEach((u) => {
-        if (u.uid && u.email) {
+        if (u.uid && u.email && !currentDeleted.includes(u.email.toLowerCase())) {
           try {
             setDoc(doc(db, "global_registered_users", u.uid), u, { merge: true });
             setDoc(doc(db, "google_registered_users", u.uid), u, { merge: true });
@@ -115,10 +177,20 @@ export function AdminGoogleUsersTab() {
     };
 
     const processSnapshot = (snap: any) => {
+      const currentDeleted = getLocalDeletedUserEmails();
+
       snap.docs.forEach((docSnap: any) => {
         const d = docSnap.data();
         const email = d.email || d.userEmail || d.mail;
         if (email) {
+          const emailKey = email.toLowerCase();
+
+          // Skip blacklisted deleted users
+          if (currentDeleted.includes(emailKey) || d.deletedAt) {
+            userMap.delete(emailKey);
+            return;
+          }
+
           const userObj: GoogleRegisteredUser = {
             uid: d.uid || docSnap.id || email,
             displayName: d.displayName || d.name || d.userName || email.split("@")[0],
@@ -127,7 +199,20 @@ export function AdminGoogleUsersTab() {
             provider: d.provider || "Google 🔵",
             lastLogin: d.lastLogin || d.createdAt || d.joinDate || "مسجل في المنصة"
           };
-          userMap.set(email.toLowerCase(), userObj);
+          userMap.set(emailKey, userObj);
+
+          // Extract Cloud Firestore permissions
+          if (d.permissions) {
+            cloudPermissionsMap[emailKey] = d.permissions as UserPermissions;
+          } else if (d.role || d.canDirectPublish !== undefined || d.canAccessAdmin !== undefined) {
+            cloudPermissionsMap[emailKey] = {
+              uid: d.uid || docSnap.id || email,
+              email: email,
+              role: d.role || "student",
+              canDirectPublish: !!d.canDirectPublish,
+              canAccessAdmin: !!d.canAccessAdmin
+            };
+          }
         }
       });
       updateUserList();
@@ -147,6 +232,26 @@ export function AdminGoogleUsersTab() {
         unsubs.push(unsub);
       } catch (e) {}
     });
+
+    // Subscriptions to deleted users markers
+    try {
+      const deletedCol = collection(db, "global_deleted_items");
+      const unsubDel = onSnapshot(deletedCol, (snap) => {
+        let changed = false;
+        snap.docs.forEach((d) => {
+          const data = d.data();
+          if (data.itemType === "user" && data.email) {
+            markUserEmailAsDeleted(data.email);
+            if (userMap.has(data.email.toLowerCase())) {
+              userMap.delete(data.email.toLowerCase());
+              changed = true;
+            }
+          }
+        });
+        if (changed) updateUserList();
+      });
+      unsubs.push(unsubDel);
+    } catch (e) {}
 
     const timer = setTimeout(() => setLoading(false), 2000);
 
@@ -169,6 +274,13 @@ export function AdminGoogleUsersTab() {
       lastLogin: new Date().toLocaleDateString("ar-SA")
     };
 
+    // Remove from deleted list if re-added manually
+    try {
+      const currentDeleted = getLocalDeletedUserEmails();
+      const updatedDeleted = currentDeleted.filter((item) => item !== email.toLowerCase());
+      localStorage.setItem(LOCAL_STORAGE_DELETED_USERS, JSON.stringify(updatedDeleted));
+    } catch {}
+
     const updated = [newUser, ...googleUsers.filter((u) => u.email.toLowerCase() !== email.toLowerCase())];
     setGoogleUsers(updated);
     try {
@@ -188,9 +300,17 @@ export function AdminGoogleUsersTab() {
       return;
     }
 
-    const updated = googleUsers.filter((u) => u.email.toLowerCase() !== userObj.email.toLowerCase());
+    const emailKey = userObj.email.toLowerCase();
+    
+    // 1. Mark email as blacklisted in local state & durable storage
+    markUserEmailAsDeleted(userObj.email);
+    await deleteIDBUser(userObj.email);
+
+    // 2. Instantly update UI list
+    const updated = googleUsers.filter((u) => u.email.toLowerCase() !== emailKey);
     setGoogleUsers(updated);
 
+    // 3. Delete from Cloud Firestore & set global deletion record
     try {
       localStorage.setItem("wathaq_registered_google_users", JSON.stringify(updated));
       if (userObj.uid) {
@@ -199,6 +319,18 @@ export function AdminGoogleUsersTab() {
         await deleteDoc(doc(db, "users", userObj.uid)).catch(() => {});
         await deleteDoc(doc(db, "registered_users", userObj.uid)).catch(() => {});
       }
+
+      await deleteDoc(doc(db, "global_registered_users", emailKey)).catch(() => {});
+      await deleteDoc(doc(db, "google_registered_users", emailKey)).catch(() => {});
+      await deleteDoc(doc(db, "users", emailKey)).catch(() => {});
+
+      // Record global deletion marker in Firestore
+      await setDoc(doc(db, "global_deleted_items", `user-${emailKey}`), {
+        itemId: `user-${emailKey}`,
+        email: emailKey,
+        itemType: "user",
+        deletedAt: new Date().toISOString()
+      }).catch(() => {});
     } catch (err) {
       console.warn("Delete user warning:", err);
     }
@@ -351,7 +483,7 @@ export function AdminGoogleUsersTab() {
                       onChange={(e) => handleChangeRole(userObj, e.target.value as any)}
                       className="bg-surface-container-high text-on-surface border border-outline-variant/40 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-primary font-bold"
                     >
-                      <option value="student">طالب عالي 🎓</option>
+                      <option value="student">طالب 🎓</option>
                       <option value="trusted_publisher">ناشر موثوق 🌟</option>
                       <option value="admin">مدير أدمن 👑</option>
                     </select>

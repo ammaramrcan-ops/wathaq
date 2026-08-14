@@ -77,6 +77,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             lastLogin: new Date().toLocaleDateString("ar-SA")
           };
           try {
+            // Un-blacklist email if user actively logs in with Google
+            const deletedStr = localStorage.getItem("wathaq_deleted_user_emails") || "[]";
+            const deletedArr: string[] = JSON.parse(deletedStr);
+            const updatedDeleted = deletedArr.filter((e) => e !== fbUser.email?.toLowerCase());
+            localStorage.setItem("wathaq_deleted_user_emails", JSON.stringify(updatedDeleted));
+
             const saved = JSON.parse(localStorage.getItem("wathaq_registered_google_users") || "[]");
             const filtered = saved.filter((item: any) => item.email !== fbUser.email);
             localStorage.setItem("wathaq_registered_google_users", JSON.stringify([userRec, ...filtered]));

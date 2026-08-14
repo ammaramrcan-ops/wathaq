@@ -16,7 +16,7 @@ import {
   deleteCustomContent 
 } from "@/lib/contentService";
 import { subscribeTeachers, deleteTeacher, addTeacher, TeacherEvaluation } from "@/lib/teacherService";
-import { getUserPermissions } from "@/lib/userPermissionsService";
+import { getUserPermissions, subscribeUserPermissions, UserPermissions } from "@/lib/userPermissionsService";
 
 interface AdminUser {
   id: string;
@@ -72,10 +72,19 @@ const ADMIN_EMAIL = "ammaramrcan@gmail.com";
 
 export default function Admin() {
   const { user, loginWithGoogle, logout } = useAuth();
-  // No mock users - start clean
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [contentList, setContentList] = useState<CustomContent[]>([]);
   const [teachers, setTeachers] = useState<TeacherEvaluation[]>([]);
+  const [userPermsState, setUserPermsState] = useState<UserPermissions | null>(null);
+
+  useEffect(() => {
+    if (user?.email) {
+      const unsub = subscribeUserPermissions(user.uid, user.email, (perm) => {
+        setUserPermsState(perm);
+      });
+      return () => unsub();
+    }
+  }, [user?.uid, user?.email]);
 
   // Curriculum Management State
   const [curriculum, setCurriculum] = useState<Record<string, string[]>>(getStoredCurriculum());
@@ -225,8 +234,12 @@ export default function Admin() {
     setTSummary("");
   };
 
-  const userPerms = user ? getUserPermissions(user.uid, user.email || "") : null;
-  const isAuthorizedAdmin = user?.email === ADMIN_EMAIL || userPerms?.canAccessAdmin || userPerms?.role === "admin";
+  const fallbackPerms = user ? getUserPermissions(user.uid, user.email || "") : null;
+  const activePerms = userPermsState || fallbackPerms;
+  const isAuthorizedAdmin = 
+    (user?.email && user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) || 
+    activePerms?.canAccessAdmin || 
+    activePerms?.role === "admin";
 
   if (!isAuthorizedAdmin) {
     return (

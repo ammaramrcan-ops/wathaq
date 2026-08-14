@@ -12,6 +12,63 @@ export interface UserPermissions {
 const LOCAL_STORAGE_PERMISSIONS = "wathaq_users_permissions_map";
 const HARDCODED_ADMIN_EMAIL = "ammaramrcan@gmail.com";
 
+// Native IndexedDB helper for user permissions
+const IDB_NAME = "wathaq_durable_storage";
+const IDB_PERM_STORE = "user_permissions_store";
+
+function openIDBPermissions(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    if (!window.indexedDB) return reject("No IndexedDB");
+    const req = window.indexedDB.open(IDB_NAME, 3);
+    req.onupgradeneeded = (e: any) => {
+      const idb = req.result;
+      if (!idb.objectStoreNames.contains(IDB_PERM_STORE)) {
+        idb.createObjectStore(IDB_PERM_STORE, { keyPath: "emailKey" });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function saveIDBPermission(perm: UserPermissions): Promise<void> {
+  try {
+    if (!perm.email) return;
+    const idb = await openIDBPermissions();
+    const tx = idb.transaction(IDB_PERM_STORE, "readwrite");
+    tx.objectStore(IDB_PERM_STORE).put({ ...perm, emailKey: perm.email.toLowerCase() });
+  } catch (e) {}
+}
+
+export async function loadIDBPermissions(): Promise<Record<string, UserPermissions>> {
+  try {
+    const idb = await openIDBPermissions();
+    return new Promise((resolve) => {
+      const tx = idb.transaction(IDB_PERM_STORE, "readonly");
+      const req = tx.objectStore(IDB_PERM_STORE).getAll();
+      req.onsuccess = () => {
+        const records = req.result || [];
+        const map: Record<string, UserPermissions> = {};
+        records.forEach((r: any) => {
+          if (r.emailKey) {
+            map[r.emailKey] = {
+              uid: r.uid,
+              email: r.email,
+              role: r.role || "student",
+              canDirectPublish: !!r.canDirectPublish,
+              canAccessAdmin: !!r.canAccessAdmin
+            };
+          }
+        });
+        resolve(map);
+      };
+      req.onerror = () => resolve({});
+    });
+  } catch (e) {
+    return {};
+  }
+}
+
 /**
  * Get local permissions map for all users
  */
@@ -25,9 +82,32 @@ export function getPermissionsMap(): Record<string, UserPermissions> {
 }
 
 /**
+ * Save permissions map to LocalStorage & IndexedDB
+ */
+export function savePermissionsMap(map: Record<string, UserPermissions>): void {
+  try {
+    localStorage.setItem(LOCAL_STORAGE_PERMISSIONS, JSON.stringify(map));
+  } catch (e) {}
+
+  Object.values(map).forEach((perm) => {
+    saveIDBPermission(perm);
+  });
+}
+
+/**
  * Get permissions for a specific user
  */
 export function getUserPermissions(uid: string, email: string): UserPermissions {
+  if (!email) {
+    return {
+      uid: uid || "guest",
+      email: "",
+      role: "student",
+      canDirectPublish: false,
+      canAccessAdmin: false
+    };
+  }
+
   const isDefaultAdmin = email.toLowerCase() === HARDCODED_ADMIN_EMAIL.toLowerCase();
 
   if (isDefaultAdmin) {
@@ -46,7 +126,6 @@ export function getUserPermissions(uid: string, email: string): UserPermissions 
     return map[key];
   }
 
-  // Default permissions for new users
   return {
     uid,
     email,
@@ -57,7 +136,7 @@ export function getUserPermissions(uid: string, email: string): UserPermissions 
 }
 
 /**
- * Update user permissions in LocalStorage & Firestore
+ * Update user permissions in LocalStorage, IndexedDB & Cloud Firestore
  */
 export async function updateUserPermissions(
   uid: string,
@@ -72,14 +151,14 @@ export async function updateUserPermissions(
     email: email || current.email
   };
 
-  // 1. Save to LocalStorage map
+  // 1. LocalStorage & IndexedDB
   try {
     const map = getPermissionsMap();
     map[email.toLowerCase()] = updated;
-    localStorage.setItem(LOCAL_STORAGE_PERMISSIONS, JSON.stringify(map));
+    savePermissionsMap(map);
   } catch (err) {}
 
-  // 2. Save to Cloud Firestore user document
+  // 2. Cloud Firestore sync
   try {
     const userDocRef = doc(db, "users", uid || email);
     await setDoc(userDocRef, { permissions: updated, role: updated.role, canDirectPublish: updated.canDirectPublish, canAccessAdmin: updated.canAccessAdmin }, { merge: true });
@@ -103,6 +182,18 @@ export function subscribeUserPermissions(
 ): () => void {
   onUpdate(getUserPermissions(uid, email));
 
+  // Also check IndexedDB backup if LocalStorage was cleared
+  loadIDBPermissions().then((idbMap) => {
+    if (email && idbMap[email.toLowerCase()]) {
+      const localMap = getPermissionsMap();
+      if (!localMap[email.toLowerCase()]) {
+        localMap[email.toLowerCase()] = idbMap[email.toLowerCase()];
+        savePermissionsMap(localMap);
+        onUpdate(idbMap[email.toLowerCase()]);
+      }
+    }
+  });
+
   let unsub: (() => void) | null = null;
   if (uid || email) {
     try {
@@ -112,16 +203,22 @@ export function subscribeUserPermissions(
         (snap) => {
           if (snap.exists()) {
             const data = snap.data();
+            let perm: UserPermissions | null = null;
             if (data.permissions) {
-              onUpdate(data.permissions as UserPermissions);
+              perm = data.permissions as UserPermissions;
             } else if (data.role || data.canDirectPublish !== undefined || data.canAccessAdmin !== undefined) {
-              const perm: UserPermissions = {
+              perm = {
                 uid: data.uid || uid,
                 email: data.email || email,
                 role: data.role || "student",
                 canDirectPublish: !!data.canDirectPublish,
                 canAccessAdmin: !!data.canAccessAdmin
               };
+            }
+            if (perm && email) {
+              const map = getPermissionsMap();
+              map[email.toLowerCase()] = perm;
+              savePermissionsMap(map);
               onUpdate(perm);
             }
           }

@@ -1,3 +1,6 @@
+import { db } from "./firebase";
+import { doc, setDoc, onSnapshot } from "firebase/firestore";
+
 export type SystemType = "azhar" | "general";
 
 export interface StudentAcademicProfile {
@@ -28,6 +31,14 @@ export const DEFAULT_CURRICULUM: Record<string, string[]> = {
   ]
 };
 
+const LOCAL_STORAGE_ACADEMIC_PROFILE = "wathaq_student_academic_profile";
+
+export const DEFAULT_ACADEMIC_PROFILE: StudentAcademicProfile = {
+  system: "general",
+  branch: "science",
+  grade: "3rd"
+};
+
 export function getStoredCurriculum(): Record<string, string[]> {
   try {
     const saved = localStorage.getItem("wathaq_curriculum_subjects");
@@ -41,6 +52,107 @@ export function saveStoredCurriculum(data: Record<string, string[]>) {
   try {
     localStorage.setItem("wathaq_curriculum_subjects", JSON.stringify(data));
   } catch (e) {}
+}
+
+export function getStoredStudentProfile(): StudentAcademicProfile {
+  try {
+    const saved = localStorage.getItem(LOCAL_STORAGE_ACADEMIC_PROFILE);
+    return saved ? JSON.parse(saved) : DEFAULT_ACADEMIC_PROFILE;
+  } catch {
+    return DEFAULT_ACADEMIC_PROFILE;
+  }
+}
+
+/**
+ * Save student academic profile to LocalStorage & Cloud Firestore
+ */
+export async function saveStoredStudentProfile(
+  profile: StudentAcademicProfile,
+  userId?: string
+): Promise<void> {
+  // 1. LocalStorage update
+  try {
+    localStorage.setItem(LOCAL_STORAGE_ACADEMIC_PROFILE, JSON.stringify(profile));
+  } catch (e) {}
+
+  // 2. Firestore Cloud sync
+  try {
+    const effectiveUid = userId || "guest_academic_profile";
+    const profileDocRef = doc(db, "academic_profiles", effectiveUid);
+    await setDoc(profileDocRef, { ...profile, updatedAt: new Date().toISOString() }, { merge: true });
+
+    if (userId) {
+      const userDocRef = doc(db, "users", userId);
+      await setDoc(userDocRef, { academicProfile: profile }, { merge: true });
+    }
+  } catch (err) {
+    console.warn("Firestore academic profile save warning:", err);
+  }
+}
+
+/**
+ * Subscribe to student academic profile changes from Cloud Firestore
+ */
+export function subscribeStudentProfile(
+  userId: string | undefined,
+  onUpdate: (profile: StudentAcademicProfile) => void
+): () => void {
+  // Emit current local state
+  onUpdate(getStoredStudentProfile());
+
+  let unsubGlobal: (() => void) | null = null;
+  let unsubUser: (() => void) | null = null;
+
+  const effectiveUid = userId || "guest_academic_profile";
+
+  try {
+    const profileDocRef = doc(db, "academic_profiles", effectiveUid);
+    unsubGlobal = onSnapshot(
+      profileDocRef,
+      (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data.system && data.branch) {
+            const prof: StudentAcademicProfile = {
+              system: data.system,
+              branch: data.branch,
+              grade: data.grade || "3rd"
+            };
+            try {
+              localStorage.setItem(LOCAL_STORAGE_ACADEMIC_PROFILE, JSON.stringify(prof));
+            } catch {}
+            onUpdate(prof);
+          }
+        }
+      },
+      (err) => console.warn("Firestore academic profile listener warning:", err)
+    );
+
+    if (userId) {
+      const userDocRef = doc(db, "users", userId);
+      unsubUser = onSnapshot(
+        userDocRef,
+        (snap) => {
+          if (snap.exists()) {
+            const data = snap.data();
+            if (data.academicProfile) {
+              const prof = data.academicProfile as StudentAcademicProfile;
+              try {
+                localStorage.setItem(LOCAL_STORAGE_ACADEMIC_PROFILE, JSON.stringify(prof));
+              } catch {}
+              onUpdate(prof);
+            }
+          }
+        },
+        (err) => console.warn("User document profile listener warning:", err)
+      );
+    }
+  } catch (e) {}
+
+  return () => {
+    if (unsubGlobal) unsubGlobal();
+    if (unsubUser) unsubUser();
+  };
 }
 
 export function getSubjectsForProfile(profile: StudentAcademicProfile | null): string[] {

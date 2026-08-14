@@ -1,5 +1,5 @@
 import { db } from "./firebase";
-import { doc, setDoc, onSnapshot } from "firebase/firestore";
+import { doc, setDoc, getDoc, onSnapshot, increment } from "firebase/firestore";
 
 export interface VisitAnalytics {
   totalVisits: number;
@@ -15,19 +15,67 @@ const LOCAL_STORAGE_VISITS = "wathaq_visit_analytics";
 const LOCAL_STORAGE_VISITOR_ID = "wathaq_visitor_id";
 const LOCAL_STORAGE_VISITOR_COUNT = "wathaq_visitor_count";
 
-function getTodayKey(): string {
-  const d = new Date();
-  return d.toISOString().split("T")[0]; // YYYY-MM-DD
+// IndexedDB helper for visit analytics durable storage
+const IDB_NAME = "wathaq_durable_storage";
+const IDB_VISITS_STORE = "visits_analytics_store";
+
+function openIDBVisits(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    if (!window.indexedDB) return reject("No IndexedDB");
+    const req = window.indexedDB.open(IDB_NAME, 4);
+    req.onupgradeneeded = (e: any) => {
+      const idb = req.result;
+      if (!idb.objectStoreNames.contains(IDB_VISITS_STORE)) {
+        idb.createObjectStore(IDB_VISITS_STORE, { keyPath: "key" });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
 }
 
-function getWeekKey(): string {
-  const d = new Date();
-  const year = d.getFullYear();
-  // Simple week calculation
-  const firstJan = new Date(year, 0, 1);
-  const dayOfYear = Math.floor((d.getTime() - firstJan.getTime()) / 86400000);
-  const weekNum = Math.ceil((dayOfYear + firstJan.getDay() + 1) / 7);
-  return `${year}-W${weekNum}`;
+async function saveIDBAnalytics(data: VisitAnalytics): Promise<void> {
+  try {
+    const idb = await openIDBVisits();
+    const tx = idb.transaction(IDB_VISITS_STORE, "readwrite");
+    tx.objectStore(IDB_VISITS_STORE).put({ key: "general_analytics", ...data });
+  } catch (e) {}
+}
+
+async function loadIDBAnalytics(): Promise<VisitAnalytics | null> {
+  try {
+    const idb = await openIDBVisits();
+    return new Promise((resolve) => {
+      const tx = idb.transaction(IDB_VISITS_STORE, "readonly");
+      const req = tx.objectStore(IDB_VISITS_STORE).get("general_analytics");
+      req.onsuccess = () => resolve(req.result ? (req.result as VisitAnalytics) : null);
+      req.onerror = () => resolve(null);
+    });
+  } catch (e) {
+    return null;
+  }
+}
+
+async function saveIDBVisitorId(id: string): Promise<void> {
+  try {
+    const idb = await openIDBVisits();
+    const tx = idb.transaction(IDB_VISITS_STORE, "readwrite");
+    tx.objectStore(IDB_VISITS_STORE).put({ key: "visitor_id", id });
+  } catch (e) {}
+}
+
+async function loadIDBVisitorId(): Promise<string | null> {
+  try {
+    const idb = await openIDBVisits();
+    return new Promise((resolve) => {
+      const tx = idb.transaction(IDB_VISITS_STORE, "readonly");
+      const req = tx.objectStore(IDB_VISITS_STORE).get("visitor_id");
+      req.onsuccess = () => resolve(req.result ? req.result.id : null);
+      req.onerror = () => resolve(null);
+    });
+  } catch (e) {
+    return null;
+  }
 }
 
 export function getLocalVisitsAnalytics(): VisitAnalytics {
@@ -48,91 +96,119 @@ export function getLocalVisitsAnalytics(): VisitAnalytics {
 }
 
 /**
- * Track a page visit automatically
+ * Track a page visit automatically using Cloud Atomic Increments and Durable Backups
  */
 export async function trackVisit(): Promise<VisitAnalytics> {
   let visitorId = "";
   let isRecurring = false;
-  let visitorCount = 1;
 
   try {
     const storedId = localStorage.getItem(LOCAL_STORAGE_VISITOR_ID);
     if (storedId) {
       visitorId = storedId;
-      const countStr = localStorage.getItem(LOCAL_STORAGE_VISITOR_COUNT) || "1";
-      visitorCount = parseInt(countStr, 10) + 1;
-      localStorage.setItem(LOCAL_STORAGE_VISITOR_COUNT, visitorCount.toString());
       isRecurring = true;
     } else {
-      visitorId = "v-" + Date.now() + "-" + Math.random().toString(36).substring(2, 7);
-      localStorage.setItem(LOCAL_STORAGE_VISITOR_ID, visitorId);
-      localStorage.setItem(LOCAL_STORAGE_VISITOR_COUNT, "1");
-      isRecurring = false;
+      // Check durable IndexedDB backup for visitor ID before generating new one
+      const idbId = await loadIDBVisitorId();
+      if (idbId) {
+        visitorId = idbId;
+        isRecurring = true;
+        localStorage.setItem(LOCAL_STORAGE_VISITOR_ID, visitorId);
+      } else {
+        visitorId = "v-" + Date.now() + "-" + Math.random().toString(36).substring(2, 7);
+        localStorage.setItem(LOCAL_STORAGE_VISITOR_ID, visitorId);
+        await saveIDBVisitorId(visitorId);
+        isRecurring = false;
+      }
     }
   } catch {}
 
-  const current = getLocalVisitsAnalytics();
-  const todayKey = getTodayKey();
-  const weekKey = getWeekKey();
-
-  // Load dates map
-  let dailyMap: Record<string, number> = {};
-  let weeklyMap: Record<string, number> = {};
-  let uniqueVisitorsSet = new Set<string>();
-
-  try {
-    const savedDaily = localStorage.getItem("wathaq_daily_visits");
-    if (savedDaily) dailyMap = JSON.parse(savedDaily);
-
-    const savedWeekly = localStorage.getItem("wathaq_weekly_visits");
-    if (savedWeekly) weeklyMap = JSON.parse(savedWeekly);
-
-    const savedUnique = localStorage.getItem("wathaq_unique_visitors");
-    if (savedUnique) uniqueVisitorsSet = new Set(JSON.parse(savedUnique));
-  } catch {}
-
-  // Update counts
-  dailyMap[todayKey] = (dailyMap[todayKey] || 0) + 1;
-  weeklyMap[weekKey] = (weeklyMap[weekKey] || 0) + 1;
-  uniqueVisitorsSet.add(visitorId);
-
-  const totalVisits = (current.totalVisits || 0) + 1;
-  const recurringVisits = (current.recurringVisits || 0) + (isRecurring ? 1 : 0);
-  const uniqueVisitorsCount = uniqueVisitorsSet.size;
-  const repeatVisitorRate = totalVisits > 0 ? Math.round((recurringVisits / totalVisits) * 100) : 0;
-
-  const updatedAnalytics: VisitAnalytics = {
-    totalVisits,
-    dailyVisits: dailyMap[todayKey],
-    weeklyVisits: weeklyMap[weekKey],
-    recurringVisits,
-    uniqueVisitorsCount,
-    repeatVisitorRate,
-    lastVisitTimestamp: new Date().toLocaleTimeString("ar-SA")
-  };
-
-  // Save locally
-  try {
-    localStorage.setItem(LOCAL_STORAGE_VISITS, JSON.stringify(updatedAnalytics));
-    localStorage.setItem("wathaq_daily_visits", JSON.stringify(dailyMap));
-    localStorage.setItem("wathaq_weekly_visits", JSON.stringify(weeklyMap));
-    localStorage.setItem("wathaq_unique_visitors", JSON.stringify(Array.from(uniqueVisitorsSet)));
-  } catch {}
-
-  // Save to Cloud Firestore
+  // Atomically increment metrics in Cloud Firestore
   try {
     const analyticsDocRef = doc(db, "analytics_summary", "general");
-    await setDoc(analyticsDocRef, updatedAnalytics, { merge: true });
-  } catch (err) {}
+    
+    // Read existing doc to calculate repeat rate accurately
+    const currentSnap = await getDoc(analyticsDocRef);
+    let prevTotal = 0;
+    let prevRecurring = 0;
+    let prevUnique = 0;
 
-  return updatedAnalytics;
+    if (currentSnap.exists()) {
+      const data = currentSnap.data();
+      prevTotal = data.totalVisits || 0;
+      prevRecurring = data.recurringVisits || 0;
+      prevUnique = data.uniqueVisitorsCount || 1;
+    }
+
+    const newTotal = prevTotal + 1;
+    const newRecurring = prevRecurring + (isRecurring ? 1 : 0);
+    const newUnique = isRecurring ? prevUnique : prevUnique + 1;
+    const repeatVisitorRate = newTotal > 0 ? Math.round((newRecurring / newTotal) * 100) : 0;
+
+    const updatedAnalytics: VisitAnalytics = {
+      totalVisits: newTotal,
+      dailyVisits: (currentSnap.data()?.dailyVisits || 0) + 1,
+      weeklyVisits: (currentSnap.data()?.weeklyVisits || 0) + 1,
+      recurringVisits: newRecurring,
+      uniqueVisitorsCount: newUnique,
+      repeatVisitorRate,
+      lastVisitTimestamp: new Date().toLocaleTimeString("ar-SA")
+    };
+
+    // Atomic cloud update
+    await setDoc(
+      analyticsDocRef,
+      {
+        totalVisits: increment(1),
+        dailyVisits: increment(1),
+        weeklyVisits: increment(1),
+        recurringVisits: increment(isRecurring ? 1 : 0),
+        uniqueVisitorsCount: isRecurring ? increment(0) : increment(1),
+        repeatVisitorRate,
+        lastVisitTimestamp: updatedAnalytics.lastVisitTimestamp
+      },
+      { merge: true }
+    );
+
+    // Save to LocalStorage & IndexedDB durable backup
+    try {
+      localStorage.setItem(LOCAL_STORAGE_VISITS, JSON.stringify(updatedAnalytics));
+      await saveIDBAnalytics(updatedAnalytics);
+    } catch {}
+
+    return updatedAnalytics;
+  } catch (err) {
+    console.warn("Firestore trackVisit cloud write warning:", err);
+  }
+
+  // Fallback to IndexedDB or LocalStorage if offline
+  const idbAnalytics = await loadIDBAnalytics();
+  if (idbAnalytics) {
+    try {
+      localStorage.setItem(LOCAL_STORAGE_VISITS, JSON.stringify(idbAnalytics));
+    } catch {}
+    return idbAnalytics;
+  }
+
+  return getLocalVisitsAnalytics();
 }
 
 /**
- * Subscribe to visit analytics snapshot
+ * Subscribe to visit analytics snapshot from Cloud Firestore & IndexedDB
  */
 export function subscribeVisitsAnalytics(onUpdate: (analytics: VisitAnalytics) => void): () => void {
+  // Emit current local state
   onUpdate(getLocalVisitsAnalytics());
+
+  // Restore from IndexedDB backup if LocalStorage was cleared
+  loadIDBAnalytics().then((idbAnalytics) => {
+    if (idbAnalytics) {
+      try {
+        localStorage.setItem(LOCAL_STORAGE_VISITS, JSON.stringify(idbAnalytics));
+      } catch {}
+      onUpdate(idbAnalytics);
+    }
+  });
 
   let unsub: (() => void) | null = null;
   try {
@@ -142,7 +218,21 @@ export function subscribeVisitsAnalytics(onUpdate: (analytics: VisitAnalytics) =
       (snap) => {
         if (snap.exists()) {
           const data = snap.data() as VisitAnalytics;
-          onUpdate(data);
+          const totalVisits = data.totalVisits || 1;
+          const recurringVisits = data.recurringVisits || 0;
+          const repeatVisitorRate = totalVisits > 0 ? Math.round((recurringVisits / totalVisits) * 100) : 0;
+
+          const updated: VisitAnalytics = {
+            ...data,
+            repeatVisitorRate
+          };
+
+          try {
+            localStorage.setItem(LOCAL_STORAGE_VISITS, JSON.stringify(updated));
+            saveIDBAnalytics(updated);
+          } catch {}
+
+          onUpdate(updated);
         }
       },
       (err) => console.warn("Visits snapshot warning:", err)

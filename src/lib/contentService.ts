@@ -92,6 +92,15 @@ export async function loadIDBUsers(): Promise<any[]> {
   }
 }
 
+export async function deleteIDBUser(email: string): Promise<void> {
+  try {
+    if (!email) return;
+    const idb = await openIDB();
+    const tx = idb.transaction(IDB_USERS_STORE, "readwrite");
+    tx.objectStore(IDB_USERS_STORE).delete(email.toLowerCase());
+  } catch (e) {}
+}
+
 // In-memory UI subscriber registry for instant local updates
 type DeletedSubscriber = (ids: string[]) => void;
 type CustomSubscriber = (items: CustomContentItem[]) => void;

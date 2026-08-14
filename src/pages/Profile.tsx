@@ -10,7 +10,10 @@ import { useAuth } from "@/context/AuthContext";
 import { 
   StudentAcademicProfile, 
   getSubjectsForProfile, 
-  getProfileLabel 
+  getProfileLabel,
+  saveStoredStudentProfile,
+  subscribeStudentProfile,
+  getStoredStudentProfile
 } from "@/lib/subjectsData";
 import { StageWizardModal } from "@/components/StageWizardModal";
 
@@ -36,19 +39,19 @@ export default function Profile() {
   const [isWizardOpen, setIsWizardOpen] = useState(false);
 
   // Academic Profile State (Azhar vs General & Branch Selection)
-  const [academicProfile, setAcademicProfile] = useState<StudentAcademicProfile>(() => {
-    try {
-      const saved = localStorage.getItem("wathaq_student_academic_profile");
-      return saved ? JSON.parse(saved) : { system: "general", branch: "science", grade: "3rd" };
-    } catch (e) {
-      return { system: "general", branch: "science", grade: "3rd" };
-    }
-  });
+  const [academicProfile, setAcademicProfile] = useState<StudentAcademicProfile>(getStoredStudentProfile());
+
+  useEffect(() => {
+    const unsub = subscribeStudentProfile(user?.uid, (prof) => {
+      setAcademicProfile(prof);
+    });
+    return () => unsub();
+  }, [user?.uid]);
 
   // Save academic profile
-  const handleSaveAcademicProfile = (updated: StudentAcademicProfile) => {
+  const handleSaveAcademicProfile = async (updated: StudentAcademicProfile) => {
     setAcademicProfile(updated);
-    localStorage.setItem("wathaq_student_academic_profile", JSON.stringify(updated));
+    await saveStoredStudentProfile(updated, user?.uid);
   };
 
   // Load custom content created by user
