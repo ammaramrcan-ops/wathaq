@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { Users, Search, CheckCircle2, UserCheck, RefreshCw, Trash2 } from "lucide-react";
+import { Users, Search, CheckCircle2, UserCheck, RefreshCw, Trash2, ShieldCheck, Zap, Lock, Unlock } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot, doc, deleteDoc, setDoc } from "firebase/firestore";
 import { loadIDBUsers, saveIDBUser } from "@/lib/contentService";
+import { getUserPermissions, updateUserPermissions, UserPermissions } from "@/lib/userPermissionsService";
 
 export interface GoogleRegisteredUser {
   uid: string;
@@ -23,6 +24,7 @@ export function AdminGoogleUsersTab() {
     }
   });
 
+  const [permissionsMap, setPermissionsMap] = useState<Record<string, UserPermissions>>({});
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState<boolean>(true);
   const [newEmailInput, setNewEmailInput] = useState("");
@@ -31,7 +33,6 @@ export function AdminGoogleUsersTab() {
   useEffect(() => {
     const userMap = new Map<string, GoogleRegisteredUser>();
 
-    // Seed accounts from Firebase Console directly into Cloud Firestore & Local Map
     const firebaseConsoleAccounts: GoogleRegisteredUser[] = [
       {
         uid: "fZRozjpgrZMZhiJyLPjGqMfW",
@@ -66,7 +67,6 @@ export function AdminGoogleUsersTab() {
       } catch {}
     });
 
-    // Load initial local storage users into map
     try {
       const saved = JSON.parse(localStorage.getItem("wathaq_registered_google_users") || "[]");
       saved.forEach((u: GoogleRegisteredUser) => {
@@ -74,7 +74,6 @@ export function AdminGoogleUsersTab() {
       });
     } catch {}
 
-    // Load durable IndexedDB users
     loadIDBUsers().then((idbUsers) => {
       let changed = false;
       idbUsers.forEach((u) => {
@@ -89,11 +88,20 @@ export function AdminGoogleUsersTab() {
     const updateUserList = () => {
       const list = Array.from(userMap.values());
       setGoogleUsers(list);
+
+      // Load permissions
+      const pMap: Record<string, UserPermissions> = {};
+      list.forEach((u) => {
+        if (u.email) {
+          pMap[u.email.toLowerCase()] = getUserPermissions(u.uid, u.email);
+        }
+      });
+      setPermissionsMap(pMap);
+
       try {
         localStorage.setItem("wathaq_registered_google_users", JSON.stringify(list));
       } catch {}
 
-      // Auto-persist all loaded users into Cloud Firestore to resist browser clearing
       list.forEach((u) => {
         if (u.uid && u.email) {
           try {
@@ -125,9 +133,7 @@ export function AdminGoogleUsersTab() {
       updateUserList();
     };
 
-    // Subscriptions to all potential user collections in Firestore
     const unsubs: (() => void)[] = [];
-
     const collectionsToListen = ["global_registered_users", "google_registered_users", "users", "registered_users", "students"];
 
     collectionsToListen.forEach((colName) => {
@@ -142,7 +148,6 @@ export function AdminGoogleUsersTab() {
       } catch (e) {}
     });
 
-    // Fallback timer if no snapshots respond
     const timer = setTimeout(() => setLoading(false), 2000);
 
     return () => {
@@ -199,6 +204,32 @@ export function AdminGoogleUsersTab() {
     }
   };
 
+  const handleToggleDirectPublish = async (userObj: GoogleRegisteredUser) => {
+    const current = getUserPermissions(userObj.uid, userObj.email);
+    const updated = await updateUserPermissions(userObj.uid, userObj.email, {
+      canDirectPublish: !current.canDirectPublish
+    });
+    setPermissionsMap((prev) => ({ ...prev, [userObj.email.toLowerCase()]: updated }));
+  };
+
+  const handleToggleAdminAccess = async (userObj: GoogleRegisteredUser) => {
+    const current = getUserPermissions(userObj.uid, userObj.email);
+    const updated = await updateUserPermissions(userObj.uid, userObj.email, {
+      canAccessAdmin: !current.canAccessAdmin,
+      role: !current.canAccessAdmin ? "admin" : current.role === "admin" ? "student" : current.role
+    });
+    setPermissionsMap((prev) => ({ ...prev, [userObj.email.toLowerCase()]: updated }));
+  };
+
+  const handleChangeRole = async (userObj: GoogleRegisteredUser, newRole: "admin" | "trusted_publisher" | "student") => {
+    const updated = await updateUserPermissions(userObj.uid, userObj.email, {
+      role: newRole,
+      canDirectPublish: newRole === "admin" || newRole === "trusted_publisher",
+      canAccessAdmin: newRole === "admin"
+    });
+    setPermissionsMap((prev) => ({ ...prev, [userObj.email.toLowerCase()]: updated }));
+  };
+
   const filteredUsers = googleUsers.filter(
     (u) =>
       u.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -211,10 +242,10 @@ export function AdminGoogleUsersTab() {
         <div>
           <h3 className="text-headline-md font-bold text-on-surface flex items-center gap-2">
             <Users className="w-6 h-6 text-primary" />
-            <span>المستخدمون المسجلون بالحسابات الحقيقية عبر Firebase / Google 🔵</span>
+            <span>المستخدمون ورتب الصلاحيات والنشر المباشر 🔵</span>
           </h3>
           <p className="text-label-sm text-on-surface-variant mt-1">
-            يتم فحص وجلب جميع مجموعات المستخدمين المسجلين سابقاً في قواعد البيانات سحابياً تلقائياً.
+            إدارة صلاحية النشر بدون مراجعة وصلاحية دخول لوحة التحكم لجميع الحسابات المسجلة.
           </p>
         </div>
 
@@ -265,7 +296,7 @@ export function AdminGoogleUsersTab() {
         </form>
       )}
 
-      {/* Users Grid or Loading / Empty State */}
+      {/* Users Grid */}
       {loading && googleUsers.length === 0 ? (
         <div className="py-12 flex flex-col items-center justify-center text-center gap-3 bg-surface-container rounded-2xl">
           <RefreshCw className="w-8 h-8 text-primary animate-spin mb-1" />
@@ -273,57 +304,101 @@ export function AdminGoogleUsersTab() {
         </div>
       ) : filteredUsers.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredUsers.map((user) => (
-            <div
-              key={user.uid || user.email}
-              className="bg-surface-container border border-outline-variant/30 hover:border-primary/50 rounded-2xl p-5 flex items-center justify-between gap-3 transition-all hover:shadow-lg relative group"
-            >
-              <div className="flex items-center gap-4 overflow-hidden">
-                {user.photoURL ? (
-                  <img
-                    src={user.photoURL}
-                    alt={user.displayName}
-                    className="w-14 h-14 rounded-full object-cover border-2 border-primary/40 shrink-0"
-                  />
-                ) : (
-                  <div className="w-14 h-14 rounded-full bg-primary/20 text-primary border-2 border-primary/40 flex items-center justify-center font-bold text-xl shrink-0">
-                    {user.displayName ? user.displayName[0] : "G"}
-                  </div>
-                )}
+          {filteredUsers.map((userObj) => {
+            const perm = permissionsMap[userObj.email.toLowerCase()] || getUserPermissions(userObj.uid, userObj.email);
+            return (
+              <div
+                key={userObj.uid || userObj.email}
+                className="bg-surface-container border border-outline-variant/30 hover:border-primary/50 rounded-2xl p-5 flex flex-col gap-3 transition-all hover:shadow-lg relative"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    {userObj.photoURL ? (
+                      <img
+                        src={userObj.photoURL}
+                        alt={userObj.displayName}
+                        className="w-12 h-12 rounded-full object-cover border-2 border-primary/40 shrink-0"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-primary/20 text-primary border-2 border-primary/40 flex items-center justify-center font-bold text-lg shrink-0">
+                        {userObj.displayName ? userObj.displayName[0] : "G"}
+                      </div>
+                    )}
 
-                <div className="flex flex-col gap-1 overflow-hidden">
-                  <div className="flex items-center gap-1.5">
-                    <h4 className="font-bold text-body-md text-on-surface truncate">{user.displayName}</h4>
-                    <span className="text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded-full font-medium shrink-0">
-                      {user.provider || "Google 🔵"}
+                    <div className="flex flex-col gap-0.5 overflow-hidden">
+                      <div className="flex items-center gap-1.5">
+                        <h4 className="font-bold text-body-md text-on-surface truncate">{userObj.displayName}</h4>
+                      </div>
+                      <p className="text-xs text-on-surface-variant font-mono truncate" dir="ltr">{userObj.email}</p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => handleDeleteUser(userObj)}
+                    title="حذف هذا المستخدم"
+                    className="p-2 text-on-surface-variant hover:text-error bg-surface-container-high hover:bg-error/10 border border-outline-variant/20 rounded-xl transition-all cursor-pointer shrink-0"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Role Selector & Controls */}
+                <div className="flex flex-col gap-2 pt-2 border-t border-outline-variant/10">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-on-surface-variant font-medium">رتبة الحساب:</span>
+                    <select
+                      value={perm.role}
+                      onChange={(e) => handleChangeRole(userObj, e.target.value as any)}
+                      className="bg-surface-container-high text-on-surface border border-outline-variant/40 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-primary font-bold"
+                    >
+                      <option value="student">طالب عالي 🎓</option>
+                      <option value="trusted_publisher">ناشر موثوق 🌟</option>
+                      <option value="admin">مدير أدمن 👑</option>
+                    </select>
+                  </div>
+
+                  {/* Direct Publish Permission Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => handleToggleDirectPublish(userObj)}
+                    className={`w-full py-1.5 px-3 rounded-xl border text-xs font-bold flex items-center justify-between transition-all cursor-pointer ${
+                      perm.canDirectPublish
+                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                        : "bg-surface-container-high text-on-surface-variant border-outline-variant/20 hover:border-primary/40"
+                    }`}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <Zap className="w-3.5 h-3.5" />
+                      <span>نشر مباشر (بدون مراجعة)</span>
                     </span>
-                  </div>
+                    <span>{perm.canDirectPublish ? "مُفعل ✅" : "معطل ❌"}</span>
+                  </button>
 
-                  <p className="text-xs text-on-surface-variant font-mono truncate" dir="ltr">{user.email}</p>
-
-                  <div className="flex items-center gap-2 mt-1 text-[11px] text-on-surface-variant/80">
-                    <span>التاريخ / الدخول: {user.lastLogin || "مسجل"}</span>
-                  </div>
+                  {/* Admin Panel Access Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => handleToggleAdminAccess(userObj)}
+                    className={`w-full py-1.5 px-3 rounded-xl border text-xs font-bold flex items-center justify-between transition-all cursor-pointer ${
+                      perm.canAccessAdmin
+                        ? "bg-purple-500/10 text-purple-400 border-purple-500/30"
+                        : "bg-surface-container-high text-on-surface-variant border-outline-variant/20 hover:border-primary/40"
+                    }`}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      <span>دخول لوحة التحكم (أدمن)</span>
+                    </span>
+                    <span>{perm.canAccessAdmin ? "مسموح 🔓" : "مغلق 🔒"}</span>
+                  </button>
                 </div>
               </div>
-
-              <button
-                onClick={() => handleDeleteUser(user)}
-                title="حذف هذا المستخدم من القائمة وقواعد البيانات"
-                className="p-2 text-on-surface-variant hover:text-error bg-surface-container-high hover:bg-error/10 border border-outline-variant/20 rounded-xl transition-all cursor-pointer shrink-0"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <div className="py-16 flex flex-col items-center justify-center text-center gap-3 bg-surface-container border border-dashed border-outline-variant/30 rounded-2xl">
           <UserCheck className="w-12 h-12 text-primary/40 mb-1" />
           <h4 className="text-headline-md text-on-surface font-bold">لا يوجد مستخدمون مسجلون حالياً</h4>
-          <p className="text-body-md text-on-surface-variant max-w-md">
-            يتم فحص واستجلاء المستندات فور قيام أي طالب بدخول المنصة بـ Google أو إنشائه حساباً.
-          </p>
         </div>
       )}
     </div>

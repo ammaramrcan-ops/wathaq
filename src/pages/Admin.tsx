@@ -9,11 +9,14 @@ import { useAuth } from "@/context/AuthContext";
 import { AddContentModal } from "@/components/AddContentModal";
 import { getStoredCurriculum, saveStoredCurriculum } from "@/lib/subjectsData";
 import { AdminGoogleUsersTab } from "@/components/admin/AdminGoogleUsersTab";
+import { AdminVisitsOverviewTab } from "@/components/admin/AdminVisitsOverviewTab";
 import { 
   subscribeCustomContent, 
   approveCustomContent, 
   deleteCustomContent 
 } from "@/lib/contentService";
+import { subscribeTeachers, deleteTeacher, addTeacher, TeacherEvaluation } from "@/lib/teacherService";
+import { getUserPermissions } from "@/lib/userPermissionsService";
 
 interface AdminUser {
   id: string;
@@ -34,20 +37,6 @@ interface CustomContent {
   createdAt: string;
   status?: "approved" | "pending";
   uploaderName?: string;
-}
-
-interface TeacherEvaluation {
-  id: string;
-  name: string;
-  subjectId: string;
-  subjectTitle: string;
-  category: "scientific" | "arabic" | "islamic";
-  rating: number;
-  reviewsCount: number;
-  experience: string;
-  strengths: string[];
-  weaknesses: string[];
-  summary: string;
 }
 
 const initialTeachers: TeacherEvaluation[] = [
@@ -129,10 +118,16 @@ export default function Admin() {
 
   useEffect(() => {
     loadData();
-    const unsub = subscribeCustomContent(user?.uid, (items) => {
+    const unsubContent = subscribeCustomContent(user?.uid, (items) => {
       setContentList(items as CustomContent[]);
     });
-    return () => unsub();
+    const unsubTeachers = subscribeTeachers((list) => {
+      setTeachers(list);
+    });
+    return () => {
+      unsubContent();
+      unsubTeachers();
+    };
   }, [user?.uid]);
 
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -151,10 +146,8 @@ export default function Admin() {
     }
   };
 
-  const handleDeleteTeacher = (id: string) => {
-    const updated = teachers.filter((t) => t.id !== id);
-    setTeachers(updated);
-    localStorage.setItem("wathaq_teachers", JSON.stringify(updated));
+  const handleDeleteTeacher = async (id: string) => {
+    await deleteTeacher(id);
   };
 
   // Add subject specifically to the selected branch key
@@ -207,7 +200,7 @@ export default function Admin() {
     }
   };
 
-  const handleAddTeacherSubmit = (e: FormEvent) => {
+  const handleAddTeacherSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!tName || !tSummary) return;
 
@@ -225,16 +218,15 @@ export default function Admin() {
       weaknesses: ["ملاحظة: الشرح يتطلب التركيز."]
     };
 
-    const updated = [newTeacher, ...teachers];
-    setTeachers(updated);
-    localStorage.setItem("wathaq_teachers", JSON.stringify(updated));
+    await addTeacher(newTeacher);
     setIsAddTeacherOpen(false);
     setTName("");
     setTExperience("");
     setTSummary("");
   };
 
-  const isAuthorizedAdmin = user?.email === ADMIN_EMAIL;
+  const userPerms = user ? getUserPermissions(user.uid, user.email || "") : null;
+  const isAuthorizedAdmin = user?.email === ADMIN_EMAIL || userPerms?.canAccessAdmin || userPerms?.role === "admin";
 
   if (!isAuthorizedAdmin) {
     return (
@@ -809,39 +801,10 @@ export default function Admin() {
 
       {/* OVERVIEW TAB */}
       {activeTab === "overview" && (
-        <div className="flex flex-col gap-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-surface-container-low border border-outline-variant/30 rounded-2xl p-5 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center">
-                <HardDrive className="w-6 h-6" />
-              </div>
-              <div>
-                <p className="text-xs text-on-surface-variant">المحتوى المنشور والمعتمد</p>
-                <h4 className="text-headline-md font-bold text-on-surface">{approvedContent.length} عناصر</h4>
-              </div>
-            </div>
-
-            <div className="bg-surface-container-low border border-outline-variant/30 rounded-2xl p-5 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center">
-                <Clock className="w-6 h-6" />
-              </div>
-              <div>
-                <p className="text-xs text-on-surface-variant">طلبات المراجعة المعلقة</p>
-                <h4 className="text-headline-md font-bold text-on-surface">{pendingContent.length} طلبات</h4>
-              </div>
-            </div>
-
-            <div className="bg-surface-container-low border border-outline-variant/30 rounded-2xl p-5 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/30 text-blue-400 flex items-center justify-center">
-                <Users className="w-6 h-6" />
-              </div>
-              <div>
-                <p className="text-xs text-on-surface-variant">الحسابات المسجلة بـ Google</p>
-                <h4 className="text-headline-md font-bold text-on-surface">مزامنة سحابية حية</h4>
-              </div>
-            </div>
-          </div>
-        </div>
+        <AdminVisitsOverviewTab
+          approvedCount={approvedContent.length}
+          pendingCount={pendingContent.length}
+        />
       )}
 
       {/* Add Subject Modal */}

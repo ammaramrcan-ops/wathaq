@@ -1,10 +1,13 @@
 import React, { useState, useEffect, FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
-import { X, Plus, Link as LinkIcon, FileText, Video, Layers, Share2, HardDrive, CheckCircle2 } from "lucide-react";
+import { 
+  X, Plus, Link as LinkIcon, FileText, Video, Layers, Share2, 
+  HardDrive, CheckCircle2, ChevronRight, ChevronLeft, HelpCircle, Sparkles, ShieldCheck 
+} from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { addCustomContent } from "@/lib/contentService";
-
+import { getUserPermissions } from "@/lib/userPermissionsService";
 import { extractYouTubeThumbnail } from "@/lib/utils";
 
 interface AddContentModalProps {
@@ -26,6 +29,10 @@ export function AddContentModal({
 }: AddContentModalProps) {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
+
+  // Wizard Step state (1: Title/Name, 2: Link, 3: Description, 4: Confirmation)
+  const [wizardStep, setWizardStep] = useState<number>(1);
+
   const [contentType, setContentType] = useState<"book" | "video" | "flashcards" | "mindmaps">(defaultContentType);
   const [title, setTitle] = useState("");
   const [subject, setSubject] = useState(defaultSubject);
@@ -37,6 +44,7 @@ export function AddContentModal({
 
   useEffect(() => {
     if (isOpen) {
+      setWizardStep(1);
       // Auto-detect Subject from URL searchParams or props
       const urlSubject = searchParams.get("subject");
       if (urlSubject) {
@@ -45,18 +53,19 @@ export function AddContentModal({
         setSubject(defaultSubject);
       }
 
-      // Auto-detect ContentType from URL searchParams or props
+      // Auto-detect ContentType from URL pathname, searchParams or props
+      const path = window.location.pathname;
       const urlType = searchParams.get("type");
       const urlFilter = searchParams.get("filter");
 
-      if (urlType === "video" || urlType === "playlist") {
+      if (path.startsWith("/videos") || urlType === "video" || urlType === "playlist") {
         setContentType("video");
+      } else if (path.startsWith("/flashcards") || urlFilter === "flashcards") {
+        setContentType("flashcards");
+      } else if (path.startsWith("/books") || urlFilter === "school" || urlFilter === "notes" || urlFilter === "summaries") {
+        setContentType("book");
       } else if (urlFilter === "mindmaps") {
         setContentType("mindmaps");
-      } else if (urlFilter === "flashcards") {
-        setContentType("flashcards");
-      } else if (urlFilter === "school" || urlFilter === "notes" || urlFilter === "summaries") {
-        setContentType("book");
       } else {
         setContentType(defaultContentType);
       }
@@ -67,12 +76,19 @@ export function AddContentModal({
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (isSubmitting || !title || !linkUrl) return;
+    if (isSubmitting || !title.trim() || !linkUrl.trim()) return;
 
     setIsSubmitting(true);
     try {
-      // Check if user is the authorized admin email "ammaramrcan@gmail.com" or on admin page
-      const isUserAdmin = user?.email === "ammaramrcan@gmail.com" || window.location.pathname.includes("admin");
+      // Check user permissions for direct publishing
+      const userPerms = user ? getUserPermissions(user.uid, user.email || "") : null;
+      const isUserAdmin = 
+        user?.email === "ammaramrcan@gmail.com" || 
+        userPerms?.canDirectPublish || 
+        userPerms?.role === "admin" || 
+        userPerms?.role === "trusted_publisher" || 
+        window.location.pathname.includes("admin");
+
       const status: "approved" | "pending" = isUserAdmin ? "approved" : "pending";
       setSubmittedStatus(status);
 
@@ -86,12 +102,12 @@ export function AddContentModal({
         linkUrl,
         image: ytThumb || "",
         description,
-        status, // "approved" | "pending"
-        uploaderName: isUserAdmin ? "أدمن المنصة" : "طالب مسجل",
-        createdAt: new Date().toLocaleDateString("ar-SA")
+        status,
+        uploaderName: isUserAdmin ? (userPerms?.role === "admin" ? "أدمن المنصة" : "ناشر معتمد") : "طالب مسجل",
+        createdAt: new Date().toLocaleDateString("ar-SA"),
+        userId: user?.uid || "guest_user"
       };
 
-      // Save to LocalStorage & Firestore cloud database
       await addCustomContent(newContentItem, user?.uid);
 
       setSuccess(true);
@@ -102,6 +118,7 @@ export function AddContentModal({
         setTitle("");
         setLinkUrl("");
         setDescription("");
+        setWizardStep(1);
         onClose();
       }, 2000);
     } catch (err) {
@@ -111,239 +128,369 @@ export function AddContentModal({
     }
   };
 
-  const getLinkFieldLabel = () => {
-    switch (contentType) {
-      case "book":
-        return { label: "رابط Google Drive للملف", placeholder: "https://drive.google.com/file/d/...", icon: HardDrive };
-      case "video":
-        return { label: "رابط الفيديو أو قائمة التشغيل", placeholder: "https://www.youtube.com/watch?v=...", icon: Video };
-      case "flashcards":
-      case "mindmaps":
-        return { label: "رابط تحميل مباشر (Direct Download URL)", placeholder: "https://example.com/files/card.pdf", icon: LinkIcon };
-    }
+  const getSubjectTitle = (code: string) => {
+    const map: Record<string, string> = {
+      physics: "الفيزياء",
+      chemistry: "الكيمياء",
+      biology: "الأحياء",
+      math: "الرياضيات",
+      grammar: "النحو والصرف",
+      literature: "الأدب والنصوص",
+      rhetoric: "البلاغة والتعبير",
+      tawheed: "التوحيد والعقيدة",
+      fiqh: "الفقه وأصوله",
+      tafseer: "التفسير وعلوم القرآن",
+      hadith: "الحديث الشريف"
+    };
+    return map[code] || code;
   };
 
-  const linkConfig = getLinkFieldLabel();
-  const LinkFieldIcon = linkConfig.icon;
-
-  const getModalTitle = () => {
-    switch (contentType) {
-      case "video":
-        return "إضافة فيديو / قائمة تشغيل جديدة";
-      case "book":
-        return "إضافة كتاب / ملزمة (Google Drive)";
-      case "flashcards":
-        return "إضافة بطاقة فلاش كارد جديدة";
-      case "mindmaps":
-        return "إضافة خريطة ذهنية جديدة";
-      default:
-        return "إضافة محتوى تعليمي جديد";
+  const getContentTypeTitle = (type: string) => {
+    switch (type) {
+      case "video": return "فيديو / قائمة تشغيل مرئية";
+      case "book": return "كتاب / ملزمة دراسية (Drive)";
+      case "flashcards": return "بطاقة فلاش كارد للمراجعة";
+      case "mindmaps": return "خريطة ذهنية تفاهمية";
+      default: return "محتوى تعليمي";
     }
   };
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
         <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 10 }}
+          initial={{ opacity: 0, scale: 0.95, y: 15 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 10 }}
-          className="relative w-full max-w-lg bg-surface-container rounded-2xl border border-outline-variant/30 p-5 sm:p-8 shadow-2xl max-h-[90vh] overflow-y-auto text-right"
+          exit={{ opacity: 0, scale: 0.95, y: 15 }}
+          className="relative w-full max-w-lg bg-surface-container rounded-3xl border border-outline-variant/30 p-6 sm:p-8 shadow-2xl max-h-[90vh] overflow-y-auto text-right"
         >
           {/* Close Button */}
           <button
             onClick={onClose}
-            className="absolute top-6 left-6 text-on-surface-variant hover:text-primary transition-colors p-1.5 rounded-lg bg-surface-container-high cursor-pointer"
+            className="absolute top-6 left-6 text-on-surface-variant hover:text-primary transition-colors p-2 rounded-xl bg-surface-container-high cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
 
-          {/* Modal Header */}
+          {/* Header Title */}
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center">
-              <Plus className="w-6 h-6" />
+            <div className="w-11 h-11 rounded-2xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center font-bold">
+              <Sparkles className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-headline-md font-headline-md text-on-surface">{getModalTitle()}</h2>
-              <p className="text-label-sm text-on-surface-variant font-light">إضافة محتوى مخصص لهذا القسم</p>
+              <h2 className="text-headline-md font-headline-md text-on-surface">إضافة محتوى خوارزمي متسلسل</h2>
+              <p className="text-label-sm text-on-surface-variant font-light">
+                إجابة سريعة على الأسئلة دون تعقيد الواجهات المزدحمة
+              </p>
             </div>
           </div>
 
+          {/* Stepper Progress Bar */}
+          {!success && (
+            <div className="flex items-center justify-between gap-1 mb-8 bg-surface-container-high p-2 rounded-2xl border border-outline-variant/20">
+              {[
+                { step: 1, label: "1. اسم المصدر" },
+                { step: 2, label: "2. الرابط" },
+                { step: 3, label: "3. الوصف" },
+                { step: 4, label: "4. التأكيد" }
+              ].map((s) => (
+                <div
+                  key={s.step}
+                  onClick={() => s.step < wizardStep && setWizardStep(s.step)}
+                  className={`flex-1 text-center py-1.5 px-1 rounded-xl text-xs font-bold transition-all ${
+                    wizardStep === s.step
+                      ? "bg-primary text-on-primary shadow-md"
+                      : wizardStep > s.step
+                      ? "bg-primary/20 text-primary cursor-pointer hover:bg-primary/30"
+                      : "text-on-surface-variant/50"
+                  }`}
+                >
+                  {s.label}
+                </div>
+              ))}
+            </div>
+          )}
+
           {success ? (
-            <div className="py-12 flex flex-col items-center justify-center text-center gap-3">
+            <div className="py-12 flex flex-col items-center justify-center text-center gap-4 animate-fadeIn">
               <CheckCircle2 className="w-16 h-16 text-primary animate-bounce" />
               {submittedStatus === "approved" ? (
                 <>
-                  <h3 className="text-headline-md text-on-surface">تم النشر والموافقة الفورية!</h3>
-                  <p className="text-body-md text-on-surface-variant">تم حفظ ونشر المحتوى بنجاح لجميع الطلاب.</p>
+                  <h3 className="text-headline-md font-bold text-on-surface">تم النشر والموافقة الفورية! 🚀</h3>
+                  <p className="text-body-md text-on-surface-variant max-w-sm">
+                    تمت إضافة المحتوى واعتماده بشكل مباشر في منصة وثاق.
+                  </p>
                 </>
               ) : (
                 <>
-                  <h3 className="text-headline-md text-on-surface">تمت إضافة الطلب بنجاح!</h3>
-                  <p className="text-body-md text-on-surface-variant">تم إرسال محتواك إلى قائمة مراجعة الأدمن، وسيتم نشره فور اعتماده.</p>
+                  <h3 className="text-headline-md font-bold text-on-surface">تم تقديم الطلب بنجاح! 📋</h3>
+                  <p className="text-body-md text-on-surface-variant max-w-sm">
+                    تم إرسال محتواك إلى قائمة مراجعة المشرفين وسيتم اعتماده قريباً.
+                  </p>
                 </>
               )}
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-              {/* Content Type Selector (Only if not locked) */}
-              {!lockType ? (
-                <div className="flex flex-col gap-2">
-                  <label className="text-label-sm text-on-surface-variant">نوع المحتوى</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setContentType("book")}
-                      className={`py-2.5 px-3 rounded-lg border text-label-sm font-medium flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                        contentType === "book"
-                          ? "bg-primary text-on-primary border-primary"
-                          : "bg-surface-container-high text-on-surface-variant border-outline-variant/30 hover:border-primary/50"
-                      }`}
-                    >
-                      <FileText className="w-4 h-4" />
-                      <span>كتاب / ملزمة (Drive)</span>
-                    </button>
+            <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+              {/* STEP 1: Content Title & Source Name Question */}
+              {wizardStep === 1 && (
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="flex flex-col gap-4"
+                >
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-headline-sm font-bold text-on-surface flex items-center gap-2">
+                      <HelpCircle className="w-5 h-5 text-primary" />
+                      <span>السؤال 1: ما هو اسم المصدر أو عنوان الدرس؟</span>
+                    </label>
+                    <p className="text-body-sm text-on-surface-variant">
+                      اكتب عنواناً واضحاً ومختصراً يساعد الطلاب في العثور عليه بسرعة.
+                    </p>
+                  </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setContentType("video")}
-                      className={`py-2.5 px-3 rounded-lg border text-label-sm font-medium flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                        contentType === "video"
-                          ? "bg-primary text-on-primary border-primary"
-                          : "bg-surface-container-high text-on-surface-variant border-outline-variant/30 hover:border-primary/50"
-                      }`}
-                    >
-                      <Video className="w-4 h-4" />
-                      <span>فيديو / قائمة تشغيل</span>
-                    </button>
+                  <input
+                    type="text"
+                    required
+                    autoFocus
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="مثال: شرح باب النيوتنية والتطبيقات العملية"
+                    className="w-full bg-surface-container-high text-on-surface border border-outline-variant/50 rounded-2xl p-4 text-body-lg focus:outline-none focus:border-primary transition-all shadow-inner"
+                  />
 
-                    <button
-                      type="button"
-                      onClick={() => setContentType("flashcards")}
-                      className={`py-2.5 px-3 rounded-lg border text-label-sm font-medium flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                        contentType === "flashcards"
-                          ? "bg-primary text-on-primary border-primary"
-                          : "bg-surface-container-high text-on-surface-variant border-outline-variant/30 hover:border-primary/50"
-                      }`}
-                    >
-                      <Layers className="w-4 h-4" />
-                      <span>بطاقة فلاش كارد</span>
-                    </button>
+                  {/* Content Type Select or Locked Badge */}
+                  {lockType || window.location.pathname.startsWith("/videos") || window.location.pathname.startsWith("/books") || window.location.pathname.startsWith("/flashcards") ? (
+                    <div className="bg-surface-container-high border border-primary/20 rounded-2xl p-3.5 flex items-center justify-between text-xs mt-1">
+                      <span className="text-on-surface-variant font-medium">القسم المستهدف (مكتشف تلقائياً):</span>
+                      <span className="text-primary font-bold flex items-center gap-1.5 bg-primary/10 border border-primary/20 px-3 py-1 rounded-full">
+                        {contentType === "video" && "🎬 قسم الفيديوهات والشروحات المرئية"}
+                        {contentType === "book" && "📚 قسم الكتب والملازم الدراسية"}
+                        {contentType === "flashcards" && "🗂️ قسم بطاقات الفلاش كارد"}
+                        {contentType === "mindmaps" && "🧠 قسم الخرائط الذهنية"}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2 mt-2">
+                      <label className="text-xs text-on-surface-variant font-bold">نوع المصدر (اختر ما يمثله المحتوى):</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setContentType("book")}
+                          className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-all ${
+                            contentType === "book" ? "bg-primary text-on-primary border-primary" : "bg-surface-container-high text-on-surface-variant border-outline-variant/30"
+                          }`}
+                        >
+                          <FileText className="w-4 h-4" />
+                          <span>كتاب / ملزمة (Drive)</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setContentType("video")}
+                          className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-all ${
+                            contentType === "video" ? "bg-primary text-on-primary border-primary" : "bg-surface-container-high text-on-surface-variant border-outline-variant/30"
+                          }`}
+                        >
+                          <Video className="w-4 h-4" />
+                          <span>فيديو / شرح مرئي</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
+                  <div className="flex justify-end mt-4">
                     <button
                       type="button"
-                      onClick={() => setContentType("mindmaps")}
-                      className={`py-2.5 px-3 rounded-lg border text-label-sm font-medium flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                        contentType === "mindmaps"
-                          ? "bg-primary text-on-primary border-primary"
-                          : "bg-surface-container-high text-on-surface-variant border-outline-variant/30 hover:border-primary/50"
-                      }`}
+                      disabled={!title.trim()}
+                      onClick={() => setWizardStep(2)}
+                      className="bg-primary text-on-primary px-6 py-3 rounded-2xl text-body-md font-bold hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-2 cursor-pointer shadow-lg shadow-primary/10"
                     >
-                      <Share2 className="w-4 h-4" />
-                      <span>خريطة ذهنية</span>
+                      <span>التالي: إضافة الرابط</span>
+                      <ChevronLeft className="w-5 h-5" />
                     </button>
                   </div>
-                </div>
-              ) : (
-                <div className="bg-surface-container-high border border-primary/20 rounded-xl p-3 flex items-center justify-between text-label-sm">
-                  <span className="text-on-surface-variant">القسم المستهدف:</span>
-                  <span className="text-primary font-medium flex items-center gap-1.5">
-                    <LinkFieldIcon className="w-4 h-4" />
-                    {contentType === "video" && "فيديوهات وشروحات مرئية"}
-                    {contentType === "book" && "كتب وملازم (Google Drive)"}
-                    {contentType === "flashcards" && "بطاقات فلاش كارد (رابط مباشر)"}
-                  </span>
-                </div>
+                </motion.div>
               )}
 
-              {/* Title */}
-              <div className="flex flex-col gap-2">
-                <label className="text-label-sm text-on-surface-variant">عنوان المحتوى</label>
-                <input
-                  type="text"
-                  required
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="مثال: شرح درس الحركة والقوانين النيوتنية"
-                  className="bg-surface-container-high text-on-surface border border-outline-variant/50 rounded-lg p-3 text-body-md focus:outline-none focus:border-primary transition-colors"
-                />
-              </div>
-
-              {/* Subject */}
-              <div className="flex flex-col gap-2">
-                <label className="text-label-sm text-on-surface-variant">المادة الدراسية</label>
-                <select
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  className="bg-surface-container-high text-on-surface border border-outline-variant/50 rounded-lg p-3 text-body-md focus:outline-none focus:border-primary transition-colors"
+              {/* STEP 2: Link URL Question */}
+              {wizardStep === 2 && (
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="flex flex-col gap-4"
                 >
-                  <optgroup label="المواد العلمية">
-                    <option value="physics">الفيزياء</option>
-                    <option value="chemistry">الكيمياء</option>
-                    <option value="biology">الأحياء</option>
-                    <option value="math">الرياضيات</option>
-                  </optgroup>
-                  <optgroup label="المواد العربية">
-                    <option value="grammar">النحو والصرف</option>
-                    <option value="literature">الأدب والنصوص</option>
-                    <option value="rhetoric">البلاغة والتعبير</option>
-                  </optgroup>
-                  <optgroup label="المواد الشرعية">
-                    <option value="tawheed">التوحيد والعقيدة</option>
-                    <option value="fiqh">الفقه وأصوله</option>
-                    <option value="tafseer">التفسير وعلوم القرآن</option>
-                    <option value="hadith">الحديث الشريف</option>
-                  </optgroup>
-                </select>
-              </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-headline-sm font-bold text-on-surface flex items-center gap-2">
+                      <LinkIcon className="w-5 h-5 text-primary" />
+                      <span>السؤال 2: ما هو رابط الوصول لهذا المصدر؟</span>
+                    </label>
+                    <p className="text-body-sm text-on-surface-variant">
+                      أدخل رابط Google Drive للمستندات أو رابط YouTube للشروحات.
+                    </p>
+                  </div>
 
-              {/* Link Input (Drive / Video / Direct Download) */}
-              <div className="flex flex-col gap-2">
-                <label className="text-label-sm text-on-surface-variant flex items-center gap-1.5">
-                  <LinkFieldIcon className="w-4 h-4 text-primary" />
-                  <span>{linkConfig.label}</span>
-                </label>
-                <input
-                  type="url"
-                  required
-                  dir="ltr"
-                  value={linkUrl}
-                  onChange={(e) => setLinkUrl(e.target.value)}
-                  placeholder={linkConfig.placeholder}
-                  className="bg-surface-container-high text-on-surface border border-outline-variant/50 rounded-lg p-3 text-body-md focus:outline-none focus:border-primary transition-colors font-mono text-xs"
-                />
-              </div>
+                  <input
+                    type="url"
+                    required
+                    autoFocus
+                    dir="ltr"
+                    value={linkUrl}
+                    onChange={(e) => setLinkUrl(e.target.value)}
+                    placeholder={contentType === "video" ? "https://www.youtube.com/watch?v=..." : "https://drive.google.com/file/d/..."}
+                    className="w-full bg-surface-container-high text-on-surface border border-outline-variant/50 rounded-2xl p-4 text-body-md focus:outline-none focus:border-primary transition-all font-mono text-xs shadow-inner"
+                  />
 
-              {/* Description */}
-              <div className="flex flex-col gap-2">
-                <label className="text-label-sm text-on-surface-variant">الوصف والتفاصيل (اختياري)</label>
-                <textarea
-                  rows={2}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="ملخص قصير أو ملاحظات هامة للطلاب..."
-                  className="bg-surface-container-high text-on-surface border border-outline-variant/50 rounded-lg p-3 text-body-md focus:outline-none focus:border-primary transition-colors"
-                />
-              </div>
+                  <div className="flex justify-between items-center mt-4">
+                    <button
+                      type="button"
+                      onClick={() => setWizardStep(1)}
+                      className="bg-surface-container-high text-on-surface-variant hover:text-on-surface px-5 py-3 rounded-2xl text-body-md font-medium transition-all flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                      <span>السابق</span>
+                    </button>
 
-              {/* Submit */}
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="mt-2 py-3 rounded-xl bg-primary text-on-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-body-md font-medium flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-primary/10"
-              >
-                {isSubmitting ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-on-primary border-t-transparent rounded-full animate-spin"></div>
-                    <span>جاري الحفظ والنشر...</span>
-                  </>
-                ) : (
-                  <>
-                    <Plus className="w-5 h-5" />
-                    <span>حفظ ونشر المحتوى</span>
-                  </>
-                )}
-              </button>
+                    <button
+                      type="button"
+                      disabled={!linkUrl.trim()}
+                      onClick={() => setWizardStep(3)}
+                      className="bg-primary text-on-primary px-6 py-3 rounded-2xl text-body-md font-bold hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-2 cursor-pointer shadow-lg shadow-primary/10"
+                    >
+                      <span>التالي: الوصف للتفاصيل</span>
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* STEP 3: Optional Description Question */}
+              {wizardStep === 3 && (
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="flex flex-col gap-4"
+                >
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-headline-sm font-bold text-on-surface flex items-center gap-2">
+                      <HelpCircle className="w-5 h-5 text-primary" />
+                      <span>السؤال 3: هل ترغب في إضافة وصف أو ملاحظات؟</span>
+                    </label>
+                    <p className="text-body-sm text-on-surface-variant">
+                      (اختياري) يمكنك كتابة نبذة مختصرة عن أهم الفوائد أو التخطي فوراً.
+                    </p>
+                  </div>
+
+                  <textarea
+                    rows={3}
+                    autoFocus
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="ملاحظات توضيحية للطلاب..."
+                    className="w-full bg-surface-container-high text-on-surface border border-outline-variant/50 rounded-2xl p-4 text-body-md focus:outline-none focus:border-primary transition-all shadow-inner"
+                  />
+
+                  <div className="flex justify-between items-center mt-4">
+                    <button
+                      type="button"
+                      onClick={() => setWizardStep(2)}
+                      className="bg-surface-container-high text-on-surface-variant hover:text-on-surface px-5 py-3 rounded-2xl text-body-md font-medium transition-all flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                      <span>السابق</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setWizardStep(4)}
+                      className="bg-primary text-on-primary px-6 py-3 rounded-2xl text-body-md font-bold hover:bg-primary/90 transition-all flex items-center gap-2 cursor-pointer shadow-lg shadow-primary/10"
+                    >
+                      <span>التالي: مراجعة الاكتشاف والتأكيد</span>
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* STEP 4: Automatic Subject & Section Review & Final Confirmation */}
+              {wizardStep === 4 && (
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="flex flex-col gap-5"
+                >
+                  <div className="flex flex-col gap-1">
+                    <h3 className="text-headline-sm font-bold text-on-surface flex items-center gap-2">
+                      <ShieldCheck className="w-5 h-5 text-primary" />
+                      <span>المراجعة والتأكيد النهائي</span>
+                    </h3>
+                    <p className="text-body-sm text-on-surface-variant">
+                      تم الاكتشاف والتعرف على المادة والقسم المباشر تلقائياً:
+                    </p>
+                  </div>
+
+                  {/* Summary Card */}
+                  <div className="bg-surface-container-high border border-primary/30 rounded-2xl p-4 flex flex-col gap-3">
+                    <div className="flex justify-between items-center border-b border-outline-variant/20 pb-2">
+                      <span className="text-xs text-on-surface-variant font-medium">المادة المستهدفة:</span>
+                      <span className="text-xs font-bold text-primary bg-primary/10 border border-primary/20 px-3 py-1 rounded-full">
+                        {getSubjectTitle(subject)}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center border-b border-outline-variant/20 pb-2">
+                      <span className="text-xs text-on-surface-variant font-medium">القسم المكتشف:</span>
+                      <span className="text-xs font-bold text-on-surface">
+                        {getContentTypeTitle(contentType)}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col gap-1 pt-1">
+                      <span className="text-xs text-on-surface-variant font-medium">عنوان المحتوى:</span>
+                      <p className="text-body-md font-bold text-on-surface">{title}</p>
+                    </div>
+
+                    {linkUrl && (
+                      <div className="flex flex-col gap-1 pt-1">
+                        <span className="text-xs text-on-surface-variant font-medium">الرابط المرفق:</span>
+                        <p className="text-xs font-mono text-primary truncate" dir="ltr">{linkUrl}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex justify-between items-center mt-2">
+                    <button
+                      type="button"
+                      onClick={() => setWizardStep(3)}
+                      className="bg-surface-container-high text-on-surface-variant hover:text-on-surface px-5 py-3 rounded-2xl text-body-md font-medium transition-all flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                      <span>تعديل الإجابات</span>
+                    </button>
+
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="bg-primary text-on-primary px-7 py-3.5 rounded-2xl text-body-md font-bold hover:bg-primary/90 disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xl shadow-primary/20"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-on-primary border-t-transparent rounded-full animate-spin"></div>
+                          <span>جاري النشر...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-5 h-5" />
+                          <span>🚀 تأكيد ونشر المحتوى</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </motion.div>
+              )}
             </form>
           )}
         </motion.div>

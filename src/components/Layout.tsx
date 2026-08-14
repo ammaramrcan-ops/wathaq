@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "motion/react";
 import { useAuth } from "@/context/AuthContext";
 import { AddContentModal } from "@/components/AddContentModal";
+import { trackVisit } from "@/lib/visitService";
 
 export function Header() {
   const navigate = useNavigate();
@@ -178,6 +179,8 @@ export function Layout({ children }: { children: ReactNode }) {
   const location = useLocation();
 
   useEffect(() => {
+    trackVisit();
+
     const path = location.pathname;
     if (path === "/") {
       document.title = "وثاق - المنصة التعليمية المجمعة للكتب والملازم والشروحات";

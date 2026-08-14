@@ -5,131 +5,7 @@ import {
   Atom, BookOpen, Compass, Star, CheckCircle2, AlertTriangle, 
   ChevronLeft, ArrowRight, Play, Award, Sparkles, ThumbsUp, ThumbsDown
 } from "lucide-react";
-
-interface TeacherEvaluation {
-  id: string;
-  name: string;
-  subjectId: string;
-  subjectTitle: string;
-  category: "scientific" | "arabic" | "islamic";
-  rating: number;
-  reviewsCount: number;
-  avatar: string;
-  experience: string;
-  strengths: string[];
-  weaknesses: string[];
-  summary: string;
-}
-
-const teachersData: TeacherEvaluation[] = [
-  // الفيزياء
-  {
-    id: "t-phys-1",
-    name: "أ. محمد عبدالسلام",
-    subjectId: "physics",
-    subjectTitle: "الفيزياء",
-    category: "scientific",
-    rating: 4.9,
-    reviewsCount: 142,
-    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200&auto=format&fit=crop",
-    experience: "15 عاماً في تدريس الفيزياء للثانوية العامة",
-    summary: "خبير ومتمكن في ربط الفيزياء بالحياة الواقعية وتيسير مسائل الميكانيكا والكهرباء.",
-    strengths: [
-      "تبسيط المفاهيم المعقدة ورسم توضيحي بصري لكل قانون.",
-      "حل أعقد مسائل الامتحانات بأسلوب متسلسل ومنطقي.",
-      "توفير تجارب افتراضية ممتعة تثبت المعلومة بسهولة."
-    ],
-    weaknesses: [
-      "سرعة الشرح أحياناً في الدروس المتقدمة والفيزياء الحديثة.",
-      "قلة الملازم والمذكرات الورقية المطبوعة (يركز أكثر على الشرح الشفهي والمرئي)."
-    ]
-  },
-  {
-    id: "t-phys-2",
-    name: "د. أحمد سامي",
-    subjectId: "physics",
-    subjectTitle: "الفيزياء",
-    category: "scientific",
-    rating: 4.7,
-    reviewsCount: 98,
-    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=200&auto=format&fit=crop",
-    experience: "12 عاماً، دكتوراه في الفيزياء التطبيقية",
-    summary: "شرح أكاديمي دقيق جداً مناسب للطلاب الراغبين في الفهم العميق والدرجات النهائية.",
-    strengths: [
-      "إحاطة كاملة بكافة الأفكار الاستثنائية والمسائل النادرة في الامتحانات.",
-      "إيقاع هادئ ومنظم جداً في استعراض خطوات الإثباتات الرياضية."
-    ],
-    weaknesses: [
-      "تحتاج المحاضرة إلى تركيز شديد نظراً لجديّة وطول وقت الشرح.",
-      "عدم تنويع وسائل التوضيح التفاعلية."
-    ]
-  },
-
-  // الكيمياء
-  {
-    id: "t-chem-1",
-    name: "أ. سارة حسن",
-    subjectId: "chemistry",
-    subjectTitle: "الكيمياء",
-    category: "scientific",
-    rating: 4.8,
-    reviewsCount: 115,
-    avatar: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=200&auto=format&fit=crop",
-    experience: "10 سنوات في تدريس الكيمياء العضوية والتحليلية",
-    summary: "مبدعة في تسمية وتفاعلات المركبات العضوية وتلخيص المعادلات الصعبة.",
-    strengths: [
-      "خرائط ذهنية رائعة تجمع كافة تفاعلات الكيمياء العضوية في ورقة واحدة.",
-      "متابعة دورية واختبارات قصيرة لتقييم استيعاب الطالب أولاً بأول."
-    ],
-    weaknesses: [
-      "الإطالة أحياناً في شرح الأجزاء التأسيسية البسيطة.",
-      "ندرة الحصص المباشرة للرد الفوري على استفسارات الطلاب."
-    ]
-  },
-
-  // النحو واللغة العربية
-  {
-    id: "t-arb-1",
-    name: "أ. محمود الشنقيطي",
-    subjectId: "grammar",
-    subjectTitle: "النحو والصرف",
-    category: "arabic",
-    rating: 4.9,
-    reviewsCount: 160,
-    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=200&auto=format&fit=crop",
-    experience: "18 عاماً في تدريس لغة الضاد والبلاغة",
-    summary: "أسلوب أعرابي ممتع يعتمد على التذوق اللغوي وفهم المعنى قبل تطبيق القواعد.",
-    strengths: [
-      "قدرة فائقة على جعل مادة النحو ممتعة وسلسة لأي طالب.",
-      "تطبيقات مكثفة على شواهد القرآن الكريم والأبيات الشعرية."
-    ],
-    weaknesses: [
-      "يتوسع أحياناً في الخلافات النحوية القديمة بين البصريين والكوفيين.",
-      "وقت الشرح قد يكون طويلاً على الطلاب الراغبين في المراجعة السريعة."
-    ]
-  },
-
-  // التوحيد والشرعيات
-  {
-    id: "t-isl-1",
-    name: "الشيخ د. عبدالرحمن",
-    subjectId: "tawheed",
-    subjectTitle: "التوحيد والعقيدة",
-    category: "islamic",
-    rating: 5.0,
-    reviewsCount: 130,
-    avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=200&auto=format&fit=crop",
-    experience: "20 عاماً في العلوم الشرعية والتربوية",
-    summary: "شرح ميسر ومؤصل لأبواب العقيدة والفقه مع استخراج الدروس والفوائد التربوية.",
-    strengths: [
-      "هدوء تام وسلاسة في عرض الأدلة والترتيب المنهجي للأفكار.",
-      "ربط المسائل الشرعية بالجانب الإيماني والأخلاقي للطالب."
-    ],
-    weaknesses: [
-      "الإيقاع هادئ جداً قد يتطلب زيادة سرعة الفيديو للبعض."
-    ]
-  }
-];
+import { subscribeTeachers, TeacherEvaluation } from "@/lib/teacherService";
 
 export default function Teachers() {
   const [step, setStep] = useState<number>(1);
@@ -138,17 +14,10 @@ export default function Teachers() {
   const [teachers, setTeachers] = useState<TeacherEvaluation[]>([]);
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem("wathaq_teachers");
-      if (saved) {
-        setTeachers(JSON.parse(saved));
-      } else {
-        setTeachers(teachersData);
-        localStorage.setItem("wathaq_teachers", JSON.stringify(teachersData));
-      }
-    } catch (err) {
-      setTeachers(teachersData);
-    }
+    const unsub = subscribeTeachers((list) => {
+      setTeachers(list);
+    });
+    return () => unsub();
   }, []);
 
   const availableTeachers = teachers.filter((t) => t.subjectId === selectedSubject);
