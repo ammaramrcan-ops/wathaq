@@ -2,7 +2,7 @@ import { useState, useEffect, FormEvent } from "react";
 import { motion } from "motion/react";
 import { 
   Users, UserCheck, Eye, RefreshCw, HardDrive, Video, Layers, 
-  Trash2, ExternalLink, Plus, ShieldCheck, BarChart3, TrendingUp, CheckCircle, Clock, Lock, Award, Star, BookOpen, FolderPlus, GraduationCap, Check
+  Trash2, ExternalLink, Plus, ShieldCheck, BarChart3, TrendingUp, CheckCircle, Clock, Lock, Award, Star, BookOpen, FolderPlus, GraduationCap, Check, Edit3, Save
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { AddContentModal } from "@/components/AddContentModal";
@@ -160,6 +160,24 @@ export default function Admin() {
     saveStoredCurriculum(updatedCurriculum);
     setIsAddSubjectOpen(false);
     setNewSubjectName("");
+  };
+
+  // Subject Name Editing State
+  const [editingSubjectOldName, setEditingSubjectOldName] = useState<string | null>(null);
+  const [editingSubjectNewValue, setEditingSubjectNewValue] = useState<string>("");
+
+  const handleEditSubjectInBranch = (oldName: string, newName: string) => {
+    if (!newName.trim() || oldName === newName.trim()) {
+      setEditingSubjectOldName(null);
+      return;
+    }
+    const currentBranchSubjects = curriculum[selectedBranchKey] || [];
+    const updatedBranchSubjects = currentBranchSubjects.map((s) => (s === oldName ? newName.trim() : s));
+    const updatedCurriculum = { ...curriculum, [selectedBranchKey]: updatedBranchSubjects };
+
+    setCurriculum(updatedCurriculum);
+    saveStoredCurriculum(updatedCurriculum);
+    setEditingSubjectOldName(null);
   };
 
   // Delete subject specifically from selected branch key
@@ -498,20 +516,55 @@ export default function Admin() {
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-stack-md">
               {currentBranchSubjects.map((sub, idx) => (
                 <div key={idx} className="bg-surface-container p-4 rounded-2xl border border-outline-variant/20 flex justify-between items-center shadow-sm hover:border-primary/50 transition-all">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center font-bold">
+                  <div className="flex items-center gap-3 flex-grow overflow-hidden">
+                    <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center font-bold shrink-0">
                       <BookOpen className="w-4 h-4" />
                     </div>
-                    <span className="font-bold text-body-md text-on-surface">{sub}</span>
+
+                    {editingSubjectOldName === sub ? (
+                      <div className="flex items-center gap-1.5 flex-grow">
+                        <input
+                          type="text"
+                          value={editingSubjectNewValue}
+                          onChange={(e) => setEditingSubjectNewValue(e.target.value)}
+                          className="bg-surface-container-high border border-primary px-2.5 py-1 rounded-lg text-body-md text-on-surface w-full focus:outline-none"
+                          autoFocus
+                        />
+                        <button
+                          onClick={() => handleEditSubjectInBranch(sub, editingSubjectNewValue)}
+                          className="text-primary hover:bg-primary/10 p-1.5 rounded-lg cursor-pointer"
+                          title="حفظ التعديل"
+                        >
+                          <Save className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="font-bold text-body-md text-on-surface truncate">{sub}</span>
+                    )}
                   </div>
 
-                  <button
-                    onClick={() => handleDeleteSubjectFromBranch(sub)}
-                    className="text-error hover:bg-error/10 p-2 rounded-lg transition-colors cursor-pointer"
-                    title="حذف هذه المادة من الشعبة"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {editingSubjectOldName !== sub && (
+                      <button
+                        onClick={() => {
+                          setEditingSubjectOldName(sub);
+                          setEditingSubjectNewValue(sub);
+                        }}
+                        className="text-on-surface-variant hover:text-primary hover:bg-surface-container-high p-1.5 rounded-lg transition-colors cursor-pointer"
+                        title="تعديل اسم المادة"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => handleDeleteSubjectFromBranch(sub)}
+                      className="text-error hover:bg-error/10 p-1.5 rounded-lg transition-colors cursor-pointer"
+                      title="حذف هذه المادة"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
