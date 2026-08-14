@@ -106,7 +106,7 @@ export function AddContentModal({
           initial={{ opacity: 0, scale: 0.95, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 10 }}
-          className="relative w-full max-w-lg bg-surface-container rounded-2xl border border-outline-variant/30 p-8 shadow-2xl overflow-hidden text-right"
+          className="relative w-full max-w-lg bg-surface-container rounded-2xl border border-outline-variant/30 p-5 sm:p-8 shadow-2xl max-h-[90vh] overflow-y-auto text-right"
         >
           {/* Close Button */}
           <button
