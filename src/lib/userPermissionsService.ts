@@ -124,15 +124,14 @@ export function getUserPermissions(uid: string, email: string): UserPermissions 
   const key = email.toLowerCase();
   if (map[key]) {
     const cached = map[key];
-    // Safeguard: LocalStorage cache alone cannot elevate non-primary emails to admin
-    if (!isDefaultAdmin && (cached.role === "admin" || cached.canAccessAdmin)) {
-      return {
-        ...cached,
-        role: cached.role === "admin" ? "trusted_publisher" : cached.role,
-        canAccessAdmin: false
-      };
-    }
-    return cached;
+    const isAdminRole = cached.role === "admin" || cached.canAccessAdmin === true;
+    return {
+      uid: cached.uid || uid,
+      email: cached.email || email,
+      role: isAdminRole ? "admin" : (cached.role || "student"),
+      canDirectPublish: isAdminRole ? true : !!cached.canDirectPublish,
+      canAccessAdmin: isAdminRole ? true : !!cached.canAccessAdmin
+    };
   }
 
   return {

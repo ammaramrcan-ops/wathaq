@@ -4,22 +4,22 @@ import { motion, AnimatePresence } from "motion/react";
 import { 
   MessageSquare, User, Plus, Sparkles, Lightbulb, 
   HelpCircle, Award, ChevronLeft, ArrowRight, Atom, 
-  BookOpen, Compass, CheckCircle2, Star, ThumbsUp, Send
+  BookOpen, Compass, CheckCircle2, Star, ThumbsUp, Send, Trash2
 } from "lucide-react";
 import Teachers from "@/pages/Teachers";
-
-// Types
-interface Discussion {
-  id: string;
-  title: string;
-  author: string;
-  subjectId?: string;
-  category: "advice" | "question";
-  replies: number;
-  time: string;
-  excerpt: string;
-  tags: string[];
-}
+import { useAuth } from "@/context/AuthContext";
+import { 
+  subscribeDiscussions, 
+  addDiscussion, 
+  deleteDiscussion, 
+  Discussion 
+} from "@/lib/communityService";
+import { 
+  subscribeStudentProfile, 
+  filterCategoriesForProfile, 
+  filterSubjectsForProfile, 
+  StudentAcademicProfile 
+} from "@/lib/subjectsData";
 
 const mainCategories = [
   { id: "scientific", title: "مواد علمية", icon: Atom },
@@ -34,41 +34,38 @@ const subjects = [
   { id: "math", title: "الرياضيات", categoryId: "scientific" },
   { id: "grammar", title: "النحو والصرف", categoryId: "arabic" },
   { id: "literature", title: "الأدب والنصوص", categoryId: "arabic" },
+  { id: "english", title: "اللغة الإنجليزية", categoryId: "arabic" },
   { id: "tawheed", title: "التوحيد والعقيدة", categoryId: "islamic" },
   { id: "fiqh", title: "الفقه وأصوله", categoryId: "islamic" }
 ];
 
-const initialDiscussions: Discussion[] = [
-  {
-    id: "d1",
-    title: "أفضل جدول مراجعة نهائية للثانوية في 60 يوماً؟",
-    author: "أحمد طارق",
-    category: "advice",
-    replies: 18,
-    time: "منذ ساعتين",
-    excerpt: "كيف تقسم يومك بين المواد العلمية والنظرية بدون توتر؟ إليك التجربة النمطية المثبتة...",
-    tags: ["نصائح مراجعة", "تنظيم الوقت"]
-  },
-  {
-    id: "d2",
-    title: "طريقة إتقان قوانين كيرشوف في الفيزياء بدون تلعثم؟",
-    author: "سارة علي",
-    category: "question",
-    subjectId: "physics",
-    replies: 12,
-    time: "منذ 4 ساعات",
-    excerpt: "عند تطبيق القانون الثاني على العروة المغلقة، متى نختار الإشارة الموجبة والسالبة بدقة؟",
-    tags: ["فيزياء", "قوانين كيرشوف"]
-  }
-];
-
 export default function Community() {
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [mode, setMode] = useState<"select" | "advice" | "question_wizard" | "teachers">("select");
   const [wizardStep, setWizardStep] = useState<number>(1);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
-  const [discussions, setDiscussions] = useState<Discussion[]>(initialDiscussions);
+  const [discussions, setDiscussions] = useState<Discussion[]>([]);
+
+  const [academicProfile, setAcademicProfile] = useState<StudentAcademicProfile | null>(null);
+
+  useEffect(() => {
+    const unsubProf = subscribeStudentProfile(user?.uid, (prof) => {
+      setAcademicProfile(prof);
+    });
+    return () => unsubProf();
+  }, [user?.uid]);
+
+  const availableCategories = filterCategoriesForProfile(academicProfile, mainCategories);
+  const availableSubjects = filterSubjectsForProfile(academicProfile, subjects);
+
+  useEffect(() => {
+    const unsub = subscribeDiscussions((list) => {
+      setDiscussions(list);
+    });
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     const modeParam = searchParams.get("mode") as any;
@@ -104,26 +101,37 @@ export default function Community() {
   const [newCategory, setNewCategory] = useState<"advice" | "question">("advice");
   const [newSubject, setNewSubject] = useState("physics");
 
-  const handleAddDiscussion = (e: FormEvent) => {
+  const handleAddDiscussion = async (e: FormEvent) => {
     e.preventDefault();
-    if (!newTitle || !newExcerpt) return;
+    if (!newTitle.trim() || !newExcerpt.trim()) return;
+
+    const authorName = user?.displayName || user?.email?.split("@")[0] || "طالب وثاق";
 
     const newPost: Discussion = {
       id: "d-" + Date.now(),
-      title: newTitle,
-      author: "طالب وثاق",
+      title: newTitle.trim(),
+      author: authorName,
+      authorEmail: user?.email || undefined,
+      authorUid: user?.uid || undefined,
       category: newCategory,
       subjectId: newCategory === "question" ? newSubject : undefined,
       replies: 0,
       time: "الآن",
-      excerpt: newExcerpt,
+      excerpt: newExcerpt.trim(),
       tags: [newCategory === "advice" ? "نصيحة جديدة" : "سؤال جديد"]
     };
 
-    setDiscussions([newPost, ...discussions]);
+    await addDiscussion(newPost);
     setIsModalOpen(false);
     setNewTitle("");
     setNewExcerpt("");
+  };
+
+  const handleDeleteDiscussion = async (discId: string) => {
+    if (!window.confirm("هل أنت تأكد من رغبتك في حذف هذا المنشور والتسجيل السحابي له؟")) {
+      return;
+    }
+    await deleteDiscussion(discId);
   };
 
   const getSubjectTitle = (code: string) => {
@@ -292,27 +300,47 @@ export default function Community() {
 
           {/* Advice List */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-stack-md">
-            {discussions.filter((d) => d.category === "advice").map((disc) => (
-              <div key={disc.id} className="bg-surface-container-low border border-outline-variant/30 rounded-2xl p-6 flex flex-col justify-between gap-4 hover:border-amber-400/50 transition-all shadow-lg">
-                <div>
-                  <div className="flex justify-between items-center gap-2 mb-2">
-                    <span className="text-label-sm font-medium text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
-                      نصيحة ومراجعة
-                    </span>
-                    <span className="text-xs text-on-surface-variant">{disc.time}</span>
-                  </div>
-                  <h3 className="text-headline-md font-bold text-on-surface mb-2">{disc.title}</h3>
-                  <p className="text-body-md text-on-surface-variant font-light leading-relaxed">
-                    {disc.excerpt}
-                  </p>
-                </div>
+            {discussions.filter((d) => d.category === "advice").map((disc) => {
+              const canDelete = 
+                user?.email === "ammaramrcan@gmail.com" || 
+                (user?.email && disc.authorEmail && user.email.toLowerCase() === disc.authorEmail.toLowerCase()) || 
+                (user?.uid && disc.authorUid && user.uid === disc.authorUid);
 
-                <div className="flex justify-between items-center pt-3 border-t border-outline-variant/10 text-label-sm text-on-surface-variant">
-                  <span>الكاتب: {disc.author}</span>
-                  <span>{disc.replies} مشاركة</span>
+              return (
+                <div key={disc.id} className="bg-surface-container-low border border-outline-variant/30 rounded-2xl p-6 flex flex-col justify-between gap-4 hover:border-amber-400/50 transition-all shadow-lg relative">
+                  <div>
+                    <div className="flex justify-between items-center gap-2 mb-2">
+                      <span className="text-label-sm font-medium text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
+                        نصيحة ومراجعة
+                      </span>
+
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-on-surface-variant">{disc.time}</span>
+                        {canDelete && (
+                          <button
+                            onClick={() => handleDeleteDiscussion(disc.id)}
+                            title="حذف هذا المنشور"
+                            className="p-1.5 text-on-surface-variant hover:text-error bg-surface-container-high hover:bg-error/10 border border-outline-variant/20 rounded-xl transition-all cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <h3 className="text-headline-md font-bold text-on-surface mb-2">{disc.title}</h3>
+                    <p className="text-body-md text-on-surface-variant font-light leading-relaxed">
+                      {disc.excerpt}
+                    </p>
+                  </div>
+
+                  <div className="flex justify-between items-center pt-3 border-t border-outline-variant/10 text-label-sm text-on-surface-variant">
+                    <span>الكاتب: {disc.author}</span>
+                    <span>{disc.replies} مشاركة</span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </motion.div>
       )}
@@ -350,7 +378,7 @@ export default function Community() {
           {/* STEP 1: CATEGORY */}
           {wizardStep === 1 && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-stack-md">
-              {mainCategories.map((cat) => {
+              {availableCategories.map((cat) => {
                 const Icon = cat.icon;
                 return (
                   <button
@@ -374,7 +402,7 @@ export default function Community() {
           {/* STEP 2: SUBJECT */}
           {wizardStep === 2 && (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-stack-md">
-              {subjects.filter((s) => s.categoryId === selectedCategory).map((sub) => (
+              {availableSubjects.filter((s) => s.categoryId === selectedCategory).map((sub) => (
                 <button
                   key={sub.id}
                   onClick={() => {
@@ -410,18 +438,42 @@ export default function Community() {
               </div>
 
               <div className="flex flex-col gap-4">
-                {discussions.filter((d) => d.category === "question" && (!d.subjectId || d.subjectId === selectedSubject)).map((disc) => (
-                  <div key={disc.id} className="bg-surface-container-low border border-outline-variant/30 rounded-2xl p-6 flex flex-col gap-3 hover:border-primary/50 transition-all shadow-lg">
-                    <div className="flex justify-between items-center gap-2">
-                      <span className="text-label-sm font-medium text-primary bg-primary/10 px-3 py-1 rounded-full border border-primary/20">
-                        سؤال أكاديمي • {getSubjectTitle(disc.subjectId || "عام")}
-                      </span>
-                      <span className="text-xs text-on-surface-variant">{disc.time}</span>
+                {discussions.filter((d) => d.category === "question" && (!d.subjectId || d.subjectId === selectedSubject)).map((disc) => {
+                  const canDelete = 
+                    user?.email === "ammaramrcan@gmail.com" || 
+                    (user?.email && disc.authorEmail && user.email.toLowerCase() === disc.authorEmail.toLowerCase()) || 
+                    (user?.uid && disc.authorUid && user.uid === disc.authorUid);
+
+                  return (
+                    <div key={disc.id} className="bg-surface-container-low border border-outline-variant/30 rounded-2xl p-6 flex flex-col gap-3 hover:border-primary/50 transition-all shadow-lg relative">
+                      <div className="flex justify-between items-center gap-2">
+                        <span className="text-label-sm font-medium text-primary bg-primary/10 px-3 py-1 rounded-full border border-primary/20">
+                          سؤال أكاديمي • {getSubjectTitle(disc.subjectId || "عام")}
+                        </span>
+
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-on-surface-variant">{disc.time}</span>
+                          {canDelete && (
+                            <button
+                              onClick={() => handleDeleteDiscussion(disc.id)}
+                              title="حذف هذا السؤال"
+                              className="p-1.5 text-on-surface-variant hover:text-error bg-surface-container-high hover:bg-error/10 border border-outline-variant/20 rounded-xl transition-all cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <h4 className="text-headline-md font-bold text-on-surface">{disc.title}</h4>
+                      <p className="text-body-md text-on-surface-variant font-light leading-relaxed">{disc.excerpt}</p>
+                      
+                      <div className="flex justify-between items-center pt-3 border-t border-outline-variant/10 text-label-sm text-on-surface-variant">
+                        <span>السائل: {disc.author}</span>
+                        <span>{disc.replies} إجابة</span>
+                      </div>
                     </div>
-                    <h4 className="text-headline-md font-bold text-on-surface">{disc.title}</h4>
-                    <p className="text-body-md text-on-surface-variant font-light leading-relaxed">{disc.excerpt}</p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -437,7 +489,7 @@ export default function Community() {
             className="relative w-full max-w-lg bg-surface-container rounded-3xl border border-outline-variant/30 p-6 sm:p-8 shadow-2xl text-right"
           >
             <h3 className="text-headline-md font-bold text-on-surface mb-4">
-              {newCategory === "advice" ? "إضافة نصيحة وم تجربة مراجعة" : "اطرح سؤالك الأكاديمي"}
+              {newCategory === "advice" ? "إضافة نصيحة أو تجربة مراجعة" : "اطرح سؤالك الأكاديمي"}
             </h3>
 
             <form onSubmit={handleAddDiscussion} className="flex flex-col gap-4">
@@ -449,7 +501,7 @@ export default function Community() {
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   placeholder="مثال: كيف أراجع الترانزستور قبل الامتحان؟"
-                  className="bg-surface-container-high border border-outline-variant/40 rounded-xl p-3 text-body-md"
+                  className="bg-surface-container-high border border-outline-variant/40 rounded-xl p-3 text-body-md text-on-surface focus:outline-none focus:border-primary"
                 />
               </div>
 
@@ -459,13 +511,11 @@ export default function Community() {
                   <select
                     value={newSubject}
                     onChange={(e) => setNewSubject(e.target.value)}
-                    className="bg-surface-container-high border border-outline-variant/40 rounded-xl p-3 text-body-md"
+                    className="bg-surface-container-high border border-outline-variant/40 rounded-xl p-3 text-body-md text-on-surface focus:outline-none focus:border-primary font-bold"
                   >
-                    <option value="physics">الفيزياء</option>
-                    <option value="chemistry">الكيمياء</option>
-                    <option value="biology">الأحياء</option>
-                    <option value="math">الرياضيات</option>
-                    <option value="grammar">النحو والصرف</option>
+                    {availableSubjects.map((s) => (
+                      <option key={s.id} value={s.id}>{s.title}</option>
+                    ))}
                   </select>
                 </div>
               )}
@@ -478,7 +528,7 @@ export default function Community() {
                   value={newExcerpt}
                   onChange={(e) => setNewExcerpt(e.target.value)}
                   placeholder="اكتب تفاصيل سؤالك أو التجربة بالتفصيل..."
-                  className="bg-surface-container-high border border-outline-variant/40 rounded-xl p-3 text-body-md"
+                  className="bg-surface-container-high border border-outline-variant/40 rounded-xl p-3 text-body-md text-on-surface focus:outline-none focus:border-primary"
                 />
               </div>
 
@@ -486,13 +536,13 @@ export default function Community() {
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl border border-outline-variant/30 text-on-surface-variant cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl border border-outline-variant/30 text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
                 >
                   إلغاء
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 rounded-xl bg-primary text-on-primary font-medium cursor-pointer"
+                  className="px-6 py-2.5 rounded-xl bg-primary text-on-primary font-bold hover:bg-primary/90 transition-all cursor-pointer shadow-lg shadow-primary/20"
                 >
                   نشر الآن
                 </button>

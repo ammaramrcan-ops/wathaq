@@ -16,6 +16,7 @@ import {
   getStoredStudentProfile
 } from "@/lib/subjectsData";
 import { StageWizardModal } from "@/components/StageWizardModal";
+import { subscribeUserPermissions, UserPermissions } from "@/lib/userPermissionsService";
 
 interface UserContribution {
   id: string;
@@ -105,18 +106,34 @@ export default function Profile() {
     return map[code] || code;
   };
 
+  const [userPerms, setUserPerms] = useState<UserPermissions | null>(null);
+
+  useEffect(() => {
+    if (user?.email) {
+      const unsub = subscribeUserPermissions(user.uid, user.email, (perm) => {
+        setUserPerms(perm);
+      });
+      return () => unsub();
+    }
+  }, [user?.uid, user?.email]);
+
+  const isAdminUser = 
+    user?.email === "ammaramrcan@gmail.com" || 
+    userPerms?.role === "admin" || 
+    userPerms?.canAccessAdmin === true;
+
   const currentSubjects = getSubjectsForProfile(academicProfile);
 
   return (
     <div className="flex flex-col gap-stack-lg">
       {/* Profile Banner */}
       <div className="bg-surface-container-low border border-outline-variant/30 rounded-3xl p-6 sm:p-8 shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-        <div className="flex items-center gap-4 sm:gap-6">
-          <div className="relative">
+        <div className="flex flex-col sm:flex-row items-center sm:items-center gap-4 sm:gap-6 w-full md:w-auto text-center sm:text-right">
+          <div className="relative shrink-0">
             {user.photoURL ? (
-              <img src={user.photoURL} alt="Avatar" className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-4 border-primary/30" />
+              <img src={user.photoURL} alt="Avatar" className="w-20 h-20 sm:w-24 sm:h-24 shrink-0 rounded-full object-cover border-4 border-primary/30 shadow-md" />
             ) : (
-              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-primary/10 border-4 border-primary/30 text-primary flex items-center justify-center text-3xl font-bold">
+              <div className="w-20 h-20 sm:w-24 sm:h-24 shrink-0 rounded-full bg-primary/10 border-4 border-primary/30 text-primary flex items-center justify-center text-3xl font-bold shadow-md">
                 {user.displayName ? user.displayName[0] : "ط"}
               </div>
             )}
@@ -125,8 +142,8 @@ export default function Profile() {
             </span>
           </div>
 
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex flex-col gap-1 min-w-0 items-center sm:items-start">
+            <div className="flex items-center gap-3 flex-wrap justify-center sm:justify-start">
               {isEditingName ? (
                 <div className="flex items-center gap-2">
                   <input
@@ -148,7 +165,7 @@ export default function Profile() {
                 </h1>
               )}
 
-              {user.email === "ammaramrcan@gmail.com" ? (
+              {isAdminUser ? (
                 <span className="bg-primary/10 text-primary border border-primary/30 px-3 py-0.5 rounded-full text-label-sm font-medium flex items-center gap-1">
                   <ShieldCheck className="w-3.5 h-3.5" /> أدمن المنصة
                 </span>
@@ -167,7 +184,7 @@ export default function Profile() {
         </div>
 
         <div className="flex items-center gap-3 w-full md:w-auto">
-          {user.email === "ammaramrcan@gmail.com" && (
+          {isAdminUser && (
             <Link
               to="/admin"
               className="flex-1 md:flex-initial bg-primary text-on-primary hover:bg-primary/90 px-4 py-2.5 rounded-xl text-label-sm font-medium flex items-center justify-center gap-2 transition-colors shadow-lg shadow-primary/10"

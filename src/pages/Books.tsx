@@ -14,6 +14,12 @@ import {
   markItemAsDeleted, 
   CustomContentItem 
 } from "@/lib/contentService";
+import { 
+  subscribeStudentProfile, 
+  filterCategoriesForProfile, 
+  filterSubjectsForProfile, 
+  StudentAcademicProfile 
+} from "@/lib/subjectsData";
 
 interface MainCategory {
   id: string;
@@ -81,6 +87,7 @@ const subjects: SubjectItem[] = [
   { id: "grammar", title: "النحو والصرف", categoryId: "arabic", description: "ملازم إعراب وشرح ألفية ابن مالك", icon: BookOpen },
   { id: "literature", title: "الأدب والنصوص", categoryId: "arabic", description: "ملخصات العصور الأدبية والنصوص", icon: BookOpen },
   { id: "rhetoric", title: "البلاغة والتعبير", categoryId: "arabic", description: "خرائط البديع والبيان والمعاني", icon: BookOpen },
+  { id: "english", title: "اللغة الإنجليزية", categoryId: "arabic", description: "قواعد الجرامر والقراءة وشرح الكلمات وترجمة المقاطع", icon: BookOpen },
   { id: "tawheed", title: "التوحيد والعقيدة", categoryId: "islamic", description: "كتب وأصول التوحيد المقررة", icon: Compass },
   { id: "fiqh", title: "الفقه وأصوله", categoryId: "islamic", description: "ملازم وأحكام الفقه المذهبي", icon: Compass }
 ];
@@ -149,7 +156,13 @@ export default function Books() {
   const [selectedFilter, setSelectedFilter] = useState<FilterType | null>(null);
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
 
+  const [academicProfile, setAcademicProfile] = useState<StudentAcademicProfile | null>(null);
+
   useEffect(() => {
+    const unsubProf = subscribeStudentProfile(user?.uid, (prof) => {
+      setAcademicProfile(prof);
+    });
+
     const unsubDeleted = subscribeDeletedItems("book", user?.uid, (ids) => {
       setDeletedBookIds(ids);
     });
@@ -162,10 +175,14 @@ export default function Books() {
     });
 
     return () => {
+      unsubProf();
       unsubDeleted();
       unsubCustom();
     };
   }, [user?.uid]);
+
+  const availableCategories = filterCategoriesForProfile(academicProfile, mainCategories);
+  const availableSubjects = filterSubjectsForProfile(academicProfile, subjects);
 
   // Convert custom items into BookResource array
   const userCustomBooks: BookResource[] = customBooks.map((item) => ({
@@ -220,8 +237,6 @@ export default function Books() {
       setStep(1);
     }
   }, [searchParams]);
-
-  const availableSubjects = subjects.filter((s) => s.categoryId === selectedCategory?.id);
 
   const handleSelectCategory = (cat: MainCategory) => {
     setSearchParams({ category: cat.id });
@@ -378,7 +393,7 @@ export default function Books() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {mainCategories.map((cat, idx) => {
+            {availableCategories.map((cat, idx) => {
               const Icon = cat.icon;
               return (
                 <motion.div
@@ -425,7 +440,7 @@ export default function Books() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {availableSubjects.map((sub, idx) => {
+            {availableSubjects.filter((sub) => sub.categoryId === selectedCategory.id).map((sub, idx) => {
               const Icon = sub.icon;
               return (
                 <motion.div

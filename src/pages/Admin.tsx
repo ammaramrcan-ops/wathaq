@@ -110,7 +110,7 @@ export default function Admin() {
   const activePerms = userPermsState || fallbackPerms;
   const isAuthorizedAdmin = 
     Boolean(user?.email && user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) || 
-    Boolean(activePerms?.canAccessAdmin === true && activePerms?.role === "admin");
+    Boolean(activePerms?.canAccessAdmin === true || activePerms?.role === "admin");
 
   if (!isAuthorizedAdmin) {
     return (

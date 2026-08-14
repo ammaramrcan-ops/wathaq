@@ -13,7 +13,9 @@ export interface VisitAnalytics {
 
 const LOCAL_STORAGE_VISITS = "wathaq_visit_analytics";
 const LOCAL_STORAGE_VISITOR_ID = "wathaq_visitor_id";
-const LOCAL_STORAGE_VISITOR_COUNT = "wathaq_visitor_count";
+const LOCAL_STORAGE_SESSION_TIME = "wathaq_last_session_time";
+const LOCAL_STORAGE_VISIT_DATE = "wathaq_last_visit_date";
+const SESSION_THROTTLE_MS = 15 * 60 * 1000; // 15 minutes session throttle window
 
 // IndexedDB helper for visit analytics durable storage
 const IDB_NAME = "wathaq_durable_storage";
@@ -96,9 +98,30 @@ export function getLocalVisitsAnalytics(): VisitAnalytics {
 }
 
 /**
- * Track a page visit automatically using Cloud Atomic Increments and Durable Backups
+ * Track a page visit accurately with Session Throttling and Date Reset Logic
  */
 export async function trackVisit(): Promise<VisitAnalytics> {
+  const now = Date.now();
+  const todayDate = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+
+  // 1. Session Throttling: If navigating within active 15-minute session, skip double-counting
+  try {
+    const lastSession = localStorage.getItem(LOCAL_STORAGE_SESSION_TIME);
+    if (lastSession) {
+      const elapsed = now - parseInt(lastSession, 10);
+      if (elapsed < SESSION_THROTTLE_MS) {
+        // Return existing analytics without incrementing total visits on every subpage click
+        return getLocalVisitsAnalytics();
+      }
+    }
+  } catch {}
+
+  // Update session timestamp & date
+  try {
+    localStorage.setItem(LOCAL_STORAGE_SESSION_TIME, now.toString());
+    localStorage.setItem(LOCAL_STORAGE_VISIT_DATE, todayDate);
+  } catch {}
+
   let visitorId = "";
   let isRecurring = false;
 
@@ -108,7 +131,6 @@ export async function trackVisit(): Promise<VisitAnalytics> {
       visitorId = storedId;
       isRecurring = true;
     } else {
-      // Check durable IndexedDB backup for visitor ID before generating new one
       const idbId = await loadIDBVisitorId();
       if (idbId) {
         visitorId = idbId;
@@ -127,28 +149,32 @@ export async function trackVisit(): Promise<VisitAnalytics> {
   try {
     const analyticsDocRef = doc(db, "analytics_summary", "general");
     
-    // Read existing doc to calculate repeat rate accurately
     const currentSnap = await getDoc(analyticsDocRef);
     let prevTotal = 0;
     let prevRecurring = 0;
     let prevUnique = 0;
+    let prevDaily = 0;
+    let storedCloudDate = "";
 
     if (currentSnap.exists()) {
       const data = currentSnap.data();
       prevTotal = data.totalVisits || 0;
       prevRecurring = data.recurringVisits || 0;
       prevUnique = data.uniqueVisitorsCount || 1;
+      storedCloudDate = data.lastDate || "";
+      prevDaily = storedCloudDate === todayDate ? (data.dailyVisits || 0) : 0;
     }
 
     const newTotal = prevTotal + 1;
     const newRecurring = prevRecurring + (isRecurring ? 1 : 0);
     const newUnique = isRecurring ? prevUnique : prevUnique + 1;
+    const newDaily = prevDaily + 1;
     const repeatVisitorRate = newTotal > 0 ? Math.round((newRecurring / newTotal) * 100) : 0;
 
     const updatedAnalytics: VisitAnalytics = {
       totalVisits: newTotal,
-      dailyVisits: (currentSnap.data()?.dailyVisits || 0) + 1,
-      weeklyVisits: (currentSnap.data()?.weeklyVisits || 0) + 1,
+      dailyVisits: newDaily,
+      weeklyVisits: newDaily,
       recurringVisits: newRecurring,
       uniqueVisitorsCount: newUnique,
       repeatVisitorRate,
@@ -160,11 +186,12 @@ export async function trackVisit(): Promise<VisitAnalytics> {
       analyticsDocRef,
       {
         totalVisits: increment(1),
-        dailyVisits: increment(1),
+        dailyVisits: storedCloudDate === todayDate ? increment(1) : 1,
         weeklyVisits: increment(1),
         recurringVisits: increment(isRecurring ? 1 : 0),
         uniqueVisitorsCount: isRecurring ? increment(0) : increment(1),
         repeatVisitorRate,
+        lastDate: todayDate,
         lastVisitTimestamp: updatedAnalytics.lastVisitTimestamp
       },
       { merge: true }

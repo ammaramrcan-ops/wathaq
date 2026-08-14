@@ -12,22 +12,22 @@ export interface StudentAcademicProfile {
 export const DEFAULT_CURRICULUM: Record<string, string[]> = {
   azhar_scientific: [
     "الفقه", "التفسير", "الحديث", "التوحيد", "النحو", "الصرف", "البلاغة", 
-    "الأدب والنصوص", "اللغة الأجنبية", "الرياضيات البحتة", "الرياضيات التطبيقية", 
+    "الأدب والنصوص", "اللغة الإنجليزية", "الرياضيات البحتة", "الرياضيات التطبيقية", 
     "الفيزياء", "الكيمياء", "الأحياء"
   ],
   azhar_literary: [
     "الفقه", "التفسير", "الحديث", "التوحيد", "النحو", "الصرف", "البلاغة", 
-    "الأدب والنصوص والمطالعة", "اللغة الأجنبية الأولى", "اللغة الأجنبية الثانية", 
+    "الأدب والنصوص والمطالعة", "اللغة الإنجليزية", "اللغة الأجنبية الثانية", 
     "التاريخ", "الجغرافيا", "الإحصاء", "الإنشاء"
   ],
   general_science: [
-    "العربي", "اللغة الأجنبية الأولى", "الأحياء", "الكيمياء", "الفيزياء"
+    "العربي", "اللغة الإنجليزية", "الأحياء", "الكيمياء", "الفيزياء"
   ],
   general_math: [
-    "العربي", "اللغة الأجنبية الأولى", "الرياضيات", "الكيمياء", "الفيزياء"
+    "العربي", "اللغة الإنجليزية", "الرياضيات", "الكيمياء", "الفيزياء"
   ],
   general_literary: [
-    "العربي", "اللغة الأجنبية الأولى", "التاريخ", "الجغرافيا", "الإحصاء"
+    "العربي", "اللغة الإنجليزية", "التاريخ", "الجغرافيا", "الإحصاء"
   ]
 };
 
@@ -188,4 +188,65 @@ export function getProfileLabel(profile: StudentAcademicProfile | null): string 
     else if (profile.branch === "literary") base = "ثانوي عام - قسم أدبي 🎓";
     return `${base}${gradeLabel}`;
   }
+}
+
+/**
+ * Filter Categories based on student profile (General vs Azhar)
+ */
+export function filterCategoriesForProfile<T extends { id: string }>(
+  profile: StudentAcademicProfile | null,
+  categories: T[]
+): T[] {
+  const isAzhar = profile?.system === "azhar";
+
+  return categories.filter((cat) => {
+    // If category is "islamic" (مواد شرعية), only show for Azhar!
+    if (cat.id === "islamic") return isAzhar;
+    // If category is "literary" (مواد أدبية) and branch is science/math, hide unless literary
+    if (cat.id === "literary" && profile?.system === "general" && profile?.branch !== "literary") {
+      return false;
+    }
+    return true;
+  });
+}
+
+/**
+ * Filter Subjects list based on student profile (system & branch)
+ */
+export function filterSubjectsForProfile<T extends { id: string; categoryId?: string; title?: string }>(
+  profile: StudentAcademicProfile | null,
+  subjects: T[]
+): T[] {
+  const isAzhar = profile?.system === "azhar";
+  const branch = profile?.branch || "science";
+
+  return subjects.filter((sub) => {
+    // 1. Sharia subjects (tawheed, fiqh, tafseer, hadith) only for Azhar
+    const isShariaSubject = ["tawheed", "fiqh", "tafseer", "hadith"].includes(sub.id) || sub.categoryId === "islamic";
+    if (isShariaSubject && !isAzhar) return false;
+
+    // 2. Branch specific filtering for General Secondary
+    if (!isAzhar) {
+      // Science branch (علمي علوم): exclude math
+      if (branch === "science" && sub.id === "math") return false;
+
+      // Math branch (علمي رياضة): exclude biology
+      if (branch === "science" && sub.id === "math") return false;
+
+      // Math branch: exclude biology
+      if (branch === "math" && sub.id === "biology") return false;
+
+      // Scientific branches: exclude purely literary subjects (history, geography) if present
+      if ((branch === "science" || branch === "math") && ["history", "geography"].includes(sub.id)) {
+        return false;
+      }
+
+      // Literary branch: exclude pure science subjects (physics, chemistry, biology, math)
+      if (branch === "literary" && ["physics", "chemistry", "biology", "math"].includes(sub.id)) {
+        return false;
+      }
+    }
+
+    return true;
+  });
 }

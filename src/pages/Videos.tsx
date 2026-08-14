@@ -17,6 +17,12 @@ import {
   getLocalCustomContent,
   CustomContentItem 
 } from "@/lib/contentService";
+import { 
+  subscribeStudentProfile, 
+  filterCategoriesForProfile, 
+  filterSubjectsForProfile, 
+  StudentAcademicProfile 
+} from "@/lib/subjectsData";
 
 interface MainCategory {
   id: string;
@@ -73,6 +79,7 @@ const subjects: SubjectItem[] = [
   { id: "grammar", title: "النحو والصرف", categoryId: "arabic", description: "قواعد الإعراب والإحكام الصرفي", icon: BookOpen },
   { id: "literature", title: "الأدب والنصوص", categoryId: "arabic", description: "العصور الأدبية وتحليل النصوص الشعرية", icon: BookOpen },
   { id: "rhetoric", title: "البلاغة والتعبير", categoryId: "arabic", description: "البيان، البديع، والمعاني", icon: BookOpen },
+  { id: "english", title: "اللغة الإنجليزية", categoryId: "arabic", description: "شروحات الجرامر والقراءة وشرح الكلمات وتدريبات الامتحانات", icon: BookOpen },
   { id: "tawheed", title: "التوحيد والعقيدة", categoryId: "islamic", description: "أركان الإيمان وأصول العقيدة الإسلامية", icon: Compass },
   { id: "fiqh", title: "الفقه وأصوله", categoryId: "islamic", description: "أحكام العبادات والمعاملات الشرعية", icon: Compass },
   { id: "tafseer", title: "التفسير وعلوم القرآن", categoryId: "islamic", description: "تدبر الآيات وعلوم نزول القرآن", icon: Compass },
@@ -149,7 +156,13 @@ export default function Videos() {
   const [customItems, setCustomItems] = useState<CustomContentItem[]>(() => getLocalCustomContent());
   const [isDeletedLoaded, setIsDeletedLoaded] = useState(false);
 
+  const [academicProfile, setAcademicProfile] = useState<StudentAcademicProfile | null>(null);
+
   useEffect(() => {
+    const unsubProf = subscribeStudentProfile(user?.uid, (prof) => {
+      setAcademicProfile(prof);
+    });
+
     const unsubDeleted = subscribeDeletedItems("video", user?.uid, (ids) => {
       setDeletedVideoIds(ids);
       setIsDeletedLoaded(true);
@@ -160,10 +173,14 @@ export default function Videos() {
     });
 
     return () => {
+      unsubProf();
       unsubDeleted();
       unsubCustom();
     };
   }, [user?.uid]);
+
+  const availableCategories = filterCategoriesForProfile(academicProfile, mainCategories);
+  const availableSubjects = filterSubjectsForProfile(academicProfile, subjects);
 
   const userCustomVideos: VideoResourceItem[] = customItems
     .filter((item) => item.status !== "pending" && item.contentType === "video")
@@ -229,8 +246,6 @@ export default function Videos() {
       setStep(1);
     }
   }, [searchParams, allVideos]);
-
-  const availableSubjects = subjects.filter((s) => s.categoryId === selectedCategory?.id);
 
   const handleSelectCategory = (cat: MainCategory) => setSearchParams({ category: cat.id });
 
@@ -353,7 +368,7 @@ export default function Videos() {
           animate={{ opacity: 1, y: 0 }}
           className="grid grid-cols-1 md:grid-cols-3 gap-stack-lg my-auto"
         >
-          {mainCategories.map((cat) => {
+          {availableCategories.map((cat) => {
             const Icon = cat.icon;
             return (
               <button
@@ -385,7 +400,7 @@ export default function Videos() {
           animate={{ opacity: 1, y: 0 }}
           className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-stack-md"
         >
-          {availableSubjects.map((sub) => {
+          {availableSubjects.filter((sub) => sub.categoryId === selectedCategory?.id).map((sub) => {
             const Icon = sub.icon;
             return (
               <button

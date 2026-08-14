@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { useAuth } from "@/context/AuthContext";
 import { AddContentModal } from "@/components/AddContentModal";
 import { trackVisit } from "@/lib/visitService";
+import { subscribeUserPermissions, UserPermissions } from "@/lib/userPermissionsService";
 
 export function Header() {
   const navigate = useNavigate();
@@ -14,6 +15,21 @@ export function Header() {
   const isHome = location.pathname === "/";
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [userPerms, setUserPerms] = useState<UserPermissions | null>(null);
+
+  useEffect(() => {
+    if (user?.email) {
+      const unsub = subscribeUserPermissions(user.uid, user.email, (perm) => {
+        setUserPerms(perm);
+      });
+      return () => unsub();
+    }
+  }, [user?.uid, user?.email]);
+
+  const isAdminUser = 
+    user?.email === "ammaramrcan@gmail.com" || 
+    userPerms?.role === "admin" || 
+    userPerms?.canAccessAdmin === true;
 
   // Determine section-specific content type & button label
   const getSectionConfig = () => {
@@ -110,7 +126,7 @@ export function Header() {
                       <span>ملفي الشخصي ومساهماتي</span>
                     </Link>
 
-                    {user.email === "ammaramrcan@gmail.com" && (
+                    {isAdminUser && (
                       <Link
                         to="/admin"
                         onClick={() => setIsUserMenuOpen(false)}
