@@ -2,10 +2,11 @@ import { useState, useEffect, FormEvent } from "react";
 import { motion } from "motion/react";
 import { 
   Users, UserCheck, Eye, RefreshCw, HardDrive, Video, Layers, 
-  Trash2, ExternalLink, Plus, ShieldCheck, BarChart3, TrendingUp, CheckCircle, Clock, Lock, Award, Star, BookOpen, FolderPlus
+  Trash2, ExternalLink, Plus, ShieldCheck, BarChart3, TrendingUp, CheckCircle, Clock, Lock, Award, Star, BookOpen, FolderPlus, GraduationCap, Check
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { AddContentModal } from "@/components/AddContentModal";
+import { getStoredCurriculum, saveStoredCurriculum } from "@/lib/subjectsData";
 
 interface AdminUser {
   id: string;
@@ -42,22 +43,6 @@ interface TeacherEvaluation {
   summary: string;
 }
 
-interface DynamicSubject {
-  id: string;
-  title: string;
-  category: string;
-}
-
-const initialSubjects: DynamicSubject[] = [
-  { id: "physics", title: "الفيزياء", category: "مواد علمية" },
-  { id: "chemistry", title: "الكيمياء", category: "مواد علمية" },
-  { id: "biology", title: "الأحياء", category: "مواد علمية" },
-  { id: "math", title: "الرياضيات", category: "مواد علمية" },
-  { id: "grammar", title: "النحو والصرف", category: "اللغة العربية" },
-  { id: "fiqh", title: "الفقه وأصوله", category: "العلوم الشرعية" },
-  { id: "tawheed", title: "التوحيد والعقيدة", category: "العلوم الشرعية" }
-];
-
 const initialTeachers: TeacherEvaluation[] = [
   {
     id: "t-phys-1",
@@ -87,34 +72,30 @@ const initialTeachers: TeacherEvaluation[] = [
   }
 ];
 
-const mockUsers: AdminUser[] = [
-  { id: "u1", name: "أحمد محمود", email: "ahmed@example.com", joinDate: "2026-08-10", visitCount: 14, status: "نشط" },
-  { id: "u2", name: "سارة علي", email: "sara@example.com", joinDate: "2026-08-12", visitCount: 8, status: "نشط" },
-  { id: "u3", name: "يوسف طارق", email: "youssef@example.com", joinDate: "2026-08-13", visitCount: 3, status: "جديد" },
-  { id: "u4", name: "ريم حسن", email: "reem@example.com", joinDate: "2026-08-14", visitCount: 1, status: "جديد" }
-];
-
 const ADMIN_EMAIL = "ammaramrcan@gmail.com";
 
 export default function Admin() {
   const { user, loginWithGoogle, logout } = useAuth();
-  const [users, setUsers] = useState<AdminUser[]>(mockUsers);
+  // No mock users - start clean
+  const [users, setUsers] = useState<AdminUser[]>([]);
   const [contentList, setContentList] = useState<CustomContent[]>([]);
   const [teachers, setTeachers] = useState<TeacherEvaluation[]>([]);
-  const [subjectsList, setSubjectsList] = useState<DynamicSubject[]>([]);
+
+  // Curriculum Management State
+  const [curriculum, setCurriculum] = useState<Record<string, string[]>>(getStoredCurriculum());
+  const [selectedSystem, setSelectedSystem] = useState<"azhar" | "general">("general");
+  const [selectedBranchKey, setSelectedBranchKey] = useState<string>("general_science");
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAddTeacherOpen, setIsAddTeacherOpen] = useState(false);
   const [isAddSubjectOpen, setIsAddSubjectOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"overview" | "pending" | "teachers" | "subjects" | "users" | "content">("overview");
+  const [newSubjectName, setNewSubjectName] = useState("");
 
-  // New Subject Form State
-  const [subTitle, setSubTitle] = useState("");
-  const [subCategory, setSubCategory] = useState("مواد علمية");
+  const [activeTab, setActiveTab] = useState<"overview" | "pending" | "teachers" | "subjects" | "users" | "content">("overview");
 
   // New Teacher Form State
   const [tName, setTName] = useState("");
-  const [tSubject, setTSubject] = useState("physics");
+  const [tSubject, setTSubject] = useState("الفيزياء");
   const [tCategory, setTCategory] = useState<"scientific" | "arabic" | "islamic">("scientific");
   const [tRating, setTRating] = useState("4.9");
   const [tExperience, setTExperience] = useState("");
@@ -133,13 +114,7 @@ export default function Admin() {
         localStorage.setItem("wathaq_teachers", JSON.stringify(initialTeachers));
       }
 
-      const savedSubjects = localStorage.getItem("wathaq_dynamic_subjects");
-      if (savedSubjects) {
-        setSubjectsList(JSON.parse(savedSubjects));
-      } else {
-        setSubjectsList(initialSubjects);
-        localStorage.setItem("wathaq_dynamic_subjects", JSON.stringify(initialSubjects));
-      }
+      setCurriculum(getStoredCurriculum());
     } catch (err) {
       console.error(err);
     }
@@ -167,28 +142,35 @@ export default function Admin() {
     localStorage.setItem("wathaq_teachers", JSON.stringify(updated));
   };
 
-  const handleAddSubjectSubmit = (e: FormEvent) => {
+  // Add subject specifically to the selected branch key
+  const handleAddSubjectToBranch = (e: FormEvent) => {
     e.preventDefault();
-    if (!subTitle) return;
+    if (!newSubjectName.trim()) return;
 
-    const newSub: DynamicSubject = {
-      id: "sub-" + Date.now(),
-      title: subTitle,
-      category: subCategory
-    };
+    const currentBranchSubjects = curriculum[selectedBranchKey] || [];
+    if (currentBranchSubjects.includes(newSubjectName.trim())) {
+      alert("هذه المادة موجودة بالفعل في هذه الشعبة!");
+      return;
+    }
 
-    const updated = [...subjectsList, newSub];
-    setSubjectsList(updated);
-    localStorage.setItem("wathaq_dynamic_subjects", JSON.stringify(updated));
+    const updatedBranchSubjects = [...currentBranchSubjects, newSubjectName.trim()];
+    const updatedCurriculum = { ...curriculum, [selectedBranchKey]: updatedBranchSubjects };
+
+    setCurriculum(updatedCurriculum);
+    saveStoredCurriculum(updatedCurriculum);
     setIsAddSubjectOpen(false);
-    setSubTitle("");
+    setNewSubjectName("");
   };
 
-  const handleDeleteSubject = (id: string) => {
-    if (window.confirm("هل أنت تأكد من رغبتك في حذف هذه المادة؟")) {
-      const updated = subjectsList.filter((s) => s.id !== id);
-      setSubjectsList(updated);
-      localStorage.setItem("wathaq_dynamic_subjects", JSON.stringify(updated));
+  // Delete subject specifically from selected branch key
+  const handleDeleteSubjectFromBranch = (subjectName: string) => {
+    if (window.confirm(`هل أنت تأكد من رغبتك في حذف مادة (${subjectName}) من هذه الشعبة؟`)) {
+      const currentBranchSubjects = curriculum[selectedBranchKey] || [];
+      const updatedBranchSubjects = currentBranchSubjects.filter((s) => s !== subjectName);
+      const updatedCurriculum = { ...curriculum, [selectedBranchKey]: updatedBranchSubjects };
+
+      setCurriculum(updatedCurriculum);
+      saveStoredCurriculum(updatedCurriculum);
     }
   };
 
@@ -200,7 +182,7 @@ export default function Admin() {
       id: "t-custom-" + Date.now(),
       name: tName,
       subjectId: tSubject,
-      subjectTitle: getSubjectTitle(tSubject),
+      subjectTitle: tSubject,
       category: tCategory,
       rating: parseFloat(tRating) || 4.9,
       reviewsCount: 1,
@@ -265,7 +247,7 @@ export default function Admin() {
           {user && (
             <button
               onClick={logout}
-              className="text-label-sm text-on-surface-variant hover:text-primary transition-colors"
+              className="text-label-sm text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
             >
               تسجيل الخروج من الحساب الحالي
             </button>
@@ -278,33 +260,18 @@ export default function Admin() {
   const pendingContent = contentList.filter((c) => c.status === "pending");
   const approvedContent = contentList.filter((c) => c.status !== "pending");
 
-  const totalUsers = users.length;
-
-  const getSubjectTitle = (code: string) => {
-    const found = subjectsList.find((s) => s.id === code || s.title === code);
-    if (found) return found.title;
-    const map: Record<string, string> = {
-      physics: "الفيزياء",
-      chemistry: "الكيمياء",
-      biology: "الأحياء",
-      math: "الرياضيات",
-      grammar: "النحو والصرف",
-      tawheed: "التوحيد والعقيدة",
-      fiqh: "الفقه وأصوله"
-    };
-    return map[code] || code;
-  };
-
-  const getContentTypeBadge = (type: string) => {
-    switch (type) {
-      case "book":
-        return <span className="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2.5 py-1 rounded-full text-[11px] flex items-center gap-1"><HardDrive className="w-3 h-3" /> رابط Drive</span>;
-      case "video":
-        return <span className="bg-rose-500/10 text-rose-400 border border-rose-500/20 px-2.5 py-1 rounded-full text-[11px] flex items-center gap-1"><Video className="w-3 h-3" /> رابط فيديو</span>;
-      default:
-        return <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full text-[11px] flex items-center gap-1"><Layers className="w-3 h-3" /> تنزيل مباشر</span>;
+  const getBranchLabel = (key: string) => {
+    switch (key) {
+      case "azhar_scientific": return "أزهري - علمي 🕌";
+      case "azhar_literary": return "أزهري - أدبي 🕌";
+      case "general_science": return "ثانوي عام - علمي علوم 🎓";
+      case "general_math": return "ثانوي عام - علمي رياضة 🎓";
+      case "general_literary": return "ثانوي عام - أدبي 🎓";
+      default: return key;
     }
   };
+
+  const currentBranchSubjects = curriculum[selectedBranchKey] || [];
 
   return (
     <div className="flex flex-col gap-stack-lg">
@@ -316,7 +283,7 @@ export default function Admin() {
           </div>
           <div>
             <h1 className="text-display-ar font-display-ar text-on-surface">لوحة تحكم الأدمن والسيطرة الشاملة</h1>
-            <p className="text-body-md text-on-surface-variant">مرحباً الأدمن ({user.displayName || user.email}). إمكانية إضافة وحذف الأقسام والمواد والمدرسين بدون أي بيانات عشوائية.</p>
+            <p className="text-body-md text-on-surface-variant">مرحباً الأدمن ({user.displayName || user.email}). التحكم الكامل بالمواد حسب الشعب والأزهر والعام.</p>
           </div>
         </div>
 
@@ -360,8 +327,8 @@ export default function Admin() {
               : "bg-surface-container-low text-on-surface-variant border-outline-variant/30 hover:border-primary/50"
           }`}
         >
-          <FolderPlus className="w-4 h-4 text-primary" />
-          <span>إدارة الأقسام والمواد الدراسية ({subjectsList.length})</span>
+          <GraduationCap className="w-4 h-4 text-primary" />
+          <span>إدارة مناهج الأزهر والعام حسب الشعبة</span>
         </button>
 
         <button
@@ -401,49 +368,153 @@ export default function Admin() {
         </button>
       </div>
 
-      {/* DYNAMIC SUBJECTS & CATEGORIES MANAGEMENT TAB */}
+      {/* DEEP HIERARCHICAL SUBJECTS & CURRICULUM MANAGEMENT TAB */}
       {activeTab === "subjects" && (
-        <div className="bg-surface-container-low border border-outline-variant/30 rounded-2xl p-6 flex flex-col gap-6">
-          <div className="flex justify-between items-center flex-wrap gap-4 border-b border-outline-variant/10 pb-4">
-            <div>
-              <h3 className="text-headline-md font-headline-md text-on-surface flex items-center gap-2">
-                <FolderPlus className="w-5 h-5 text-primary" />
-                <span>إدارة إضافة وحذف الأقسام والمواد الدراسية</span>
-              </h3>
-              <p className="text-label-sm text-on-surface-variant">يمكنك إضافة مادة جديدة لأي قسم، أو حذف أية مادة غير مطلوبة.</p>
-            </div>
-
-            <button
-              onClick={() => setIsAddSubjectOpen(true)}
-              className="bg-primary text-on-primary hover:bg-primary/90 px-4 py-2 rounded-lg text-label-sm font-medium flex items-center gap-1.5 cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>إضافة مادة جديدة</span>
-            </button>
+        <div className="bg-surface-container-low border border-outline-variant/30 rounded-3xl p-6 sm:p-8 flex flex-col gap-6 shadow-xl">
+          <div>
+            <h3 className="text-headline-md font-bold text-on-surface flex items-center gap-2">
+              <GraduationCap className="w-6 h-6 text-primary" />
+              <span>إدارة وتعديل مواد كل شعبة في المنهج الأزهري والعام</span>
+            </h3>
+            <p className="text-label-sm text-on-surface-variant mt-1">
+              اختر النظام الأكاديمي والشعبة، ثم أضف أو احذف أية مادة تظهر للطلاب في ذلك القسم تحديداً.
+            </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-stack-md">
-            {subjectsList.map((sub) => (
-              <div key={sub.id} className="bg-surface-container p-5 rounded-2xl border border-outline-variant/20 flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center font-bold">
-                    <BookOpen className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h4 className="text-body-lg font-bold text-on-surface">{sub.title}</h4>
-                    <span className="text-xs text-on-surface-variant">{sub.category}</span>
-                  </div>
-                </div>
+          {/* Step 1: System Selector (Azhar vs General) */}
+          <div className="flex flex-col gap-3">
+            <label className="text-label-sm font-bold text-on-surface">1. اختر نظام التعليم لتعديل مواده:</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <button
+                onClick={() => {
+                  setSelectedSystem("azhar");
+                  setSelectedBranchKey("azhar_scientific");
+                }}
+                className={`p-4 rounded-2xl border transition-all flex items-center justify-between cursor-pointer ${
+                  selectedSystem === "azhar"
+                    ? "bg-primary/10 border-primary text-primary font-bold shadow-md"
+                    : "bg-surface-container text-on-surface border-outline-variant/30"
+                }`}
+              >
+                <span>🕌 التعليم الأزهري الشريف</span>
+                {selectedSystem === "azhar" && <Check className="w-5 h-5 text-primary" />}
+              </button>
 
+              <button
+                onClick={() => {
+                  setSelectedSystem("general");
+                  setSelectedBranchKey("general_science");
+                }}
+                className={`p-4 rounded-2xl border transition-all flex items-center justify-between cursor-pointer ${
+                  selectedSystem === "general"
+                    ? "bg-primary/10 border-primary text-primary font-bold shadow-md"
+                    : "bg-surface-container text-on-surface border-outline-variant/30"
+                }`}
+              >
+                <span>🎓 الثانوي العام (تربية وتعليم)</span>
+                {selectedSystem === "general" && <Check className="w-5 h-5 text-primary" />}
+              </button>
+            </div>
+          </div>
+
+          {/* Step 2: Branch Selector */}
+          <div className="flex flex-col gap-3 pt-3 border-t border-outline-variant/10">
+            <label className="text-label-sm font-bold text-on-surface">2. اختر الشعبة المستهدفة:</label>
+            {selectedSystem === "azhar" ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <button
-                  onClick={() => handleDeleteSubject(sub.id)}
-                  className="text-error hover:bg-error/10 p-2 rounded-lg transition-colors cursor-pointer"
-                  title="حذف هذه المادة"
+                  onClick={() => setSelectedBranchKey("azhar_scientific")}
+                  className={`p-3.5 rounded-xl border text-center font-bold transition-all cursor-pointer ${
+                    selectedBranchKey === "azhar_scientific"
+                      ? "bg-primary text-on-primary border-primary shadow-md"
+                      : "bg-surface-container text-on-surface border-outline-variant/30"
+                  }`}
                 >
-                  <Trash2 className="w-4 h-4" />
+                  قسم علمي أزهري ({curriculum.azhar_scientific?.length || 0} مادة)
+                </button>
+                <button
+                  onClick={() => setSelectedBranchKey("azhar_literary")}
+                  className={`p-3.5 rounded-xl border text-center font-bold transition-all cursor-pointer ${
+                    selectedBranchKey === "azhar_literary"
+                      ? "bg-primary text-on-primary border-primary shadow-md"
+                      : "bg-surface-container text-on-surface border-outline-variant/30"
+                  }`}
+                >
+                  قسم أدبي أزهري ({curriculum.azhar_literary?.length || 0} مادة)
                 </button>
               </div>
-            ))}
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <button
+                  onClick={() => setSelectedBranchKey("general_science")}
+                  className={`p-3.5 rounded-xl border text-center font-bold transition-all cursor-pointer ${
+                    selectedBranchKey === "general_science"
+                      ? "bg-primary text-on-primary border-primary shadow-md"
+                      : "bg-surface-container text-on-surface border-outline-variant/30"
+                  }`}
+                >
+                  علمي علوم ({curriculum.general_science?.length || 0} مواد)
+                </button>
+                <button
+                  onClick={() => setSelectedBranchKey("general_math")}
+                  className={`p-3.5 rounded-xl border text-center font-bold transition-all cursor-pointer ${
+                    selectedBranchKey === "general_math"
+                      ? "bg-primary text-on-primary border-primary shadow-md"
+                      : "bg-surface-container text-on-surface border-outline-variant/30"
+                  }`}
+                >
+                  علمي رياضة ({curriculum.general_math?.length || 0} مواد)
+                </button>
+                <button
+                  onClick={() => setSelectedBranchKey("general_literary")}
+                  className={`p-3.5 rounded-xl border text-center font-bold transition-all cursor-pointer ${
+                    selectedBranchKey === "general_literary"
+                      ? "bg-primary text-on-primary border-primary shadow-md"
+                      : "bg-surface-container text-on-surface border-outline-variant/30"
+                  }`}
+                >
+                  قسم أدبي ({curriculum.general_literary?.length || 0} مواد)
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Step 3: Subjects List for Selected Branch */}
+          <div className="flex flex-col gap-4 pt-4 border-t border-outline-variant/10">
+            <div className="flex justify-between items-center flex-wrap gap-4">
+              <h4 className="text-body-lg font-bold text-on-surface flex items-center gap-2">
+                <span>المواد الحالية المقررة في ({getBranchLabel(selectedBranchKey)}):</span>
+              </h4>
+
+              <button
+                onClick={() => setIsAddSubjectOpen(true)}
+                className="bg-primary text-on-primary hover:bg-primary/90 px-4 py-2 rounded-xl text-label-sm font-medium flex items-center gap-1.5 cursor-pointer shadow-md"
+              >
+                <Plus className="w-4 h-4" />
+                <span>إضافة مادة جديدة لـ {getBranchLabel(selectedBranchKey)}</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-stack-md">
+              {currentBranchSubjects.map((sub, idx) => (
+                <div key={idx} className="bg-surface-container p-4 rounded-2xl border border-outline-variant/20 flex justify-between items-center shadow-sm hover:border-primary/50 transition-all">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center font-bold">
+                      <BookOpen className="w-4 h-4" />
+                    </div>
+                    <span className="font-bold text-body-md text-on-surface">{sub}</span>
+                  </div>
+
+                  <button
+                    onClick={() => handleDeleteSubjectFromBranch(sub)}
+                    className="text-error hover:bg-error/10 p-2 rounded-lg transition-colors cursor-pointer"
+                    title="حذف هذه المادة من الشعبة"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -455,9 +526,8 @@ export default function Admin() {
             <div>
               <h3 className="text-headline-md font-headline-md text-on-surface flex items-center gap-2">
                 <Award className="w-5 h-5 text-amber-400" />
-                <span>إدارة تقييمات المدرسين (إزالة أي صور عشوائية)</span>
+                <span>إدارة تقييمات المدرسين (خالية من صور الاستوك العشوائية)</span>
               </h3>
-              <p className="text-label-sm text-on-surface-variant">تم حذف الصور العشوائية والاعتماد على رموز الحروف والتقييم الأكاديمي.</p>
             </div>
 
             <button
@@ -526,7 +596,6 @@ export default function Admin() {
                 <tr className="border-b border-outline-variant/20 text-label-sm text-on-surface-variant">
                   <th className="py-3 px-4">عنوان المحتوى</th>
                   <th className="py-3 px-4">المرفِع</th>
-                  <th className="py-3 px-4">المادة</th>
                   <th className="py-3 px-4 text-left">قرار الأدمن</th>
                 </tr>
               </thead>
@@ -535,7 +604,6 @@ export default function Admin() {
                   <tr key={c.id} className="hover:bg-surface-container/50 transition-colors">
                     <td className="py-4 px-4 font-medium text-on-surface">{c.title}</td>
                     <td className="py-4 px-4 text-on-surface-variant text-sm">{c.uploaderName || "طالب مسجل"}</td>
-                    <td className="py-4 px-4 text-on-surface-variant">{getSubjectTitle(c.subject)}</td>
                     <td className="py-4 px-4 text-left">
                       <div className="flex items-center justify-end gap-2">
                         <button
@@ -568,9 +636,9 @@ export default function Admin() {
 
       {/* OVERVIEW TAB */}
       {activeTab === "overview" && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-stack-lg">
-          <div className="bg-surface-container-low border border-outline-variant/30 rounded-2xl p-6 flex flex-col gap-4">
-            <h3 className="text-headline-md font-headline-md text-on-surface">أحدث الطلاب المسجلين</h3>
+        <div className="bg-surface-container-low border border-outline-variant/30 rounded-2xl p-6 flex flex-col gap-4">
+          <h3 className="text-headline-md font-headline-md text-on-surface">الطلاب المسجلون حالياً</h3>
+          {users.length > 0 ? (
             <div className="flex flex-col gap-3">
               {users.map((u) => (
                 <div key={u.id} className="flex justify-between items-center p-3 bg-surface-container rounded-xl border border-outline-variant/10">
@@ -583,13 +651,15 @@ export default function Admin() {
                       <p className="text-[12px] text-on-surface-variant">{u.email}</p>
                     </div>
                   </div>
-                  <span className="text-label-sm text-on-surface-variant bg-surface-container-high px-2.5 py-1 rounded-full">
-                    {u.visitCount} زيارة
-                  </span>
                 </div>
               ))}
             </div>
-          </div>
+          ) : (
+            <div className="py-12 flex flex-col items-center justify-center text-center opacity-60">
+              <Users className="w-10 h-10 text-on-surface-variant mb-2" />
+              <p className="text-body-md text-on-surface-variant">لا يوجد طلاب افتراضيون حالياً. القائمة تنشأ تلقائياً مع تسجيل الطلاب.</p>
+            </div>
+          )}
         </div>
       )}
 
@@ -599,47 +669,37 @@ export default function Admin() {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="relative w-full max-w-md bg-surface-container rounded-2xl border border-outline-variant/30 p-6 shadow-2xl text-right"
+            className="relative w-full max-w-md bg-surface-container rounded-3xl border border-outline-variant/30 p-6 sm:p-8 shadow-2xl text-right"
           >
-            <h3 className="text-headline-md font-bold text-on-surface mb-4">إضافة مادة جديدة للأقسام</h3>
-            <form onSubmit={handleAddSubjectSubmit} className="flex flex-col gap-4">
+            <h3 className="text-headline-md font-bold text-on-surface mb-2">
+              إضافة مادة جديدة لـ ({getBranchLabel(selectedBranchKey)})
+            </h3>
+            <p className="text-xs text-on-surface-variant mb-4">ستظهر هذه المادة مباشرة للطلاب المسجلين في هذا المنهج والشعبة.</p>
+
+            <form onSubmit={handleAddSubjectToBranch} className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
                 <label className="text-label-sm text-on-surface-variant">اسم المادة</label>
                 <input
                   type="text"
                   required
-                  value={subTitle}
-                  onChange={(e) => setSubTitle(e.target.value)}
-                  placeholder="مثال: الإحصاء أو الجغرافيا"
-                  className="bg-surface-container-high border border-outline-variant/40 rounded-lg p-3 text-body-md"
+                  value={newSubjectName}
+                  onChange={(e) => setNewSubjectName(e.target.value)}
+                  placeholder="مثال: الفلسفة، الفرنسية، أو التفاضل"
+                  className="bg-surface-container-high border border-outline-variant/40 rounded-xl p-3 text-body-md"
                 />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-label-sm text-on-surface-variant">القسم الدراسي</label>
-                <select
-                  value={subCategory}
-                  onChange={(e) => setSubCategory(e.target.value)}
-                  className="bg-surface-container-high border border-outline-variant/40 rounded-lg p-3 text-body-md"
-                >
-                  <option value="مواد علمية">مواد علمية</option>
-                  <option value="اللغة العربية">اللغة العربية</option>
-                  <option value="العلوم الشرعية">العلوم الشرعية</option>
-                  <option value="المواد الأدبية">المواد الأدبية</option>
-                </select>
               </div>
 
               <div className="flex justify-end gap-3 mt-2">
                 <button
                   type="button"
                   onClick={() => setIsAddSubjectOpen(false)}
-                  className="px-4 py-2 rounded-lg border border-outline-variant/30 text-on-surface-variant"
+                  className="px-4 py-2.5 rounded-xl border border-outline-variant/30 text-on-surface-variant cursor-pointer"
                 >
                   إلغاء
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 rounded-lg bg-primary text-on-primary font-medium"
+                  className="px-6 py-2.5 rounded-xl bg-primary text-on-primary font-medium cursor-pointer"
                 >
                   حفظ المادة
                 </button>
@@ -655,7 +715,7 @@ export default function Admin() {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="relative w-full max-w-lg bg-surface-container rounded-2xl border border-outline-variant/30 p-6 shadow-2xl text-right max-h-[90vh] overflow-y-auto"
+            className="relative w-full max-w-lg bg-surface-container rounded-3xl border border-outline-variant/30 p-6 shadow-2xl text-right max-h-[90vh] overflow-y-auto"
           >
             <h3 className="text-headline-md font-bold text-on-surface mb-4">إضافة مدرس جديد</h3>
             <form onSubmit={handleAddTeacherSubmit} className="flex flex-col gap-4">
@@ -667,7 +727,7 @@ export default function Admin() {
                   value={tName}
                   onChange={(e) => setTName(e.target.value)}
                   placeholder="مثال: أ. أحمد العوضي"
-                  className="bg-surface-container-high border border-outline-variant/40 rounded-lg p-3 text-body-md"
+                  className="bg-surface-container-high border border-outline-variant/40 rounded-xl p-3 text-body-md"
                 />
               </div>
 
@@ -679,7 +739,7 @@ export default function Admin() {
                   value={tSubject}
                   onChange={(e) => setTSubject(e.target.value)}
                   placeholder="مثال: الفيزياء"
-                  className="bg-surface-container-high border border-outline-variant/40 rounded-lg p-3 text-body-md"
+                  className="bg-surface-container-high border border-outline-variant/40 rounded-xl p-3 text-body-md"
                 />
               </div>
 
@@ -690,7 +750,7 @@ export default function Admin() {
                   required
                   value={tSummary}
                   onChange={(e) => setTSummary(e.target.value)}
-                  className="bg-surface-container-high border border-outline-variant/40 rounded-lg p-3 text-body-md"
+                  className="bg-surface-container-high border border-outline-variant/40 rounded-xl p-3 text-body-md"
                 />
               </div>
 
@@ -698,13 +758,13 @@ export default function Admin() {
                 <button
                   type="button"
                   onClick={() => setIsAddTeacherOpen(false)}
-                  className="px-4 py-2 rounded-lg border border-outline-variant/30 text-on-surface-variant"
+                  className="px-4 py-2.5 rounded-xl border border-outline-variant/30 text-on-surface-variant"
                 >
                   إلغاء
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 rounded-lg bg-primary text-on-primary font-medium"
+                  className="px-6 py-2.5 rounded-xl bg-primary text-on-primary font-medium"
                 >
                   حفظ المدرس
                 </button>
