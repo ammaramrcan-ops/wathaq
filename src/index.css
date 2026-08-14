@@ -52,6 +52,29 @@
   }
 }
 
+@layer components {
+  /* Ultra-smooth interactive buttons & cards */
+  .btn-interactive {
+    @apply transition-all duration-200 ease-out active:scale-95 cursor-pointer;
+  }
+  
+  .btn-primary {
+    @apply bg-primary text-on-primary font-bold rounded-xl transition-all duration-200 hover:bg-primary/90 hover:shadow-[0_0_20px_rgba(181,205,182,0.3)] hover:-translate-y-0.5 active:scale-95 active:translate-y-0 cursor-pointer;
+  }
+
+  .btn-secondary {
+    @apply bg-surface-container-high text-on-surface border border-outline-variant/30 hover:border-primary/50 font-bold rounded-xl transition-all duration-200 hover:bg-surface-container-highest hover:-translate-y-0.5 active:scale-95 cursor-pointer;
+  }
+
+  .btn-ghost {
+    @apply text-on-surface-variant hover:text-primary hover:bg-primary/10 rounded-xl transition-all duration-200 active:scale-95 cursor-pointer;
+  }
+
+  .card-interactive {
+    @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:border-primary/40;
+  }
+}
+
 @layer utilities {
   .text-display-ar {
     font-size: 42px;
@@ -90,4 +113,3 @@
     letter-spacing: 0.05em;
   }
 }
-

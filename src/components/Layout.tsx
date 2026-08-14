@@ -1,6 +1,6 @@
 import { ReactNode, useState, useEffect } from "react";
 import { NavLink, Link, useNavigate, useLocation } from "react-router-dom";
-import { ArrowLeft, Plus, User, LogOut, ShieldCheck, ChevronDown } from "lucide-react";
+import { ArrowLeft, Plus, User, LogOut, ShieldCheck, ChevronDown, Home, PlayCircle, BookOpen, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "motion/react";
 import { useAuth } from "@/context/AuthContext";
@@ -58,37 +58,42 @@ export function Header() {
         {/* Header Actions */}
         <div className="flex items-center gap-2 sm:gap-3">
           {!isHome && (
-            <button 
+            <motion.button 
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.93 }}
               onClick={() => navigate(-1)}
-              className="text-on-surface-variant hover:text-primary transition-colors p-2 rounded-lg text-label-sm font-label-sm flex items-center gap-1 bg-surface-container-high md:bg-transparent"
+              className="text-on-surface-variant hover:text-primary transition-colors p-2 rounded-lg text-label-sm font-label-sm flex items-center gap-1 bg-surface-container-high md:bg-transparent cursor-pointer"
               title="العودة للصفحة السابقة"
             >
               <ArrowLeft className="w-4 h-4" />
               <span className="hidden sm:inline">العودة</span>
-            </button>
+            </motion.button>
           )}
 
           {/* Dynamic Login / My Account Menu */}
           {user ? (
             <div className="relative">
-              <button
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                className="bg-surface-container-high text-on-surface border border-primary/30 hover:border-primary px-3 py-2 rounded-xl text-label-sm font-medium flex items-center gap-2 cursor-pointer transition-all"
+                className="bg-surface-container-high text-on-surface border border-primary/30 hover:border-primary px-3 py-2 rounded-xl text-label-sm font-medium flex items-center gap-2 cursor-pointer transition-all shadow-sm hover:shadow-md"
               >
                 <div className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-bold">
                   {user.displayName ? user.displayName[0] : "ط"}
                 </div>
                 <span className="max-w-[100px] truncate">{user.displayName || "حسابي"}</span>
                 <ChevronDown className="w-3.5 h-3.5 text-on-surface-variant" />
-              </button>
+              </motion.button>
 
               {/* User Dropdown Menu */}
               <AnimatePresence>
                 {isUserMenuOpen && (
                   <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 8 }}
+                    initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                    transition={{ duration: 0.15 }}
                     className="absolute left-0 mt-2 w-56 bg-surface-container rounded-2xl border border-outline-variant/30 shadow-2xl p-2 z-50 text-right"
                   >
                     <div className="p-3 border-b border-outline-variant/10">
@@ -116,24 +121,27 @@ export function Header() {
                       </Link>
                     )}
 
-                    <button
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
                       onClick={() => {
                         logout();
                         setIsUserMenuOpen(false);
                       }}
-                      className="w-full flex items-center gap-2 p-2.5 rounded-lg text-label-sm text-error hover:bg-error/10 transition-colors cursor-pointer"
+                      className="w-full flex items-center gap-2 p-2.5 rounded-lg text-label-sm text-error hover:bg-error/10 transition-colors cursor-pointer font-medium"
                     >
                       <LogOut className="w-4 h-4" />
                       <span>تسجيل الخروج</span>
-                    </button>
+                    </motion.button>
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
           ) : (
-            <button
+            <motion.button
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.94 }}
               onClick={loginWithGoogle}
-              className="bg-surface-container-high text-on-surface border border-outline-variant/40 hover:border-primary transition-all px-3 sm:px-4 py-2 rounded-xl text-label-sm font-medium flex items-center gap-2 cursor-pointer"
+              className="bg-surface-container-high text-on-surface border border-outline-variant/40 hover:border-primary transition-all px-3 sm:px-4 py-2 rounded-xl text-label-sm font-medium flex items-center gap-2 cursor-pointer shadow-sm hover:shadow-md"
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -142,7 +150,7 @@ export function Header() {
                 <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
               </svg>
               <span>دخول بـ Google</span>
-            </button>
+            </motion.button>
           )}
         </div>
       </div>
@@ -158,20 +166,53 @@ export function Header() {
   );
 }
 
-export function Footer() {
+function MobileBottomNav() {
+  const location = useLocation();
+
+  const navItems = [
+    { path: "/", label: "الرئيسية", icon: Home },
+    { path: "/videos", label: "فيديوهات", icon: PlayCircle },
+    { path: "/books", label: "كتب وملازم", icon: BookOpen },
+    { path: "/community", label: "المجتمع", icon: MessageSquare },
+    { path: "/profile", label: "حسابي", icon: User }
+  ];
+
   return (
-    <footer className="bg-background border-t border-outline-variant/10 w-full mt-auto">
-      <div className="max-w-container-max mx-auto flex flex-col items-center gap-stack-sm py-section-padding px-gutter">
-        <h2 className="text-headline-md font-headline-md text-on-surface mb-stack-md text-center">وثاق</h2>
-        <nav className="flex flex-wrap justify-center gap-4 sm:gap-6 mb-stack-md">
-          <Link to="/" className="text-on-surface-variant hover:text-primary transition-colors text-label-sm font-label-sm opacity-80 hover:opacity-100">الرئيسية</Link>
-          <Link to="/videos" className="text-on-surface-variant hover:text-primary transition-colors text-label-sm font-label-sm opacity-80 hover:opacity-100">الفيديوهات</Link>
-          <Link to="/books" className="text-on-surface-variant hover:text-primary transition-colors text-label-sm font-label-sm opacity-80 hover:opacity-100">الكتب والملازم</Link>
-          <Link to="/community" className="text-on-surface-variant hover:text-primary transition-colors text-label-sm font-label-sm opacity-80 hover:opacity-100">المجتمع والنقاشات</Link>
-        </nav>
-        <p className="text-body-md font-body-md text-on-surface-variant opacity-80 text-center">© وثاق للتميز الصامت</p>
-      </div>
-    </footer>
+    <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-surface/90 backdrop-blur-xl border-t border-outline-variant/20 px-2 py-1.5 shadow-[0_-5px_25px_rgba(0,0,0,0.4)] flex justify-around items-center">
+      {navItems.map((item) => {
+        const isActive = item.path === "/" 
+          ? location.pathname === "/" 
+          : location.pathname.startsWith(item.path);
+        const Icon = item.icon;
+
+        return (
+          <NavLink
+            key={item.path}
+            to={item.path}
+            className="relative flex flex-col items-center gap-1 py-1 px-3 rounded-2xl transition-all cursor-pointer"
+          >
+            <motion.div
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.88 }}
+              className={`flex flex-col items-center justify-center transition-colors ${
+                isActive ? "text-primary font-bold" : "text-on-surface-variant/70 hover:text-on-surface"
+              }`}
+            >
+              <Icon className="w-5 h-5 mb-0.5" />
+              <span className="text-[11px] font-medium tracking-tight">{item.label}</span>
+            </motion.div>
+
+            {isActive && (
+              <motion.div
+                layoutId="mobileActiveIndicator"
+                className="absolute -bottom-1 w-8 h-1 bg-primary rounded-full shadow-[0_0_10px_rgba(181,205,182,0.8)]"
+                transition={{ type: "spring", stiffness: 400, damping: 30 }}
+              />
+            )}
+          </NavLink>
+        );
+      })}
+    </div>
   );
 }
 
@@ -198,7 +239,7 @@ export function Layout({ children }: { children: ReactNode }) {
   }, [location.pathname]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-background text-on-surface">
+    <div className="min-h-screen flex flex-col bg-background text-on-surface pb-16 md:pb-0">
       <Header />
       <motion.main 
         initial={{ opacity: 0, y: 10 }}
@@ -208,7 +249,7 @@ export function Layout({ children }: { children: ReactNode }) {
       >
         {children}
       </motion.main>
-      <Footer />
+      <MobileBottomNav />
     </div>
   );
 }

@@ -462,16 +462,20 @@ export function AddContentModal({
                   </div>
 
                   <div className="flex justify-between items-center mt-2">
-                    <button
+                    <motion.button
+                      whileHover={{ scale: 1.04 }}
+                      whileTap={{ scale: 0.95 }}
                       type="button"
                       onClick={() => setWizardStep(3)}
                       className="bg-surface-container-high text-on-surface-variant hover:text-on-surface px-5 py-3 rounded-2xl text-body-md font-medium transition-all flex items-center gap-1.5 cursor-pointer"
                     >
                       <ChevronRight className="w-5 h-5" />
                       <span>تعديل الإجابات</span>
-                    </button>
+                    </motion.button>
 
-                    <button
+                    <motion.button
+                      whileHover={{ scale: 1.04, y: -1 }}
+                      whileTap={{ scale: 0.94 }}
                       type="submit"
                       disabled={isSubmitting}
                       className="bg-primary text-on-primary px-7 py-3.5 rounded-2xl text-body-md font-bold hover:bg-primary/90 disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xl shadow-primary/20"
@@ -487,7 +491,7 @@ export function AddContentModal({
                           <span>🚀 تأكيد ونشر المحتوى</span>
                         </>
                       )}
-                    </button>
+                    </motion.button>
                   </div>
                 </motion.div>
               )}

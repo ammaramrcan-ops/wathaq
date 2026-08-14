@@ -121,7 +121,9 @@ export function StageWizardModal({
                   <h4 className="text-body-lg font-bold text-on-surface">1. ما هو النظام التعليمي الذي تدرس به؟</h4>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <button
+                    <motion.button
+                      whileHover={{ scale: 1.03, y: -2 }}
+                      whileTap={{ scale: 0.96 }}
                       onClick={() => handleSelectSystem("general")}
                       className={`p-5 rounded-2xl border text-right flex flex-col gap-3 transition-all cursor-pointer ${
                         selectedSystem === "general"
@@ -139,9 +141,11 @@ export function StageWizardModal({
                           شعب علمي علوم، علمي رياضة، أو أدبي لمختلف الصفوف الثانوية.
                         </p>
                       </div>
-                    </button>
+                    </motion.button>
 
-                    <button
+                    <motion.button
+                      whileHover={{ scale: 1.03, y: -2 }}
+                      whileTap={{ scale: 0.96 }}
                       onClick={() => handleSelectSystem("azhar")}
                       className={`p-5 rounded-2xl border text-right flex flex-col gap-3 transition-all cursor-pointer ${
                         selectedSystem === "azhar"
@@ -159,7 +163,7 @@ export function StageWizardModal({
                           يشمل المواد الشرعية، التفسير، التوحيد، الفقه، والعلوم الشاملة.
                         </p>
                       </div>
-                    </button>
+                    </motion.button>
                   </div>
                 </motion.div>
               )}
