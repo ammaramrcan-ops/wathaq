@@ -1,4 +1,4 @@
-import { db } from "./firebase";
+import { db, auth } from "./firebase";
 import { collection, doc, setDoc, deleteDoc, onSnapshot } from "firebase/firestore";
 
 export interface CustomContentItem {
@@ -7,6 +7,7 @@ export interface CustomContentItem {
   subject: string;
   contentType: "book" | "video" | "flashcards" | "mindmaps";
   linkUrl: string;
+  image?: string;
   description?: string;
   status: "approved" | "pending";
   uploaderName: string;
@@ -101,6 +102,33 @@ export async function deleteIDBUser(email: string): Promise<void> {
   } catch (e) {}
 }
 
+export async function clearLocalUserSessionData(): Promise<void> {
+  try {
+    localStorage.removeItem(LOCAL_STORAGE_CUSTOM);
+    localStorage.removeItem(LOCAL_STORAGE_DELETED_VIDEOS);
+    localStorage.removeItem(LOCAL_STORAGE_DELETED_BOOKS);
+    localStorage.removeItem("wathaq_deleted_teachers");
+    localStorage.removeItem("wathaq_teachers");
+    localStorage.removeItem("wathaq_users_permissions_map");
+    localStorage.removeItem("wathaq_persisted_user");
+    localStorage.removeItem("wathaq_registered_google_users");
+  } catch (e) {}
+
+  try {
+    const idb = await openIDB();
+    const tx = idb.transaction([IDB_STORE, IDB_USERS_STORE], "readwrite");
+    tx.objectStore(IDB_STORE).clear();
+    tx.objectStore(IDB_USERS_STORE).clear();
+  } catch (e) {}
+
+  // Notify UI subscribers to immediately reset active state upon logout
+  try {
+    notifyDeletedSubscribers("video");
+    notifyDeletedSubscribers("book");
+    notifyCustomSubscribers();
+  } catch (e) {}
+}
+
 // In-memory UI subscriber registry for instant local updates
 type DeletedSubscriber = (ids: string[]) => void;
 type CustomSubscriber = (items: CustomContentItem[]) => void;
@@ -185,9 +213,11 @@ export async function markItemAsDeleted(
     console.warn("LocalStorage delete write warning:", err);
   }
 
-  // 2. Persist asynchronously to Firestore cloud database
+  // 2. Persist asynchronously to Firestore cloud database if user UID exists
   try {
-    const effectiveUid = userId || "guest_user";
+    const effectiveUid = userId || auth.currentUser?.uid;
+    if (!effectiveUid) return;
+
     const deleteRecord = {
       itemId,
       itemType,
@@ -195,13 +225,13 @@ export async function markItemAsDeleted(
       deletedBy: effectiveUid
     };
 
-    // Global deletion in Firestore (ALWAYS set so cloud deletion persists even when clearing browser data)
+    // Global deletion in Firestore (ONLY succeeds if user is Admin, otherwise isolated locally)
     try {
       const globalDeletedRef = doc(db, "global_deleted_items", itemId);
       await setDoc(globalDeletedRef, deleteRecord);
     } catch (gErr: any) {
-      if (gErr?.code === "permission-denied" || gErr?.message?.includes("permission") || gErr?.message?.includes("Missing or insufficient permissions")) {
-        console.error("⚠️ خطأ في قواعد حماية Firebase (Firebase Rules Permission Denied): يرجى مراجعة وتحديث قواعد Firebase Console إلى allow read, write: if true;");
+      if (gErr?.code === "permission-denied" || gErr?.message?.includes("permission")) {
+        console.warn("🔒 عملية الحذف العام متوقفة للضيوف وغير المسؤولين (تتطلب صلاحية الأدمن في Firestore Rules).");
       } else {
         console.warn("Global deleted Firestore write error:", gErr);
       }
@@ -241,7 +271,7 @@ export function subscribeDeletedItems(
   onUpdate(localIds);
 
   const collectedIds = new Set<string>(localIds);
-  const effectiveUid = userId || "guest_user";
+  const effectiveUid = userId || auth.currentUser?.uid;
 
   // Check IndexedDB durable backup (restores deleted IDs if LocalStorage was cleared)
   loadIDBDeletedItems(itemType).then((idbIds) => {
@@ -288,26 +318,28 @@ export function subscribeDeletedItems(
       (err) => console.warn("Firestore global deleted listener warning:", err)
     );
 
-    // 2. Subscribe to User Isolated Deleted Items from Firestore
-    const userDeletedCol = collection(db, "users", effectiveUid, "deleted_items");
-    unsubUser = onSnapshot(
-      userDeletedCol,
-      (snap) => {
-        snap.docs.forEach((docSnap) => {
-          const data = docSnap.data();
-          if (!data.itemType || data.itemType === itemType) {
-            collectedIds.add(docSnap.id);
-            saveIDBDeletedItem(docSnap.id, itemType);
-          }
-        });
-        const combined = Array.from(collectedIds);
-        try {
-          localStorage.setItem(key, JSON.stringify(combined));
-        } catch {}
-        onUpdate(combined);
-      },
-      (err) => console.warn("Firestore user deleted listener warning:", err)
-    );
+    // 2. Subscribe to User Isolated Deleted Items from Firestore ONLY if a valid UID exists
+    if (effectiveUid) {
+      const userDeletedCol = collection(db, "users", effectiveUid, "deleted_items");
+      unsubUser = onSnapshot(
+        userDeletedCol,
+        (snap) => {
+          snap.docs.forEach((docSnap) => {
+            const data = docSnap.data();
+            if (!data.itemType || data.itemType === itemType) {
+              collectedIds.add(docSnap.id);
+              saveIDBDeletedItem(docSnap.id, itemType);
+            }
+          });
+          const combined = Array.from(collectedIds);
+          try {
+            localStorage.setItem(key, JSON.stringify(combined));
+          } catch {}
+          onUpdate(combined);
+        },
+        (err) => console.warn("Firestore user deleted listener warning:", err)
+      );
+    }
   } catch (err) {
     console.warn("Firestore listener setup warning:", err);
   }
@@ -326,12 +358,27 @@ export async function addCustomContent(
   item: CustomContentItem,
   userId?: string
 ): Promise<void> {
+  const effectiveUid = userId || auth.currentUser?.uid;
   const itemWithUser: CustomContentItem = {
     ...item,
-    userId: userId || "guest_user"
+    ...(effectiveUid ? { userId: effectiveUid } : {})
   };
 
-  // 1. Save to LocalStorage & notify React UI state instantly
+  // 1. Save to Cloud Firestore FIRST
+  try {
+    const docRef = doc(db, "custom_content", itemWithUser.id);
+    await setDoc(docRef, itemWithUser);
+
+    if (itemWithUser.userId) {
+      const userDocRef = doc(db, "users", itemWithUser.userId, "custom_content", itemWithUser.id);
+      await setDoc(userDocRef, itemWithUser).catch((e) => console.warn("User custom content subcollection write warning:", e));
+    }
+  } catch (err: any) {
+    console.error("Firestore addCustomContent error:", err);
+    throw new Error("فشل حفظ المحتوى على السيرفر سحابياً. يرجى التأكد من صلاحية الحساب أو إعادة المحاولة.");
+  }
+
+  // 2. Save to LocalStorage & notify React UI state ONLY after Firestore succeeds
   try {
     const existing = getLocalCustomContent();
     const updated = [itemWithUser, ...existing.filter((i) => i.id !== item.id)];
@@ -339,18 +386,6 @@ export async function addCustomContent(
     notifyCustomSubscribers();
   } catch (err) {
     console.warn("LocalStorage custom content write warning:", err);
-  }
-
-  // 2. Save to Firestore
-  try {
-    const docRef = doc(db, "custom_content", itemWithUser.id);
-    await setDoc(docRef, itemWithUser);
-
-    // Also store under user isolated path
-    const userDocRef = doc(db, "users", itemWithUser.userId!, "custom_content", itemWithUser.id);
-    await setDoc(userDocRef, itemWithUser);
-  } catch (err) {
-    console.warn("Firestore addCustomContent warning:", err);
   }
 }
 
@@ -403,7 +438,16 @@ export function subscribeCustomContent(
  * Approve a pending custom content item in Firestore & LocalStorage
  */
 export async function approveCustomContent(id: string): Promise<void> {
-  // 1. Update LocalStorage & notify React UI state instantly
+  // 1. Persist status: "approved" to Firestore Cloud FIRST
+  try {
+    const docRef = doc(db, "custom_content", id);
+    await setDoc(docRef, { status: "approved" }, { merge: true });
+  } catch (err: any) {
+    console.error("Firestore approveCustomContent error:", err);
+    throw new Error("فشل الموافقة على المحتوى سحابياً (تتطلب صلاحية الأدمن).");
+  }
+
+  // 2. Update LocalStorage & notify React UI state
   try {
     const current = getLocalCustomContent();
     const updated = current.map((item) => (item.id === id ? { ...item, status: "approved" as const } : item));
@@ -412,21 +456,22 @@ export async function approveCustomContent(id: string): Promise<void> {
   } catch (err) {
     console.warn("LocalStorage approveCustomContent warning:", err);
   }
-
-  // 2. Persist status: "approved" to Firestore Cloud
-  try {
-    const docRef = doc(db, "custom_content", id);
-    await setDoc(docRef, { status: "approved" }, { merge: true });
-  } catch (err) {
-    console.warn("Firestore approveCustomContent warning:", err);
-  }
 }
 
 /**
  * Delete a custom content item from Firestore & LocalStorage
  */
 export async function deleteCustomContent(id: string): Promise<void> {
-  // 1. Update LocalStorage & notify React UI state
+  // 1. Delete document from Firestore Cloud FIRST
+  try {
+    const docRef = doc(db, "custom_content", id);
+    await deleteDoc(docRef);
+  } catch (err: any) {
+    console.error("Firestore deleteCustomContent error:", err);
+    throw new Error("فشل حذف المحتوى سحابياً (تتطلب صلاحية الأدمن أو المالك).");
+  }
+
+  // 2. Update LocalStorage & notify React UI state
   try {
     const current = getLocalCustomContent();
     const updated = current.filter((item) => item.id !== id);
@@ -434,13 +479,5 @@ export async function deleteCustomContent(id: string): Promise<void> {
     notifyCustomSubscribers();
   } catch (err) {
     console.warn("LocalStorage deleteCustomContent warning:", err);
-  }
-
-  // 2. Delete document from Firestore Cloud
-  try {
-    const docRef = doc(db, "custom_content", id);
-    await deleteDoc(docRef);
-  } catch (err) {
-    console.warn("Firestore deleteCustomContent warning:", err);
   }
 }

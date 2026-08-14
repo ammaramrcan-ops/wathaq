@@ -148,10 +148,26 @@ export function getLocalTeachers(): TeacherEvaluation[] {
 }
 
 /**
- * Mark a teacher as deleted permanently across LocalStorage and Cloud Firestore
+ * Mark a teacher as deleted permanently across Cloud Firestore & LocalStorage
  */
 export async function deleteTeacher(teacherId: string): Promise<void> {
-  // 1. Local storage & state sync
+  // 1. Cloud Firestore sync FIRST (requires Admin permissions)
+  try {
+    const globalDeletedRef = doc(db, "global_deleted_items", teacherId);
+    await setDoc(globalDeletedRef, {
+      itemId: teacherId,
+      itemType: "teacher",
+      deletedAt: new Date().toISOString()
+    });
+
+    const teacherDocRef = doc(db, "teachers", teacherId);
+    await deleteDoc(teacherDocRef);
+  } catch (err: any) {
+    console.error("Firestore teacher delete error:", err);
+    throw new Error("فشل حذف المعلم سحابياً (تتطلب صلاحية الأدمن والاتصال).");
+  }
+
+  // 2. Local storage & state sync ONLY after Cloud Firestore succeeds
   try {
     const deletedIds = getLocalDeletedTeacherIds();
     if (!deletedIds.includes(teacherId)) {
@@ -163,38 +179,30 @@ export async function deleteTeacher(teacherId: string): Promise<void> {
     const updatedTeachers = currentTeachers.filter((t) => t.id !== teacherId);
     localStorage.setItem(LOCAL_STORAGE_TEACHERS, JSON.stringify(updatedTeachers));
   } catch (err) {
-    console.warn("Local teacher delete warning:", err);
-  }
-
-  // 2. Cloud Firestore sync
-  try {
-    const globalDeletedRef = doc(db, "global_deleted_items", teacherId);
-    await setDoc(globalDeletedRef, {
-      itemId: teacherId,
-      itemType: "teacher",
-      deletedAt: new Date().toISOString()
-    });
-
-    const teacherDocRef = doc(db, "teachers", teacherId);
-    await deleteDoc(teacherDocRef).catch(() => {});
-  } catch (err) {
-    console.warn("Firestore teacher delete warning:", err);
+    console.warn("Local teacher delete cache update warning:", err);
   }
 }
 
 /**
- * Add or update a teacher in LocalStorage & Firestore
+ * Add or update a teacher in Cloud Firestore & LocalStorage
  */
 export async function addTeacher(teacher: TeacherEvaluation): Promise<void> {
+  // 1. Cloud Firestore sync FIRST
+  try {
+    await setDoc(doc(db, "teachers", teacher.id), teacher, { merge: true });
+  } catch (err: any) {
+    console.error("Firestore addTeacher error:", err);
+    throw new Error("فشل إضافة المعلم سحابياً (تتطلب صلاحية الأدمن والاتصال).");
+  }
+
+  // 2. Local storage sync ONLY after Firestore succeeds
   try {
     const current = getLocalTeachers();
     const updated = [teacher, ...current.filter((t) => t.id !== teacher.id)];
     localStorage.setItem(LOCAL_STORAGE_TEACHERS, JSON.stringify(updated));
-  } catch (err) {}
-
-  try {
-    await setDoc(doc(db, "teachers", teacher.id), teacher, { merge: true });
-  } catch (err) {}
+  } catch (err) {
+    console.warn("LocalStorage teacher add cache update warning:", err);
+  }
 }
 
 /**

@@ -68,21 +68,21 @@ export function AdminGoogleUsersTab() {
         uid: "fZRozjpgrZMZhiJyLPjGqMfW",
         displayName: "عمار الشامي",
         email: "proammarelshamy@gmail.com",
-        provider: "Google 🔵",
+        provider: "Google",
         lastLogin: "مُزامن سحابياً"
       },
       {
         uid: "n63NjR2AAeaQh86G2gO2vO",
         displayName: "عمار الشامي",
         email: "ammargr40@gmail.com",
-        provider: "Google 🔵",
+        provider: "Google",
         lastLogin: "مُزامن سحابياً"
       },
       {
         uid: "34Nfyd2n6RgFmAxHU8OB28",
         displayName: "عمار الشامي",
         email: "ammarahmedelshamy@gmail.com",
-        provider: "Google 🔵",
+        provider: "Google",
         lastLogin: "مُزامن سحابياً"
       }
     ];
@@ -93,12 +93,6 @@ export function AdminGoogleUsersTab() {
       const key = u.email.toLowerCase();
       if (!deletedEmails.includes(key)) {
         userMap.set(key, u);
-        try {
-          setDoc(doc(db, "global_registered_users", u.uid), u, { merge: true });
-          setDoc(doc(db, "google_registered_users", u.uid), u, { merge: true });
-          setDoc(doc(db, "users", u.uid), u, { merge: true });
-          saveIDBUser(u);
-        } catch {}
       }
     });
 
@@ -163,15 +157,6 @@ export function AdminGoogleUsersTab() {
       try {
         localStorage.setItem("wathaq_registered_google_users", JSON.stringify(list));
       } catch {}
-
-      list.forEach((u) => {
-        if (u.uid && u.email && !currentDeleted.includes(u.email.toLowerCase())) {
-          try {
-            setDoc(doc(db, "global_registered_users", u.uid), u, { merge: true });
-            setDoc(doc(db, "google_registered_users", u.uid), u, { merge: true });
-          } catch {}
-        }
-      });
 
       setLoading(false);
     };

@@ -11,7 +11,7 @@ import {
 } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 import { auth, db, isFirebaseConfigured } from "@/lib/firebase";
-import { saveIDBUser } from "@/lib/contentService";
+import { saveIDBUser, clearLocalUserSessionData } from "@/lib/contentService";
 
 interface AuthUser {
   uid: string;
@@ -57,7 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Listen for Firebase auth state changes
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
-      if (fbUser) {
+      if (fbUser && !fbUser.isAnonymous) {
         const u = {
           uid: fbUser.uid,
           email: fbUser.email,
@@ -99,11 +99,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         }
       } else {
-        // Auto-authenticate guest user anonymously so Firestore write/read operations succeed
-        try {
-          await signInAnonymously(auth);
-        } catch (anonErr) {
-          console.warn("Anonymous auth initialization warning:", anonErr);
+        // If user is anonymous or signed out, maintain Guest UI state (user = null)
+        setUser(null);
+        if (!fbUser) {
+          // Auto-authenticate guest user anonymously in background so Firestore write/read rules pass
+          try {
+            await signInAnonymously(auth);
+          } catch (anonErr) {
+            console.warn("Anonymous auth initialization warning:", anonErr);
+          }
         }
       }
       setLoading(false);
@@ -139,24 +143,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await setDoc(doc(db, "users", res.user.uid), userRec, { merge: true });
       }
     } catch (err: any) {
-      console.warn("Firebase Auth Error, using local demo fallback:", err.message);
-      const u = {
-        uid: "user-" + Date.now(),
-        email: email,
-        displayName: email.split("@")[0] || "طالب وثاق",
-      };
-      setUser(u);
-      const userRec = {
-        uid: u.uid,
-        displayName: u.displayName,
-        email: u.email,
-        provider: "سيرفر محلي",
-        lastLogin: new Date().toLocaleDateString("ar-SA")
-      };
-      const saved = JSON.parse(localStorage.getItem("wathaq_registered_google_users") || "[]");
-      const filtered = saved.filter((item: any) => item.email !== email);
-      localStorage.setItem("wathaq_registered_google_users", JSON.stringify([userRec, ...filtered]));
-      saveIDBUser(userRec);
+      console.error("Firebase Login Error:", err.message);
+      throw err;
     }
   };
 
@@ -195,7 +183,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch (e) {}
       }
     } catch (err: any) {
-      console.warn("Google Auth Warning / Fallback:", err.message);
+      console.error("Google Auth Error:", err.message);
+      throw err;
     }
   };
 
@@ -212,12 +201,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         photoURL: res.user.photoURL
       });
     } catch (err: any) {
-      console.warn("Firebase Auth Error, using local demo fallback:", err.message);
-      setUser({
-        uid: "user-" + Date.now(),
-        email: email,
-        displayName: name,
-      });
+      console.error("Firebase Registration Error:", err.message);
+      throw err;
     }
   };
 
@@ -227,6 +212,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       console.error("Signout error", err);
     }
+    await clearLocalUserSessionData();
     setUser(null);
   };
 

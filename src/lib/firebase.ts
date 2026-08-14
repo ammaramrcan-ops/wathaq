@@ -4,12 +4,12 @@ import { getFirestore } from "firebase/firestore";
 
 // Firebase Configuration from environment variables
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyCr1UD50KcKuWdw8aUOjQgGALAoMdAKuB4",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "wathaq-92751.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "wathaq-92751",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "wathaq-92751.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "430884197568",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:430884197568:web:05f1518dd8830d5c8fc925"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || ""
 };
 
 // Initialize Firebase (prevent multiple initialization during HMR)

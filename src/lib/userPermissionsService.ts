@@ -123,7 +123,16 @@ export function getUserPermissions(uid: string, email: string): UserPermissions 
   const map = getPermissionsMap();
   const key = email.toLowerCase();
   if (map[key]) {
-    return map[key];
+    const cached = map[key];
+    // Safeguard: LocalStorage cache alone cannot elevate non-primary emails to admin
+    if (!isDefaultAdmin && (cached.role === "admin" || cached.canAccessAdmin)) {
+      return {
+        ...cached,
+        role: cached.role === "admin" ? "trusted_publisher" : cached.role,
+        canAccessAdmin: false
+      };
+    }
+    return cached;
   }
 
   return {

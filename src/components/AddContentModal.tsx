@@ -6,9 +6,10 @@ import {
   HardDrive, CheckCircle2, ChevronRight, ChevronLeft, HelpCircle, Sparkles, ShieldCheck 
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { auth } from "@/lib/firebase";
 import { addCustomContent } from "@/lib/contentService";
 import { getUserPermissions } from "@/lib/userPermissionsService";
-import { extractYouTubeThumbnail } from "@/lib/utils";
+import { extractYouTubeThumbnail, getSubjectTitle, getContentTypeTitle } from "@/lib/utils";
 
 interface AddContentModalProps {
   isOpen: boolean;
@@ -41,6 +42,42 @@ export function AddContentModal({
   const [success, setSuccess] = useState(false);
   const [submittedStatus, setSubmittedStatus] = useState<"approved" | "pending">("approved");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [urlError, setUrlError] = useState<string>("");
+
+  const validateUrlDomain = (urlStr: string): { isValid: boolean; reason?: string } => {
+    if (!urlStr.trim()) return { isValid: false, reason: "رابط الوصول مطلوب" };
+    try {
+      const parsed = new URL(urlStr.trim());
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        return { isValid: false, reason: "يجب أن يبدأ الرابط بـ http:// أو https://" };
+      }
+      const hostname = parsed.hostname.toLowerCase();
+      const pathname = parsed.pathname.toLowerCase();
+      const isWhitelisted = 
+        hostname.endsWith("youtube.com") ||
+        hostname.endsWith("youtu.be") ||
+        hostname.endsWith("drive.google.com") ||
+        hostname.endsWith("docs.google.com") ||
+        hostname.endsWith("archive.org") ||
+        hostname.endsWith("res.cloudinary.com") ||
+        hostname.endsWith("telegram.org") ||
+        hostname.endsWith("t.me") ||
+        hostname.endsWith("dropbox.com") ||
+        hostname.endsWith("mediafire.com") ||
+        hostname.endsWith("github.com") ||
+        pathname.endsWith(".pdf");
+
+      if (!isWhitelisted) {
+        return { 
+          isValid: false, 
+          reason: "الرابط يجب أن ينتمي لنطاق موثوق (مثل YouTube, Google Drive, Archive, Cloudinary, Telegram, أو ملف PDF)." 
+        };
+      }
+      return { isValid: true };
+    } catch (e) {
+      return { isValid: false, reason: "صيغة الرابط غير صحيحة، يرجى كتابة رابط كامل يبدأ بـ http:// أو https://" };
+    }
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -78,16 +115,23 @@ export function AddContentModal({
     e.preventDefault();
     if (isSubmitting || !title.trim() || !linkUrl.trim()) return;
 
+    const urlCheck = validateUrlDomain(linkUrl);
+    if (!urlCheck.isValid) {
+      setUrlError(urlCheck.reason || "الرابط غير موثوق");
+      setWizardStep(2);
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       // Check user permissions for direct publishing
-      const userPerms = user ? getUserPermissions(user.uid, user.email || "") : null;
+      const effectiveUserId = user?.uid || auth.currentUser?.uid;
+      const userPerms = effectiveUserId ? getUserPermissions(effectiveUserId, user?.email || "") : null;
       const isUserAdmin = 
-        user?.email === "ammaramrcan@gmail.com" || 
-        userPerms?.canDirectPublish || 
+        (user?.email && user.email.toLowerCase() === "ammaramrcan@gmail.com") || 
+        userPerms?.canDirectPublish === true || 
         userPerms?.role === "admin" || 
-        userPerms?.role === "trusted_publisher" || 
-        window.location.pathname.includes("admin");
+        userPerms?.role === "trusted_publisher";
 
       const status: "approved" | "pending" = isUserAdmin ? "approved" : "pending";
       setSubmittedStatus(status);
@@ -105,10 +149,10 @@ export function AddContentModal({
         status,
         uploaderName: isUserAdmin ? (userPerms?.role === "admin" ? "أدمن المنصة" : "ناشر معتمد") : "طالب مسجل",
         createdAt: new Date().toLocaleDateString("ar-SA"),
-        userId: user?.uid || "guest_user"
+        ...(effectiveUserId ? { userId: effectiveUserId } : {})
       };
 
-      await addCustomContent(newContentItem, user?.uid);
+      await addCustomContent(newContentItem, effectiveUserId);
 
       setSuccess(true);
       if (onSuccess) onSuccess(newContentItem);
@@ -125,33 +169,6 @@ export function AddContentModal({
       console.error("Content creation error:", err);
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const getSubjectTitle = (code: string) => {
-    const map: Record<string, string> = {
-      physics: "الفيزياء",
-      chemistry: "الكيمياء",
-      biology: "الأحياء",
-      math: "الرياضيات",
-      grammar: "النحو والصرف",
-      literature: "الأدب والنصوص",
-      rhetoric: "البلاغة والتعبير",
-      tawheed: "التوحيد والعقيدة",
-      fiqh: "الفقه وأصوله",
-      tafseer: "التفسير وعلوم القرآن",
-      hadith: "الحديث الشريف"
-    };
-    return map[code] || code;
-  };
-
-  const getContentTypeTitle = (type: string) => {
-    switch (type) {
-      case "video": return "فيديو / قائمة تشغيل مرئية";
-      case "book": return "كتاب / ملزمة دراسية (Drive)";
-      case "flashcards": return "بطاقة فلاش كارد للمراجعة";
-      case "mindmaps": return "خريطة ذهنية تفاهمية";
-      default: return "محتوى تعليمي";
     }
   };
 
@@ -337,10 +354,20 @@ export function AddContentModal({
                     autoFocus
                     dir="ltr"
                     value={linkUrl}
-                    onChange={(e) => setLinkUrl(e.target.value)}
+                    onChange={(e) => {
+                      setLinkUrl(e.target.value);
+                      if (urlError) setUrlError("");
+                    }}
                     placeholder={contentType === "video" ? "https://www.youtube.com/watch?v=..." : "https://drive.google.com/file/d/..."}
-                    className="w-full bg-surface-container-high text-on-surface border border-outline-variant/50 rounded-2xl p-4 text-body-md focus:outline-none focus:border-primary transition-all font-mono text-xs shadow-inner"
+                    className={`w-full bg-surface-container-high text-on-surface border rounded-2xl p-4 text-body-md focus:outline-none transition-all font-mono text-xs shadow-inner ${
+                      urlError ? "border-error focus:border-error" : "border-outline-variant/50 focus:border-primary"
+                    }`}
                   />
+                  {urlError && (
+                    <div className="bg-error/10 border border-error/30 text-error p-3 rounded-xl text-xs font-medium">
+                      ⚠️ {urlError}
+                    </div>
+                  )}
 
                   <div className="flex justify-between items-center mt-4">
                     <button
@@ -355,7 +382,15 @@ export function AddContentModal({
                     <button
                       type="button"
                       disabled={!linkUrl.trim()}
-                      onClick={() => setWizardStep(3)}
+                      onClick={() => {
+                        const check = validateUrlDomain(linkUrl);
+                        if (!check.isValid) {
+                          setUrlError(check.reason || "الرابط غير موثوق");
+                          return;
+                        }
+                        setUrlError("");
+                        setWizardStep(3);
+                      }}
                       className="bg-primary text-on-primary px-6 py-3 rounded-2xl text-body-md font-bold hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-2 cursor-pointer shadow-lg shadow-primary/10"
                     >
                       <span>التالي: الوصف للتفاصيل</span>

@@ -19,3 +19,36 @@ export function extractYouTubeThumbnail(url: string | undefined | null): string 
 
   return null;
 }
+
+/**
+ * Get Arabic human readable subject name from subject key
+ */
+export function getSubjectTitle(code: string): string {
+  const map: Record<string, string> = {
+    physics: "الفيزياء",
+    chemistry: "الكيمياء",
+    biology: "الأحياء",
+    math: "الرياضيات",
+    grammar: "النحو والصرف",
+    literature: "الأدب والنصوص",
+    rhetoric: "البلاغة والتعبير",
+    tawheed: "التوحيد والعقيدة",
+    fiqh: "الفقه وأصوله",
+    tafseer: "التفسير وعلوم القرآن",
+    hadith: "الحديث الشريف"
+  };
+  return map[code] || code;
+}
+
+/**
+ * Get Arabic human readable content type title
+ */
+export function getContentTypeTitle(type: string): string {
+  switch (type) {
+    case "video": return "فيديو / قائمة تشغيل مرئية";
+    case "book": return "كتاب / ملزمة دراسية (Drive)";
+    case "flashcards": return "بطاقة فلاش كارد للمراجعة";
+    case "mindmaps": return "خريطة ذهنية تفاهمية";
+    default: return "محتوى تعليمي";
+  }
+}
