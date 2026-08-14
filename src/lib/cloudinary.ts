@@ -17,8 +17,8 @@ export const isCloudinaryConfigured = Boolean(
 );
 
 export async function uploadImageToCloudinary(file: File): Promise<CloudinaryUploadResponse> {
-  const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || "demo";
-  const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || "docs_upload_example_preset";
+  const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || "dtp2karqd";
+  const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || "dtp2karqd";
 
   const url = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
   const formData = new FormData();
