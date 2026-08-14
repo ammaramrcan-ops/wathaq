@@ -4,9 +4,14 @@ import { Link, useNavigate } from "react-router-dom";
 import { 
   User, Mail, Calendar, Award, BookOpen, Video, Layers, 
   MessageSquare, Trash2, ExternalLink, Plus, CheckCircle, Clock, 
-  LogOut, Edit3, Save, ShieldCheck
+  LogOut, Edit3, Save, ShieldCheck, GraduationCap, Sparkles, Check
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { 
+  StudentAcademicProfile, 
+  getSubjectsForProfile, 
+  getProfileLabel 
+} from "@/lib/subjectsData";
 
 interface UserContribution {
   id: string;
@@ -23,10 +28,27 @@ export default function Profile() {
   const { user, logout, updateUserProfile } = useAuth();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState<"contributions" | "discussions" | "settings">("contributions");
+  const [activeTab, setActiveTab] = useState<"contributions" | "curriculum" | "discussions">("contributions");
   const [myContent, setMyContent] = useState<UserContribution[]>([]);
   const [isEditingName, setIsEditingName] = useState(false);
   const [newName, setNewName] = useState(user?.displayName || "");
+
+  // Academic Profile State (Azhar vs General & Branch Selection)
+  const [academicProfile, setAcademicProfile] = useState<StudentAcademicProfile>(() => {
+    try {
+      const saved = localStorage.getItem("wathaq_student_academic_profile");
+      return saved ? JSON.parse(saved) : { system: "general", branch: "science" };
+    } catch (e) {
+      return { system: "general", branch: "science" };
+    }
+  });
+
+  // Save academic profile to localStorage
+  const handleUpdateAcademicProfile = (newSystem: "azhar" | "general", newBranch: string) => {
+    const updated = { system: newSystem, branch: newBranch };
+    setAcademicProfile(updated);
+    localStorage.setItem("wathaq_student_academic_profile", JSON.stringify(updated));
+  };
 
   // Load custom content created by user
   useEffect(() => {
@@ -79,6 +101,8 @@ export default function Profile() {
     return map[code] || code;
   };
 
+  const currentSubjects = getSubjectsForProfile(academicProfile);
+
   return (
     <div className="flex flex-col gap-stack-lg">
       {/* Profile Banner */}
@@ -126,14 +150,14 @@ export default function Profile() {
                 </span>
               ) : (
                 <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-0.5 rounded-full text-label-sm font-medium">
-                  طالب متميز
+                  {getProfileLabel(academicProfile)}
                 </span>
               )}
             </div>
 
             <p className="text-body-md text-on-surface-variant font-mono text-xs" dir="ltr">{user.email}</p>
             <p className="text-label-sm text-on-surface-variant/70 flex items-center gap-1 mt-1">
-              <Calendar className="w-3.5 h-3.5 text-primary" /> عضو مسجل في منصة وثاق
+              <Calendar className="w-3.5 h-3.5 text-primary" /> مسار النظام: <span className="font-bold text-on-surface">{getProfileLabel(academicProfile)}</span>
             </p>
           </div>
         </div>
@@ -159,6 +183,148 @@ export default function Profile() {
             <LogOut className="w-4 h-4" />
             <span>تسجيل الخروج</span>
           </button>
+        </div>
+      </div>
+
+      {/* Academic Curriculum Specification Selector */}
+      <div className="bg-surface-container-low border border-primary/30 rounded-3xl p-6 sm:p-8 flex flex-col gap-6 shadow-xl">
+        <div className="flex justify-between items-center flex-wrap gap-4 border-b border-outline-variant/10 pb-4">
+          <div>
+            <h2 className="text-headline-md font-bold text-on-surface flex items-center gap-2">
+              <GraduationCap className="w-6 h-6 text-primary" />
+              <span>تحديد قسم المنهج وشعبة الطالب (أزهري أم ثانوي عام)</span>
+            </h2>
+            <p className="text-label-sm text-on-surface-variant mt-1">
+              اختر نوع تعليمك والشعبة لتظهر لك المواد الرسمية الخاصة بمنهجك بدقة.
+            </p>
+          </div>
+          <span className="bg-primary/10 text-primary border border-primary/20 px-3 py-1 rounded-full text-xs font-bold">
+            مُفعل حالياً: {getProfileLabel(academicProfile)}
+          </span>
+        </div>
+
+        {/* Step 1: System Selection (Azhar vs General) */}
+        <div className="flex flex-col gap-3">
+          <label className="text-label-sm font-bold text-on-surface">1. اختر نوع التعليم:</label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <button
+              onClick={() => handleUpdateAcademicProfile("azhar", "scientific")}
+              className={`p-5 rounded-2xl border transition-all flex items-center justify-between cursor-pointer ${
+                academicProfile.system === "azhar"
+                  ? "bg-primary/10 border-primary text-primary shadow-lg"
+                  : "bg-surface-container border-outline-variant/30 text-on-surface hover:border-primary/50"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">🕌</span>
+                <div className="text-right">
+                  <h3 className="font-bold text-body-lg">تعليم أزهري شريف</h3>
+                  <p className="text-xs opacity-75">المواد الشرعية والعلوم العربية والعلمية</p>
+                </div>
+              </div>
+              {academicProfile.system === "azhar" && <Check className="w-5 h-5 text-primary" />}
+            </button>
+
+            <button
+              onClick={() => handleUpdateAcademicProfile("general", "science")}
+              className={`p-5 rounded-2xl border transition-all flex items-center justify-between cursor-pointer ${
+                academicProfile.system === "general"
+                  ? "bg-primary/10 border-primary text-primary shadow-lg"
+                  : "bg-surface-container border-outline-variant/30 text-on-surface hover:border-primary/50"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">🎓</span>
+                <div className="text-right">
+                  <h3 className="font-bold text-body-lg">ثانوي عام (تربية وتعليم)</h3>
+                  <p className="text-xs opacity-75">علمي علوم / علمي رياضة / أدبي</p>
+                </div>
+              </div>
+              {academicProfile.system === "general" && <Check className="w-5 h-5 text-primary" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Step 2: Branch Selection */}
+        <div className="flex flex-col gap-3 pt-3 border-t border-outline-variant/10">
+          <label className="text-label-sm font-bold text-on-surface">2. اختر القسم والشعبة الخاصة بك:</label>
+          {academicProfile.system === "azhar" ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <button
+                onClick={() => handleUpdateAcademicProfile("azhar", "scientific")}
+                className={`p-4 rounded-xl border text-center font-bold transition-all cursor-pointer ${
+                  academicProfile.branch === "scientific"
+                    ? "bg-primary text-on-primary border-primary shadow-md"
+                    : "bg-surface-container text-on-surface border-outline-variant/30 hover:border-primary/50"
+                }`}
+              >
+                قسم علمي أزهري (14 مادة)
+              </button>
+              <button
+                onClick={() => handleUpdateAcademicProfile("azhar", "literary")}
+                className={`p-4 rounded-xl border text-center font-bold transition-all cursor-pointer ${
+                  academicProfile.branch === "literary"
+                    ? "bg-primary text-on-primary border-primary shadow-md"
+                    : "bg-surface-container text-on-surface border-outline-variant/30 hover:border-primary/50"
+                }`}
+              >
+                قسم أدبي أزهري (14 مادة)
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <button
+                onClick={() => handleUpdateAcademicProfile("general", "science")}
+                className={`p-4 rounded-xl border text-center font-bold transition-all cursor-pointer ${
+                  academicProfile.branch === "science"
+                    ? "bg-primary text-on-primary border-primary shadow-md"
+                    : "bg-surface-container text-on-surface border-outline-variant/30 hover:border-primary/50"
+                }`}
+              >
+                علمي علوم (5 مواد)
+              </button>
+              <button
+                onClick={() => handleUpdateAcademicProfile("general", "math")}
+                className={`p-4 rounded-xl border text-center font-bold transition-all cursor-pointer ${
+                  academicProfile.branch === "math"
+                    ? "bg-primary text-on-primary border-primary shadow-md"
+                    : "bg-surface-container text-on-surface border-outline-variant/30 hover:border-primary/50"
+                }`}
+              >
+                علمي رياضة (5 مواد)
+              </button>
+              <button
+                onClick={() => handleUpdateAcademicProfile("general", "literary")}
+                className={`p-4 rounded-xl border text-center font-bold transition-all cursor-pointer ${
+                  academicProfile.branch === "literary"
+                    ? "bg-primary text-on-primary border-primary shadow-md"
+                    : "bg-surface-container text-on-surface border-outline-variant/30 hover:border-primary/50"
+                }`}
+              >
+                قسم أدبي (5 مواد)
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Display Current Track Subjects */}
+        <div className="flex flex-col gap-3 pt-3 border-t border-outline-variant/10">
+          <span className="text-label-sm font-bold text-on-surface flex items-center gap-1.5">
+            <Sparkles className="w-4 h-4 text-amber-400" />
+            <span>قائمة المواد المقررة عليك في منهج ({getProfileLabel(academicProfile)}):</span>
+          </span>
+
+          <div className="flex flex-wrap gap-2">
+            {currentSubjects.map((sub, idx) => (
+              <span
+                key={idx}
+                className="bg-surface-container-high text-on-surface border border-outline-variant/30 px-3.5 py-1.5 rounded-xl text-label-sm font-medium flex items-center gap-1 shadow-sm"
+              >
+                <BookOpen className="w-3.5 h-3.5 text-primary" />
+                <span>{sub}</span>
+              </span>
+            ))}
+          </div>
         </div>
       </div>
 

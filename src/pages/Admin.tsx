@@ -2,7 +2,7 @@ import { useState, useEffect, FormEvent } from "react";
 import { motion } from "motion/react";
 import { 
   Users, UserCheck, Eye, RefreshCw, HardDrive, Video, Layers, 
-  Trash2, ExternalLink, Plus, ShieldCheck, BarChart3, TrendingUp, CheckCircle, Clock, Lock, Award, Star, AlertTriangle 
+  Trash2, ExternalLink, Plus, ShieldCheck, BarChart3, TrendingUp, CheckCircle, Clock, Lock, Award, Star, BookOpen, FolderPlus
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { AddContentModal } from "@/components/AddContentModal";
@@ -36,12 +36,27 @@ interface TeacherEvaluation {
   category: "scientific" | "arabic" | "islamic";
   rating: number;
   reviewsCount: number;
-  avatar: string;
   experience: string;
   strengths: string[];
   weaknesses: string[];
   summary: string;
 }
+
+interface DynamicSubject {
+  id: string;
+  title: string;
+  category: string;
+}
+
+const initialSubjects: DynamicSubject[] = [
+  { id: "physics", title: "الفيزياء", category: "مواد علمية" },
+  { id: "chemistry", title: "الكيمياء", category: "مواد علمية" },
+  { id: "biology", title: "الأحياء", category: "مواد علمية" },
+  { id: "math", title: "الرياضيات", category: "مواد علمية" },
+  { id: "grammar", title: "النحو والصرف", category: "اللغة العربية" },
+  { id: "fiqh", title: "الفقه وأصوله", category: "العلوم الشرعية" },
+  { id: "tawheed", title: "التوحيد والعقيدة", category: "العلوم الشرعية" }
+];
 
 const initialTeachers: TeacherEvaluation[] = [
   {
@@ -52,8 +67,7 @@ const initialTeachers: TeacherEvaluation[] = [
     category: "scientific",
     rating: 4.9,
     reviewsCount: 142,
-    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200&auto=format&fit=crop",
-    experience: "15 عاماً في تدريس الفيزياء للثانوية العامة",
+    experience: "15 عاماً في تدريس الفيزياء للثانوية العامة والأزهرية",
     summary: "خبير ومتمكن في ربط الفيزياء بالحياة الواقعية وتيسير مسائل الميكانيكا والكهرباء.",
     strengths: ["تبسيط المفاهيم المعقدة.", "حل أعقد مسائل الامتحانات بأسلوب متسلسل."],
     weaknesses: ["سرعة الشرح أحياناً في الدروس المتقدمة."]
@@ -66,7 +80,6 @@ const initialTeachers: TeacherEvaluation[] = [
     category: "scientific",
     rating: 4.8,
     reviewsCount: 115,
-    avatar: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=200&auto=format&fit=crop",
     experience: "10 سنوات في تدريس الكيمياء العضوية والتحليلية",
     summary: "مبدعة في تسمية وتفاعلات المركبات العضوية وتلخيص المعادلات الصعبة.",
     strengths: ["خرائط ذهنية رائعة تجمع التفاعلات.", "متابعة دورية واختبارات قصيرة."],
@@ -88,9 +101,16 @@ export default function Admin() {
   const [users, setUsers] = useState<AdminUser[]>(mockUsers);
   const [contentList, setContentList] = useState<CustomContent[]>([]);
   const [teachers, setTeachers] = useState<TeacherEvaluation[]>([]);
+  const [subjectsList, setSubjectsList] = useState<DynamicSubject[]>([]);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAddTeacherOpen, setIsAddTeacherOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"overview" | "pending" | "teachers" | "users" | "content">("overview");
+  const [isAddSubjectOpen, setIsAddSubjectOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"overview" | "pending" | "teachers" | "subjects" | "users" | "content">("overview");
+
+  // New Subject Form State
+  const [subTitle, setSubTitle] = useState("");
+  const [subCategory, setSubCategory] = useState("مواد علمية");
 
   // New Teacher Form State
   const [tName, setTName] = useState("");
@@ -99,10 +119,7 @@ export default function Admin() {
   const [tRating, setTRating] = useState("4.9");
   const [tExperience, setTExperience] = useState("");
   const [tSummary, setTSummary] = useState("");
-  const [tStrength, setTStrength] = useState("");
-  const [tWeakness, setTWeakness] = useState("");
 
-  // Load custom content and teachers from localStorage
   const loadData = () => {
     try {
       const savedContent = JSON.parse(localStorage.getItem("wathaq_custom_content") || "[]");
@@ -114,6 +131,14 @@ export default function Admin() {
       } else {
         setTeachers(initialTeachers);
         localStorage.setItem("wathaq_teachers", JSON.stringify(initialTeachers));
+      }
+
+      const savedSubjects = localStorage.getItem("wathaq_dynamic_subjects");
+      if (savedSubjects) {
+        setSubjectsList(JSON.parse(savedSubjects));
+      } else {
+        setSubjectsList(initialSubjects);
+        localStorage.setItem("wathaq_dynamic_subjects", JSON.stringify(initialSubjects));
       }
     } catch (err) {
       console.error(err);
@@ -142,10 +167,28 @@ export default function Admin() {
     localStorage.setItem("wathaq_teachers", JSON.stringify(updated));
   };
 
-  const handleClearAllTeachers = () => {
-    if (window.confirm("هل أنت تأكد من رغبتك في حذف جميع المدرسين وإلغاء البيانات الافتراضية؟")) {
-      setTeachers([]);
-      localStorage.setItem("wathaq_teachers", JSON.stringify([]));
+  const handleAddSubjectSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    if (!subTitle) return;
+
+    const newSub: DynamicSubject = {
+      id: "sub-" + Date.now(),
+      title: subTitle,
+      category: subCategory
+    };
+
+    const updated = [...subjectsList, newSub];
+    setSubjectsList(updated);
+    localStorage.setItem("wathaq_dynamic_subjects", JSON.stringify(updated));
+    setIsAddSubjectOpen(false);
+    setSubTitle("");
+  };
+
+  const handleDeleteSubject = (id: string) => {
+    if (window.confirm("هل أنت تأكد من رغبتك في حذف هذه المادة؟")) {
+      const updated = subjectsList.filter((s) => s.id !== id);
+      setSubjectsList(updated);
+      localStorage.setItem("wathaq_dynamic_subjects", JSON.stringify(updated));
     }
   };
 
@@ -161,30 +204,23 @@ export default function Admin() {
       category: tCategory,
       rating: parseFloat(tRating) || 4.9,
       reviewsCount: 1,
-      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200&auto=format&fit=crop",
       experience: tExperience || "مدرس معتمد في المنصة",
       summary: tSummary,
-      strengths: tStrength ? [tStrength] : ["تبسيط الشرح وتسهيل المفاهيم."],
-      weaknesses: tWeakness ? [tWeakness] : ["ملاحظة: الشرح يتطلب التركيز."]
+      strengths: ["تبسيط الشرح وتسهيل المفاهيم."],
+      weaknesses: ["ملاحظة: الشرح يتطلب التركيز."]
     };
 
     const updated = [newTeacher, ...teachers];
     setTeachers(updated);
     localStorage.setItem("wathaq_teachers", JSON.stringify(updated));
     setIsAddTeacherOpen(false);
-
-    // Reset Form
     setTName("");
     setTExperience("");
     setTSummary("");
-    setTStrength("");
-    setTWeakness("");
   };
 
-  // Check if current user is the authorized admin
   const isAuthorizedAdmin = user?.email === ADMIN_EMAIL;
 
-  // Google Sign-In Guard for Admin Panel
   if (!isAuthorizedAdmin) {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center p-4 text-center my-auto">
@@ -239,29 +275,22 @@ export default function Admin() {
     );
   }
 
-  // Filter approved vs pending content
   const pendingContent = contentList.filter((c) => c.status === "pending");
   const approvedContent = contentList.filter((c) => c.status !== "pending");
 
-  // Analytics Metrics
   const totalUsers = users.length;
-  const newVisits = users.filter((u) => u.visitCount <= 2).length;
-  const returningVisits = users.filter((u) => u.visitCount > 2).length;
-  const totalVisits = users.reduce((acc, u) => acc + u.visitCount, 0);
 
   const getSubjectTitle = (code: string) => {
+    const found = subjectsList.find((s) => s.id === code || s.title === code);
+    if (found) return found.title;
     const map: Record<string, string> = {
       physics: "الفيزياء",
       chemistry: "الكيمياء",
       biology: "الأحياء",
       math: "الرياضيات",
       grammar: "النحو والصرف",
-      literature: "الأدب والنصوص",
-      rhetoric: "البلاغة والتعبير",
       tawheed: "التوحيد والعقيدة",
-      fiqh: "الفقه وأصوله",
-      tafseer: "التفسير وعلوم القرآن",
-      hadith: "الحديث الشريف"
+      fiqh: "الفقه وأصوله"
     };
     return map[code] || code;
   };
@@ -272,8 +301,6 @@ export default function Admin() {
         return <span className="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2.5 py-1 rounded-full text-[11px] flex items-center gap-1"><HardDrive className="w-3 h-3" /> رابط Drive</span>;
       case "video":
         return <span className="bg-rose-500/10 text-rose-400 border border-rose-500/20 px-2.5 py-1 rounded-full text-[11px] flex items-center gap-1"><Video className="w-3 h-3" /> رابط فيديو</span>;
-      case "flashcards":
-        return <span className="bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2.5 py-1 rounded-full text-[11px] flex items-center gap-1"><Layers className="w-3 h-3" /> تنزيل فلاش كارد</span>;
       default:
         return <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full text-[11px] flex items-center gap-1"><Layers className="w-3 h-3" /> تنزيل مباشر</span>;
     }
@@ -288,8 +315,8 @@ export default function Admin() {
             <ShieldCheck className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-display-ar font-display-ar text-on-surface">لوحة تحكم الأدمن والسيطرة الكاملة</h1>
-            <p className="text-body-md text-on-surface-variant">مرحباً ({user.displayName || user.email}). يمكنك إضافة وحذف وتعديل أي مدرس أو كتاب أو محتوى بدون بيانات ثابتة.</p>
+            <h1 className="text-display-ar font-display-ar text-on-surface">لوحة تحكم الأدمن والسيطرة الشاملة</h1>
+            <p className="text-body-md text-on-surface-variant">مرحباً الأدمن ({user.displayName || user.email}). إمكانية إضافة وحذف الأقسام والمواد والمدرسين بدون أي بيانات عشوائية.</p>
           </div>
         </div>
 
@@ -326,6 +353,18 @@ export default function Admin() {
         </button>
 
         <button
+          onClick={() => setActiveTab("subjects")}
+          className={`px-4 sm:px-5 py-2.5 rounded-lg text-label-sm font-medium transition-all flex items-center gap-2 border whitespace-nowrap cursor-pointer ${
+            activeTab === "subjects"
+              ? "bg-primary text-on-primary border-primary"
+              : "bg-surface-container-low text-on-surface-variant border-outline-variant/30 hover:border-primary/50"
+          }`}
+        >
+          <FolderPlus className="w-4 h-4 text-primary" />
+          <span>إدارة الأقسام والمواد الدراسية ({subjectsList.length})</span>
+        </button>
+
+        <button
           onClick={() => setActiveTab("pending")}
           className={`px-4 sm:px-5 py-2.5 rounded-lg text-label-sm font-medium transition-all flex items-center gap-2 border whitespace-nowrap cursor-pointer ${
             activeTab === "pending"
@@ -346,19 +385,7 @@ export default function Admin() {
           }`}
         >
           <Award className="w-4 h-4 text-amber-400" />
-          <span>إدارة دليل المدرسين ({teachers.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab("users")}
-          className={`px-4 sm:px-5 py-2.5 rounded-lg text-label-sm font-medium transition-all flex items-center gap-2 border whitespace-nowrap cursor-pointer ${
-            activeTab === "users"
-              ? "bg-primary text-on-primary border-primary"
-              : "bg-surface-container-low text-on-surface-variant border-outline-variant/30 hover:border-primary/50"
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          <span>المستخدمين المسجلين ({totalUsers})</span>
+          <span>إدارة المدرسين ({teachers.length})</span>
         </button>
 
         <button
@@ -374,6 +401,53 @@ export default function Admin() {
         </button>
       </div>
 
+      {/* DYNAMIC SUBJECTS & CATEGORIES MANAGEMENT TAB */}
+      {activeTab === "subjects" && (
+        <div className="bg-surface-container-low border border-outline-variant/30 rounded-2xl p-6 flex flex-col gap-6">
+          <div className="flex justify-between items-center flex-wrap gap-4 border-b border-outline-variant/10 pb-4">
+            <div>
+              <h3 className="text-headline-md font-headline-md text-on-surface flex items-center gap-2">
+                <FolderPlus className="w-5 h-5 text-primary" />
+                <span>إدارة إضافة وحذف الأقسام والمواد الدراسية</span>
+              </h3>
+              <p className="text-label-sm text-on-surface-variant">يمكنك إضافة مادة جديدة لأي قسم، أو حذف أية مادة غير مطلوبة.</p>
+            </div>
+
+            <button
+              onClick={() => setIsAddSubjectOpen(true)}
+              className="bg-primary text-on-primary hover:bg-primary/90 px-4 py-2 rounded-lg text-label-sm font-medium flex items-center gap-1.5 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>إضافة مادة جديدة</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-stack-md">
+            {subjectsList.map((sub) => (
+              <div key={sub.id} className="bg-surface-container p-5 rounded-2xl border border-outline-variant/20 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center font-bold">
+                    <BookOpen className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-body-lg font-bold text-on-surface">{sub.title}</h4>
+                    <span className="text-xs text-on-surface-variant">{sub.category}</span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => handleDeleteSubject(sub.id)}
+                  className="text-error hover:bg-error/10 p-2 rounded-lg transition-colors cursor-pointer"
+                  title="حذف هذه المادة"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* TEACHERS MANAGEMENT TAB */}
       {activeTab === "teachers" && (
         <div className="bg-surface-container-low border border-outline-variant/30 rounded-2xl p-6 flex flex-col gap-6">
@@ -381,80 +455,56 @@ export default function Admin() {
             <div>
               <h3 className="text-headline-md font-headline-md text-on-surface flex items-center gap-2">
                 <Award className="w-5 h-5 text-amber-400" />
-                <span>إدارة وتقييمات المدرسين (إمكانية إضافة وحذف أي مدرس)</span>
+                <span>إدارة تقييمات المدرسين (إزالة أي صور عشوائية)</span>
               </h3>
-              <p className="text-label-sm text-on-surface-variant">لا توجد أية بيانات ثابتة، يمكنك تعديل وحذف وإضافة أي مدرس وسينعكس فوراً بالموقع.</p>
+              <p className="text-label-sm text-on-surface-variant">تم حذف الصور العشوائية والاعتماد على رموز الحروف والتقييم الأكاديمي.</p>
             </div>
 
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setIsAddTeacherOpen(true)}
-                className="bg-primary text-on-primary hover:bg-primary/90 px-4 py-2 rounded-lg text-label-sm font-medium flex items-center gap-1.5 cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span>إضافة مدرس جديد</span>
-              </button>
-
-              {teachers.length > 0 && (
-                <button
-                  onClick={handleClearAllTeachers}
-                  className="bg-error/10 text-error border border-error/30 hover:bg-error hover:text-white px-3 py-2 rounded-lg text-label-sm transition-colors cursor-pointer"
-                >
-                  تفريغ وحذف جميع المدرسين
-                </button>
-              )}
-            </div>
+            <button
+              onClick={() => setIsAddTeacherOpen(true)}
+              className="bg-primary text-on-primary hover:bg-primary/90 px-4 py-2 rounded-lg text-label-sm font-medium flex items-center gap-1.5 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>إضافة مدرس جديد</span>
+            </button>
           </div>
 
-          {/* Teachers Cards Grid */}
-          {teachers.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-stack-md">
-              {teachers.map((t) => (
-                <div key={t.id} className="bg-surface-container p-5 rounded-2xl border border-outline-variant/20 flex flex-col justify-between gap-4">
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-3">
-                      <img src={t.avatar} alt={t.name} className="w-12 h-12 rounded-full object-cover border border-primary/30" />
-                      <div>
-                        <h4 className="text-body-lg font-bold text-on-surface">{t.name}</h4>
-                        <span className="text-label-sm text-primary">{t.subjectTitle} • {t.experience}</span>
-                      </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-stack-md">
+            {teachers.map((t) => (
+              <div key={t.id} className="bg-surface-container p-5 rounded-2xl border border-outline-variant/20 flex flex-col justify-between gap-4">
+                <div className="flex justify-between items-start">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/30 text-primary flex items-center justify-center text-body-lg font-bold">
+                      {t.name.replace("أ. ", "").replace("د. ", "")[0]}
                     </div>
-
-                    <button
-                      onClick={() => handleDeleteTeacher(t.id)}
-                      className="text-error hover:bg-error/10 p-2 rounded-lg transition-colors cursor-pointer"
-                      title="حذف هذا المدرس"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div>
+                      <h4 className="text-body-lg font-bold text-on-surface">{t.name}</h4>
+                      <span className="text-label-sm text-primary">{t.subjectTitle} • {t.experience}</span>
+                    </div>
                   </div>
 
-                  <p className="text-label-sm text-on-surface-variant font-light bg-surface-container-high p-3 rounded-xl">
-                    "{t.summary}"
-                  </p>
-
-                  <div className="flex justify-between items-center pt-2 border-t border-outline-variant/10 text-label-sm">
-                    <span className="flex items-center gap-1 text-amber-400 font-bold">
-                      <Star className="w-4 h-4 fill-amber-400" /> {t.rating}
-                    </span>
-                    <span className="text-xs text-on-surface-variant">القسم: {t.category}</span>
-                  </div>
+                  <button
+                    onClick={() => handleDeleteTeacher(t.id)}
+                    className="text-error hover:bg-error/10 p-2 rounded-lg transition-colors cursor-pointer"
+                    title="حذف هذا المدرس"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="py-12 flex flex-col items-center justify-center text-center gap-3 border border-dashed border-outline-variant/30 rounded-xl">
-              <Award className="w-12 h-12 text-primary/40 mb-1" />
-              <h4 className="text-headline-md text-on-surface">دليل المدرسين فارغ حالياً</h4>
-              <p className="text-body-md text-on-surface-variant">تم حذف جميع المدرسين الافتراضيين. يمكنك إضافة مدرسك الخاص الآن.</p>
-              <button
-                onClick={() => setIsAddTeacherOpen(true)}
-                className="mt-2 bg-primary text-on-primary px-4 py-2 rounded-lg text-label-sm font-medium"
-              >
-                إضافة أول مدرس
-              </button>
-            </div>
-          )}
+
+                <p className="text-label-sm text-on-surface-variant font-light bg-surface-container-high p-3 rounded-xl">
+                  "{t.summary}"
+                </p>
+
+                <div className="flex justify-between items-center pt-2 border-t border-outline-variant/10 text-label-sm">
+                  <span className="flex items-center gap-1 text-amber-400 font-bold">
+                    <Star className="w-4 h-4 fill-amber-400" /> {t.rating}
+                  </span>
+                  <span className="text-xs text-on-surface-variant">القسم: {t.category}</span>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -467,7 +517,6 @@ export default function Admin() {
                 <Clock className="w-5 h-5 text-amber-400" />
                 <span>طلبات المحتوى المعلقة بانتظار موافقة الأدمن</span>
               </h3>
-              <p className="text-label-sm text-on-surface-variant">الرافعون العاديون ينتظرون موافقتك لتنشر الملفات لجميع الطلاب.</p>
             </div>
           </div>
 
@@ -476,9 +525,8 @@ export default function Admin() {
               <thead>
                 <tr className="border-b border-outline-variant/20 text-label-sm text-on-surface-variant">
                   <th className="py-3 px-4">عنوان المحتوى</th>
-                  <th className="py-3 px-4">اسم المرفِع</th>
+                  <th className="py-3 px-4">المرفِع</th>
                   <th className="py-3 px-4">المادة</th>
-                  <th className="py-3 px-4">النوع والرابط</th>
                   <th className="py-3 px-4 text-left">قرار الأدمن</th>
                 </tr>
               </thead>
@@ -488,14 +536,6 @@ export default function Admin() {
                     <td className="py-4 px-4 font-medium text-on-surface">{c.title}</td>
                     <td className="py-4 px-4 text-on-surface-variant text-sm">{c.uploaderName || "طالب مسجل"}</td>
                     <td className="py-4 px-4 text-on-surface-variant">{getSubjectTitle(c.subject)}</td>
-                    <td className="py-4 px-4">
-                      <div className="flex flex-col gap-1">
-                        {getContentTypeBadge(c.contentType)}
-                        <a href={c.linkUrl} target="_blank" rel="noreferrer" className="text-xs text-primary font-mono hover:underline truncate max-w-[180px]" dir="ltr">
-                          {c.linkUrl}
-                        </a>
-                      </div>
-                    </td>
                     <td className="py-4 px-4 text-left">
                       <div className="flex items-center justify-end gap-2">
                         <button
@@ -508,7 +548,6 @@ export default function Admin() {
                         <button
                           onClick={() => handleDeleteContent(c.id)}
                           className="bg-error/10 text-error border border-error/30 hover:bg-error hover:text-white p-1.5 rounded-lg transition-colors cursor-pointer"
-                          title="رفض وحذف الطلب"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -521,7 +560,7 @@ export default function Admin() {
           ) : (
             <div className="py-12 flex flex-col items-center justify-center text-center gap-3 border border-dashed border-outline-variant/30 rounded-xl">
               <CheckCircle className="w-12 h-12 text-emerald-400 mb-1" />
-              <h4 className="text-headline-md text-on-surface">لا توجد طلبات مراجعة معلقة حالياً</h4>
+              <h4 className="text-headline-md text-on-surface">لا توجد طلبات معلقة حالياً</h4>
             </div>
           )}
         </div>
@@ -530,12 +569,8 @@ export default function Admin() {
       {/* OVERVIEW TAB */}
       {activeTab === "overview" && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-stack-lg">
-          {/* Quick Users List */}
           <div className="bg-surface-container-low border border-outline-variant/30 rounded-2xl p-6 flex flex-col gap-4">
-            <h3 className="text-headline-md font-headline-md text-on-surface flex items-center justify-between">
-              <span>أحدث المسجلين بالمنصة</span>
-              <button onClick={() => setActiveTab("users")} className="text-label-sm text-primary hover:underline font-normal">عرض الكل ←</button>
-            </h3>
+            <h3 className="text-headline-md font-headline-md text-on-surface">أحدث الطلاب المسجلين</h3>
             <div className="flex flex-col gap-3">
               {users.map((u) => (
                 <div key={u.id} className="flex justify-between items-center p-3 bg-surface-container rounded-xl border border-outline-variant/10">
@@ -555,140 +590,64 @@ export default function Admin() {
               ))}
             </div>
           </div>
+        </div>
+      )}
 
-          {/* Quick Content Summary */}
-          <div className="bg-surface-container-low border border-outline-variant/30 rounded-2xl p-6 flex flex-col gap-4">
-            <h3 className="text-headline-md font-headline-md text-on-surface flex items-center justify-between">
-              <span>أحدث المحتوى المنشور</span>
-              <button onClick={() => setActiveTab("content")} className="text-label-sm text-primary hover:underline font-normal">إدارة المحتوى ←</button>
-            </h3>
-
-            {approvedContent.length > 0 ? (
-              <div className="flex flex-col gap-3">
-                {approvedContent.slice(0, 4).map((c) => (
-                  <div key={c.id} className="flex justify-between items-center p-3 bg-surface-container rounded-xl border border-outline-variant/10">
-                    <div>
-                      <h4 className="text-body-md text-on-surface font-medium mb-1">{c.title}</h4>
-                      <p className="text-[12px] text-on-surface-variant">المادة: {getSubjectTitle(c.subject)}</p>
-                    </div>
-                    {getContentTypeBadge(c.contentType)}
-                  </div>
-                ))}
+      {/* Add Subject Modal */}
+      {isAddSubjectOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="relative w-full max-w-md bg-surface-container rounded-2xl border border-outline-variant/30 p-6 shadow-2xl text-right"
+          >
+            <h3 className="text-headline-md font-bold text-on-surface mb-4">إضافة مادة جديدة للأقسام</h3>
+            <form onSubmit={handleAddSubjectSubmit} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-label-sm text-on-surface-variant">اسم المادة</label>
+                <input
+                  type="text"
+                  required
+                  value={subTitle}
+                  onChange={(e) => setSubTitle(e.target.value)}
+                  placeholder="مثال: الإحصاء أو الجغرافيا"
+                  className="bg-surface-container-high border border-outline-variant/40 rounded-lg p-3 text-body-md"
+                />
               </div>
-            ) : (
-              <div className="py-12 flex flex-col items-center justify-center text-center gap-3 opacity-60">
-                <HardDrive className="w-10 h-10 text-on-surface-variant mb-1" />
-                <p className="text-body-md text-on-surface-variant">لم يتم نشر محتوى مخصص بعد.</p>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-label-sm text-on-surface-variant">القسم الدراسي</label>
+                <select
+                  value={subCategory}
+                  onChange={(e) => setSubCategory(e.target.value)}
+                  className="bg-surface-container-high border border-outline-variant/40 rounded-lg p-3 text-body-md"
+                >
+                  <option value="مواد علمية">مواد علمية</option>
+                  <option value="اللغة العربية">اللغة العربية</option>
+                  <option value="العلوم الشرعية">العلوم الشرعية</option>
+                  <option value="المواد الأدبية">المواد الأدبية</option>
+                </select>
               </div>
-            )}
-          </div>
+
+              <div className="flex justify-end gap-3 mt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddSubjectOpen(false)}
+                  className="px-4 py-2 rounded-lg border border-outline-variant/30 text-on-surface-variant"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2 rounded-lg bg-primary text-on-primary font-medium"
+                >
+                  حفظ المادة
+                </button>
+              </div>
+            </form>
+          </motion.div>
         </div>
       )}
-
-      {/* USERS TAB */}
-      {activeTab === "users" && (
-        <div className="bg-surface-container-low border border-outline-variant/30 rounded-2xl p-6 flex flex-col gap-4 overflow-x-auto">
-          <h3 className="text-headline-md font-headline-md text-on-surface mb-2">قائمة وأسماء الطلاب المسجلين</h3>
-          <table className="w-full text-right border-collapse min-w-[600px]">
-            <thead>
-              <tr className="border-b border-outline-variant/20 text-label-sm text-on-surface-variant">
-                <th className="py-3 px-4">اسم الطالب</th>
-                <th className="py-3 px-4">البريد الإلكتروني</th>
-                <th className="py-3 px-4">تاريخ الانضمام</th>
-                <th className="py-3 px-4">عدد الزيارات</th>
-                <th className="py-3 px-4">الحالة</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-outline-variant/10 text-body-md">
-              {users.map((u) => (
-                <tr key={u.id} className="hover:bg-surface-container/50 transition-colors">
-                  <td className="py-4 px-4 font-medium text-on-surface flex items-center gap-2">
-                    <UserCheck className="w-4 h-4 text-primary" />
-                    <span>{u.name}</span>
-                  </td>
-                  <td className="py-4 px-4 text-on-surface-variant font-mono text-xs" dir="ltr">{u.email}</td>
-                  <td className="py-4 px-4 text-on-surface-variant">{u.joinDate}</td>
-                  <td className="py-4 px-4 text-on-surface">{u.visitCount} زيارة</td>
-                  <td className="py-4 px-4">
-                    <span className={`px-3 py-1 rounded-full text-label-sm ${u.status === "نشط" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-blue-500/10 text-blue-400 border border-blue-500/20"}`}>
-                      {u.status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* CONTENT MANAGEMENT TAB */}
-      {activeTab === "content" && (
-        <div className="bg-surface-container-low border border-outline-variant/30 rounded-2xl p-6 flex flex-col gap-4 overflow-x-auto">
-          <div className="flex justify-between items-center flex-wrap gap-4 mb-2">
-            <div>
-              <h3 className="text-headline-md font-headline-md text-on-surface">جدول المحتوى المنشور والمفعل (إمكانية حذف أي مادة)</h3>
-              <p className="text-label-sm text-on-surface-variant">الكتب عبر Google Drive، الفيديوهات عبر URL، والفلاش كارد عبر التحميل المباشر.</p>
-            </div>
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="bg-primary text-on-primary hover:bg-primary/90 px-4 py-2 rounded-lg text-label-sm font-medium flex items-center gap-1.5"
-            >
-              <Plus className="w-4 h-4" />
-              <span>إضافة محتوى</span>
-            </button>
-          </div>
-
-          {approvedContent.length > 0 ? (
-            <table className="w-full text-right border-collapse min-w-[600px]">
-              <thead>
-                <tr className="border-b border-outline-variant/20 text-label-sm text-on-surface-variant">
-                  <th className="py-3 px-4">العنوان</th>
-                  <th className="py-3 px-4">المادة</th>
-                  <th className="py-3 px-4">نوع المحتوى والرابط</th>
-                  <th className="py-3 px-4">الرابط المباشر</th>
-                  <th className="py-3 px-4 text-left">إجراءات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-outline-variant/10 text-body-md">
-                {approvedContent.map((c) => (
-                  <tr key={c.id} className="hover:bg-surface-container/50 transition-colors">
-                    <td className="py-4 px-4 font-medium text-on-surface">{c.title}</td>
-                    <td className="py-4 px-4 text-on-surface-variant">{getSubjectTitle(c.subject)}</td>
-                    <td className="py-4 px-4">{getContentTypeBadge(c.contentType)}</td>
-                    <td className="py-4 px-4 text-xs font-mono text-primary max-w-[200px] truncate" dir="ltr">
-                      <a href={c.linkUrl} target="_blank" rel="noreferrer" className="hover:underline flex items-center gap-1">
-                        <ExternalLink className="w-3.5 h-3.5" />
-                        <span className="truncate">{c.linkUrl}</span>
-                      </a>
-                    </td>
-                    <td className="py-4 px-4 text-left">
-                      <button
-                        onClick={() => handleDeleteContent(c.id)}
-                        className="text-error hover:bg-error/10 p-2 rounded-lg transition-colors cursor-pointer"
-                        title="حذف المحتوى"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <div className="py-12 flex flex-col items-center justify-center text-center gap-3 border border-dashed border-outline-variant/30 rounded-xl">
-              <HardDrive className="w-12 h-12 text-primary/40 mb-1" />
-              <h4 className="text-headline-md text-on-surface">لا يوجد محتوى منشور حالياً</h4>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Global Add Content Modal */}
-      <AddContentModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSuccess={loadData}
-      />
 
       {/* Add Teacher Modal */}
       {isAddTeacherOpen && (
@@ -696,9 +655,9 @@ export default function Admin() {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="relative w-full max-w-lg bg-surface-container rounded-2xl border border-outline-variant/30 p-6 sm:p-8 shadow-2xl text-right max-h-[90vh] overflow-y-auto"
+            className="relative w-full max-w-lg bg-surface-container rounded-2xl border border-outline-variant/30 p-6 shadow-2xl text-right max-h-[90vh] overflow-y-auto"
           >
-            <h3 className="text-headline-md font-bold text-on-surface mb-4">إضافة مدرس جديد وتقييمه</h3>
+            <h3 className="text-headline-md font-bold text-on-surface mb-4">إضافة مدرس جديد</h3>
             <form onSubmit={handleAddTeacherSubmit} className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
                 <label className="text-label-sm text-on-surface-variant">اسم المدرس</label>
@@ -712,55 +671,25 @@ export default function Admin() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-label-sm text-on-surface-variant">المادة</label>
-                  <select
-                    value={tSubject}
-                    onChange={(e) => setTSubject(e.target.value)}
-                    className="bg-surface-container-high border border-outline-variant/40 rounded-lg p-3 text-body-md"
-                  >
-                    <option value="physics">الفيزياء</option>
-                    <option value="chemistry">الكيمياء</option>
-                    <option value="biology">الأحياء</option>
-                    <option value="math">الرياضيات</option>
-                    <option value="grammar">النحو والصرف</option>
-                    <option value="tawheed">التوحيد والعقيدة</option>
-                  </select>
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-label-sm text-on-surface-variant">التقييم (من 5)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    max="5"
-                    value={tRating}
-                    onChange={(e) => setTRating(e.target.value)}
-                    className="bg-surface-container-high border border-outline-variant/40 rounded-lg p-3 text-body-md"
-                  />
-                </div>
-              </div>
-
               <div className="flex flex-col gap-1.5">
-                <label className="text-label-sm text-on-surface-variant">الخبرة</label>
+                <label className="text-label-sm text-on-surface-variant">المادة</label>
                 <input
                   type="text"
-                  value={tExperience}
-                  onChange={(e) => setTExperience(e.target.value)}
-                  placeholder="مثال: 10 أعوام في تدريس الثانوي"
+                  required
+                  value={tSubject}
+                  onChange={(e) => setTSubject(e.target.value)}
+                  placeholder="مثال: الفيزياء"
                   className="bg-surface-container-high border border-outline-variant/40 rounded-lg p-3 text-body-md"
                 />
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-label-sm text-on-surface-variant">نبذة ملخصة</label>
+                <label className="text-label-sm text-on-surface-variant">نبذة عن المدرس</label>
                 <textarea
                   rows={2}
                   required
                   value={tSummary}
                   onChange={(e) => setTSummary(e.target.value)}
-                  placeholder="ملخص قصير عن أسلوب الشرح..."
                   className="bg-surface-container-high border border-outline-variant/40 rounded-lg p-3 text-body-md"
                 />
               </div>
@@ -784,6 +713,12 @@ export default function Admin() {
           </motion.div>
         </div>
       )}
+
+      <AddContentModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={loadData}
+      />
     </div>
   );
 }

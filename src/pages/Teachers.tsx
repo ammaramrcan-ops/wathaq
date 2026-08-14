@@ -386,11 +386,9 @@ export default function Teachers() {
                   {/* Top Profile Header */}
                   <div className="flex justify-between items-start gap-4">
                     <div className="flex gap-4 items-center">
-                      <img
-                        src={teacher.avatar}
-                        alt={teacher.name}
-                        className="w-16 h-16 rounded-full object-cover border-2 border-primary/40"
-                      />
+                      <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/30 text-primary flex items-center justify-center text-headline-md font-bold shrink-0 shadow-md">
+                        {teacher.name.replace("أ. ", "").replace("د. ", "")[0]}
+                      </div>
                       <div>
                         <h3 className="text-headline-md font-bold text-on-surface mb-1">{teacher.name}</h3>
                         <p className="text-label-sm text-primary">{teacher.subjectTitle} • {teacher.experience}</p>
