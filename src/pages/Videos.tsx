@@ -3,7 +3,7 @@ import { motion } from "motion/react";
 import { useSearchParams } from "react-router-dom";
 import { 
   Atom, BookOpen, Compass, PlayCircle, ListVideo, 
-  ArrowRight, Sparkles, Clock, ChevronLeft, Play, User, Plus
+  ArrowRight, Sparkles, Clock, ChevronLeft, Play, User, Plus, Trash2
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { AddContentModal } from "@/components/AddContentModal";
@@ -242,8 +242,53 @@ export default function Videos() {
     setActiveVideo(null);
   };
 
+  const [videoList, setVideoList] = useState<VideoResource[]>(videoResourcesData);
+
+  useEffect(() => {
+    try {
+      const savedCustom = JSON.parse(localStorage.getItem("wathaq_custom_content") || "[]");
+      const customVids = savedCustom
+        .filter((item: any) => item.status !== "pending" && item.contentType === "video")
+        .map((item: any) => ({
+          id: item.id,
+          title: item.title,
+          subjectId: item.subject,
+          type: "single",
+          videoUrl: item.linkUrl,
+          author: item.uploaderName || "مساهمة من الطالب",
+          description: item.description || "فيديو شرح مخصص",
+          image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=800&auto=format&fit=crop"
+        }));
+
+      const deletedIds = JSON.parse(localStorage.getItem("wathaq_deleted_videos") || "[]");
+      const filteredDefaults = videoResourcesData.filter((v) => !deletedIds.includes(v.id));
+
+      setVideoList([...customVids, ...filteredDefaults]);
+    } catch (e) {
+      setVideoList(videoResourcesData);
+    }
+  }, []);
+
+  const handleDeleteVideo = (id: string) => {
+    if (window.confirm("هل أنت تأكد من رغبتك في حذف هذا الفيديو مباشرة؟")) {
+      const updated = videoList.filter((v) => v.id !== id);
+      setVideoList(updated);
+
+      // Track deleted defaults
+      try {
+        const deletedIds = JSON.parse(localStorage.getItem("wathaq_deleted_videos") || "[]");
+        localStorage.setItem("wathaq_deleted_videos", JSON.stringify([...deletedIds, id]));
+
+        // Remove from custom content
+        const savedCustom = JSON.parse(localStorage.getItem("wathaq_custom_content") || "[]");
+        const updatedCustom = savedCustom.filter((item: any) => item.id !== id);
+        localStorage.setItem("wathaq_custom_content", JSON.stringify(updatedCustom));
+      } catch (err) {}
+    }
+  };
+
   // Filtered Video Resources
-  const finalVideos = videoResourcesData.filter(
+  const finalVideos = videoList.filter(
     (v) =>
       v.subjectId === selectedSubject?.id &&
       v.type === selectedContentType?.id
@@ -528,6 +573,19 @@ export default function Videos() {
                     >
                       <Play className="w-6 h-6 translate-x-[-1px]" />
                     </button>
+
+                    {user?.email === "ammaramrcan@gmail.com" && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteVideo(vid.id);
+                        }}
+                        className="absolute top-3 left-3 bg-error/90 text-white p-2 rounded-xl shadow-lg hover:bg-error transition-all z-20 cursor-pointer"
+                        title="حذف هذا الفيديو مباشرة كـ أدمن"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
 
                     {vid.duration && (
                       <span className="absolute bottom-3 right-3 bg-black/80 px-2.5 py-1 rounded text-[11px] text-white flex items-center gap-1">

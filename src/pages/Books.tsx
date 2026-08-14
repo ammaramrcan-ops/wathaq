@@ -1,4 +1,4 @@
-import { BookOpen, FileText, LayoutList, Share2, Layers, Plus, ExternalLink } from "lucide-react";
+import { BookOpen, FileText, LayoutList, Share2, Layers, Plus, ExternalLink, Trash2 } from "lucide-react";
 import { motion } from "motion/react";
 import { useState, useEffect } from "react";
 import Flashcards from "@/pages/Flashcards";
@@ -45,15 +45,41 @@ export default function Books() {
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [customBooks, setCustomBooks] = useState<any[]>([]);
+  const [deletedBookIds, setDeletedBookIds] = useState<string[]>([]);
 
   // Load custom content approved
-  useEffect(() => {
+  const loadBooks = () => {
     try {
       const saved = JSON.parse(localStorage.getItem("wathaq_custom_content") || "[]");
       const approved = saved.filter((item: any) => item.status !== "pending" && (item.contentType === "book" || item.contentType === "mindmaps"));
       setCustomBooks(approved);
+
+      const deleted = JSON.parse(localStorage.getItem("wathaq_deleted_books") || "[]");
+      setDeletedBookIds(deleted);
     } catch (e) {}
+  };
+
+  useEffect(() => {
+    loadBooks();
   }, []);
+
+  const handleDeleteBook = (id: string, e: any) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (window.confirm("هل أنت تأكد من رغبتك في حذف هذا الكتاب/الملزمة مباشرة؟")) {
+      try {
+        const updatedDeleted = [...deletedBookIds, id];
+        setDeletedBookIds(updatedDeleted);
+        localStorage.setItem("wathaq_deleted_books", JSON.stringify(updatedDeleted));
+
+        const savedCustom = JSON.parse(localStorage.getItem("wathaq_custom_content") || "[]");
+        const updatedCustom = savedCustom.filter((item: any) => item.id !== id);
+        setCustomBooks(updatedCustom.filter((item: any) => item.status !== "pending" && (item.contentType === "book" || item.contentType === "mindmaps")));
+        localStorage.setItem("wathaq_custom_content", JSON.stringify(updatedCustom));
+      } catch (err) {}
+    }
+  };
 
   const isAdmin = user?.email === "ammaramrcan@gmail.com";
 
@@ -101,7 +127,10 @@ export default function Books() {
 
         <AddContentModal
           isOpen={isAddModalOpen}
-          onClose={() => setIsAddModalOpen(false)}
+          onClose={() => {
+            setIsAddModalOpen(false);
+            loadBooks();
+          }}
           defaultContentType="book"
         />
       </div>
@@ -135,8 +164,8 @@ export default function Books() {
   }
 
   const allFilteredBooks = [
-    ...defaultBooks.filter((b) => b.category === activeFilter || activeFilter === "school"),
-    ...customBooks.map((cb) => ({
+    ...defaultBooks.filter((b) => !deletedBookIds.includes(b.id) && (b.category === activeFilter || activeFilter === "school")),
+    ...customBooks.filter((cb) => !deletedBookIds.includes(cb.id)).map((cb) => ({
       id: cb.id,
       title: cb.title,
       subtitle: cb.description || "محتوى مخصص",
@@ -177,7 +206,7 @@ export default function Books() {
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: idx * 0.05 }}
-            className="group flex flex-col bg-surface-container-low rounded-2xl border border-outline-variant/30 overflow-hidden hover:border-primary transition-all shadow-lg"
+            className="group flex flex-col bg-surface-container-low rounded-2xl border border-outline-variant/30 overflow-hidden hover:border-primary transition-all shadow-lg relative"
           >
             <div className="aspect-[4/3] overflow-hidden relative">
               <img
@@ -188,7 +217,19 @@ export default function Books() {
               <span className="absolute top-3 left-3 bg-black/60 backdrop-blur-md text-white p-1.5 rounded-lg text-xs flex items-center gap-1">
                 <ExternalLink className="w-3.5 h-3.5" /> Google Drive
               </span>
+
+              {/* Direct Admin Delete Button */}
+              {isAdmin && (
+                <button
+                  onClick={(e) => handleDeleteBook(book.id, e)}
+                  className="absolute top-3 right-3 bg-error/90 text-white p-2 rounded-xl shadow-lg hover:bg-error transition-all z-20 cursor-pointer"
+                  title="حذف هذا الكتاب مباشرة كـ أدمن"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
             </div>
+
             <div className="p-stack-md flex flex-col gap-1 text-right">
               <h3 className="text-body-lg font-body-lg text-on-surface group-hover:text-primary transition-colors">
                 {book.title}
@@ -201,7 +242,10 @@ export default function Books() {
 
       <AddContentModal
         isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
+        onClose={() => {
+          setIsAddModalOpen(false);
+          loadBooks();
+        }}
         defaultContentType="book"
       />
     </div>
