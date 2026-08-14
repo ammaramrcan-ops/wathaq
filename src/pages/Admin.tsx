@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, FormEvent } from "react";
 import { motion } from "motion/react";
 import { 
   Users, UserCheck, Eye, RefreshCw, HardDrive, Video, Layers, 
-  Trash2, ExternalLink, Plus, ShieldCheck, BarChart3, TrendingUp, CheckCircle, Clock, Lock, LogIn 
+  Trash2, ExternalLink, Plus, ShieldCheck, BarChart3, TrendingUp, CheckCircle, Clock, Lock, Award, Star, AlertTriangle 
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { AddContentModal } from "@/components/AddContentModal";
@@ -28,6 +28,52 @@ interface CustomContent {
   uploaderName?: string;
 }
 
+interface TeacherEvaluation {
+  id: string;
+  name: string;
+  subjectId: string;
+  subjectTitle: string;
+  category: "scientific" | "arabic" | "islamic";
+  rating: number;
+  reviewsCount: number;
+  avatar: string;
+  experience: string;
+  strengths: string[];
+  weaknesses: string[];
+  summary: string;
+}
+
+const initialTeachers: TeacherEvaluation[] = [
+  {
+    id: "t-phys-1",
+    name: "أ. محمد عبدالسلام",
+    subjectId: "physics",
+    subjectTitle: "الفيزياء",
+    category: "scientific",
+    rating: 4.9,
+    reviewsCount: 142,
+    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200&auto=format&fit=crop",
+    experience: "15 عاماً في تدريس الفيزياء للثانوية العامة",
+    summary: "خبير ومتمكن في ربط الفيزياء بالحياة الواقعية وتيسير مسائل الميكانيكا والكهرباء.",
+    strengths: ["تبسيط المفاهيم المعقدة.", "حل أعقد مسائل الامتحانات بأسلوب متسلسل."],
+    weaknesses: ["سرعة الشرح أحياناً في الدروس المتقدمة."]
+  },
+  {
+    id: "t-chem-1",
+    name: "أ. سارة حسن",
+    subjectId: "chemistry",
+    subjectTitle: "الكيمياء",
+    category: "scientific",
+    rating: 4.8,
+    reviewsCount: 115,
+    avatar: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=200&auto=format&fit=crop",
+    experience: "10 سنوات في تدريس الكيمياء العضوية والتحليلية",
+    summary: "مبدعة في تسمية وتفاعلات المركبات العضوية وتلخيص المعادلات الصعبة.",
+    strengths: ["خرائط ذهنية رائعة تجمع التفاعلات.", "متابعة دورية واختبارات قصيرة."],
+    weaknesses: ["الإطالة أحياناً في شرح الأجزاء التأسيسية."]
+  }
+];
+
 const mockUsers: AdminUser[] = [
   { id: "u1", name: "أحمد محمود", email: "ahmed@example.com", joinDate: "2026-08-10", visitCount: 14, status: "نشط" },
   { id: "u2", name: "سارة علي", email: "sara@example.com", joinDate: "2026-08-12", visitCount: 8, status: "نشط" },
@@ -41,21 +87,41 @@ export default function Admin() {
   const { user, loginWithGoogle, logout } = useAuth();
   const [users, setUsers] = useState<AdminUser[]>(mockUsers);
   const [contentList, setContentList] = useState<CustomContent[]>([]);
+  const [teachers, setTeachers] = useState<TeacherEvaluation[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"overview" | "pending" | "users" | "content">("overview");
+  const [isAddTeacherOpen, setIsAddTeacherOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"overview" | "pending" | "teachers" | "users" | "content">("overview");
 
-  // Load custom content from localStorage
-  const loadContent = () => {
+  // New Teacher Form State
+  const [tName, setTName] = useState("");
+  const [tSubject, setTSubject] = useState("physics");
+  const [tCategory, setTCategory] = useState<"scientific" | "arabic" | "islamic">("scientific");
+  const [tRating, setTRating] = useState("4.9");
+  const [tExperience, setTExperience] = useState("");
+  const [tSummary, setTSummary] = useState("");
+  const [tStrength, setTStrength] = useState("");
+  const [tWeakness, setTWeakness] = useState("");
+
+  // Load custom content and teachers from localStorage
+  const loadData = () => {
     try {
-      const saved = JSON.parse(localStorage.getItem("wathaq_custom_content") || "[]");
-      setContentList(saved);
+      const savedContent = JSON.parse(localStorage.getItem("wathaq_custom_content") || "[]");
+      setContentList(savedContent);
+
+      const savedTeachers = localStorage.getItem("wathaq_teachers");
+      if (savedTeachers) {
+        setTeachers(JSON.parse(savedTeachers));
+      } else {
+        setTeachers(initialTeachers);
+        localStorage.setItem("wathaq_teachers", JSON.stringify(initialTeachers));
+      }
     } catch (err) {
       console.error(err);
     }
   };
 
   useEffect(() => {
-    loadContent();
+    loadData();
   }, []);
 
   const handleDeleteContent = (id: string) => {
@@ -68,6 +134,51 @@ export default function Admin() {
     const updated = contentList.map((c) => (c.id === id ? { ...c, status: "approved" as const } : c));
     setContentList(updated);
     localStorage.setItem("wathaq_custom_content", JSON.stringify(updated));
+  };
+
+  const handleDeleteTeacher = (id: string) => {
+    const updated = teachers.filter((t) => t.id !== id);
+    setTeachers(updated);
+    localStorage.setItem("wathaq_teachers", JSON.stringify(updated));
+  };
+
+  const handleClearAllTeachers = () => {
+    if (window.confirm("هل أنت تأكد من رغبتك في حذف جميع المدرسين وإلغاء البيانات الافتراضية؟")) {
+      setTeachers([]);
+      localStorage.setItem("wathaq_teachers", JSON.stringify([]));
+    }
+  };
+
+  const handleAddTeacherSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    if (!tName || !tSummary) return;
+
+    const newTeacher: TeacherEvaluation = {
+      id: "t-custom-" + Date.now(),
+      name: tName,
+      subjectId: tSubject,
+      subjectTitle: getSubjectTitle(tSubject),
+      category: tCategory,
+      rating: parseFloat(tRating) || 4.9,
+      reviewsCount: 1,
+      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200&auto=format&fit=crop",
+      experience: tExperience || "مدرس معتمد في المنصة",
+      summary: tSummary,
+      strengths: tStrength ? [tStrength] : ["تبسيط الشرح وتسهيل المفاهيم."],
+      weaknesses: tWeakness ? [tWeakness] : ["ملاحظة: الشرح يتطلب التركيز."]
+    };
+
+    const updated = [newTeacher, ...teachers];
+    setTeachers(updated);
+    localStorage.setItem("wathaq_teachers", JSON.stringify(updated));
+    setIsAddTeacherOpen(false);
+
+    // Reset Form
+    setTName("");
+    setTExperience("");
+    setTSummary("");
+    setTStrength("");
+    setTWeakness("");
   };
 
   // Check if current user is the authorized admin
@@ -177,8 +288,8 @@ export default function Admin() {
             <ShieldCheck className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-display-ar font-display-ar text-on-surface">لوحة تحكم الأدمن ومراجعة المحتوى</h1>
-            <p className="text-body-md text-on-surface-variant">مرحباً بك ({user.displayName || user.email}). أنت مسجل بالحساب المصرح الرسمي.</p>
+            <h1 className="text-display-ar font-display-ar text-on-surface">لوحة تحكم الأدمن والسيطرة الكاملة</h1>
+            <p className="text-body-md text-on-surface-variant">مرحباً ({user.displayName || user.email}). يمكنك إضافة وحذف وتعديل أي مدرس أو كتاب أو محتوى بدون بيانات ثابتة.</p>
           </div>
         </div>
 
@@ -193,7 +304,7 @@ export default function Admin() {
 
           <button
             onClick={logout}
-            className="bg-surface-container-high border border-outline-variant/30 text-on-surface hover:text-error transition-colors px-3 py-2.5 rounded-xl text-label-sm"
+            className="bg-surface-container-high border border-outline-variant/30 text-on-surface hover:text-error transition-colors px-3 py-2.5 rounded-xl text-label-sm cursor-pointer"
           >
             خروج الأدمن
           </button>
@@ -224,9 +335,18 @@ export default function Admin() {
         >
           <Clock className="w-4 h-4 text-amber-400" />
           <span>طلبات المراجعة ({pendingContent.length})</span>
-          {pendingContent.length > 0 && (
-            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
-          )}
+        </button>
+
+        <button
+          onClick={() => setActiveTab("teachers")}
+          className={`px-4 sm:px-5 py-2.5 rounded-lg text-label-sm font-medium transition-all flex items-center gap-2 border whitespace-nowrap cursor-pointer ${
+            activeTab === "teachers"
+              ? "bg-primary text-on-primary border-primary"
+              : "bg-surface-container-low text-on-surface-variant border-outline-variant/30 hover:border-primary/50"
+          }`}
+        >
+          <Award className="w-4 h-4 text-amber-400" />
+          <span>إدارة دليل المدرسين ({teachers.length})</span>
         </button>
 
         <button
@@ -254,46 +374,89 @@ export default function Admin() {
         </button>
       </div>
 
-      {/* Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-stack-md">
-        <div className="bg-surface-container-low border border-outline-variant/30 rounded-2xl p-6 flex flex-col gap-2">
-          <div className="flex justify-between items-center text-on-surface-variant">
-            <span className="text-label-sm">طلبات مراجعة معلقة</span>
-            <Clock className="w-5 h-5 text-amber-400" />
-          </div>
-          <span className="text-headline-lg font-bold text-on-surface">{pendingContent.length} طلبات</span>
-          <span className="text-[12px] text-amber-400">بانتظار موافقتك للنشر</span>
-        </div>
+      {/* TEACHERS MANAGEMENT TAB */}
+      {activeTab === "teachers" && (
+        <div className="bg-surface-container-low border border-outline-variant/30 rounded-2xl p-6 flex flex-col gap-6">
+          <div className="flex justify-between items-center flex-wrap gap-4 border-b border-outline-variant/10 pb-4">
+            <div>
+              <h3 className="text-headline-md font-headline-md text-on-surface flex items-center gap-2">
+                <Award className="w-5 h-5 text-amber-400" />
+                <span>إدارة وتقييمات المدرسين (إمكانية إضافة وحذف أي مدرس)</span>
+              </h3>
+              <p className="text-label-sm text-on-surface-variant">لا توجد أية بيانات ثابتة، يمكنك تعديل وحذف وإضافة أي مدرس وسينعكس فوراً بالموقع.</p>
+            </div>
 
-        <div className="bg-surface-container-low border border-outline-variant/30 rounded-2xl p-6 flex flex-col gap-2">
-          <div className="flex justify-between items-center text-on-surface-variant">
-            <span className="text-label-sm">إجمالي الطلاب المسجلين</span>
-            <Users className="w-5 h-5 text-primary" />
-          </div>
-          <span className="text-headline-lg font-bold text-on-surface">{totalUsers} طالب</span>
-          <span className="text-[12px] text-emerald-400 flex items-center gap-1">
-            <TrendingUp className="w-3.5 h-3.5" /> +25% هذا الأسبوع
-          </span>
-        </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setIsAddTeacherOpen(true)}
+                className="bg-primary text-on-primary hover:bg-primary/90 px-4 py-2 rounded-lg text-label-sm font-medium flex items-center gap-1.5 cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>إضافة مدرس جديد</span>
+              </button>
 
-        <div className="bg-surface-container-low border border-outline-variant/30 rounded-2xl p-6 flex flex-col gap-2">
-          <div className="flex justify-between items-center text-on-surface-variant">
-            <span className="text-label-sm">الزيارات الجديدة (New Visitors)</span>
-            <Eye className="w-5 h-5 text-blue-400" />
+              {teachers.length > 0 && (
+                <button
+                  onClick={handleClearAllTeachers}
+                  className="bg-error/10 text-error border border-error/30 hover:bg-error hover:text-white px-3 py-2 rounded-lg text-label-sm transition-colors cursor-pointer"
+                >
+                  تفريغ وحذف جميع المدرسين
+                </button>
+              )}
+            </div>
           </div>
-          <span className="text-headline-lg font-bold text-on-surface">{newVisits} زيارة</span>
-          <span className="text-[12px] text-on-surface-variant/70">أول مرة للمنصة</span>
-        </div>
 
-        <div className="bg-surface-container-low border border-outline-variant/30 rounded-2xl p-6 flex flex-col gap-2">
-          <div className="flex justify-between items-center text-on-surface-variant">
-            <span className="text-label-sm">الزيارات المكررة (Returning)</span>
-            <RefreshCw className="w-5 h-5 text-emerald-400" />
-          </div>
-          <span className="text-headline-lg font-bold text-on-surface">{returningVisits} زيارة</span>
-          <span className="text-[12px] text-emerald-400">معدل العودة 75%</span>
+          {/* Teachers Cards Grid */}
+          {teachers.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-stack-md">
+              {teachers.map((t) => (
+                <div key={t.id} className="bg-surface-container p-5 rounded-2xl border border-outline-variant/20 flex flex-col justify-between gap-4">
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-3">
+                      <img src={t.avatar} alt={t.name} className="w-12 h-12 rounded-full object-cover border border-primary/30" />
+                      <div>
+                        <h4 className="text-body-lg font-bold text-on-surface">{t.name}</h4>
+                        <span className="text-label-sm text-primary">{t.subjectTitle} • {t.experience}</span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => handleDeleteTeacher(t.id)}
+                      className="text-error hover:bg-error/10 p-2 rounded-lg transition-colors cursor-pointer"
+                      title="حذف هذا المدرس"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <p className="text-label-sm text-on-surface-variant font-light bg-surface-container-high p-3 rounded-xl">
+                    "{t.summary}"
+                  </p>
+
+                  <div className="flex justify-between items-center pt-2 border-t border-outline-variant/10 text-label-sm">
+                    <span className="flex items-center gap-1 text-amber-400 font-bold">
+                      <Star className="w-4 h-4 fill-amber-400" /> {t.rating}
+                    </span>
+                    <span className="text-xs text-on-surface-variant">القسم: {t.category}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="py-12 flex flex-col items-center justify-center text-center gap-3 border border-dashed border-outline-variant/30 rounded-xl">
+              <Award className="w-12 h-12 text-primary/40 mb-1" />
+              <h4 className="text-headline-md text-on-surface">دليل المدرسين فارغ حالياً</h4>
+              <p className="text-body-md text-on-surface-variant">تم حذف جميع المدرسين الافتراضيين. يمكنك إضافة مدرسك الخاص الآن.</p>
+              <button
+                onClick={() => setIsAddTeacherOpen(true)}
+                className="mt-2 bg-primary text-on-primary px-4 py-2 rounded-lg text-label-sm font-medium"
+              >
+                إضافة أول مدرس
+              </button>
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
       {/* PENDING APPROVAL TAB */}
       {activeTab === "pending" && (
@@ -359,9 +522,6 @@ export default function Admin() {
             <div className="py-12 flex flex-col items-center justify-center text-center gap-3 border border-dashed border-outline-variant/30 rounded-xl">
               <CheckCircle className="w-12 h-12 text-emerald-400 mb-1" />
               <h4 className="text-headline-md text-on-surface">لا توجد طلبات مراجعة معلقة حالياً</h4>
-              <p className="text-body-md text-on-surface-variant max-w-sm">
-                تمت مراجعة ونشر جميع الطلبات المعلقة بنجاح.
-              </p>
             </div>
           )}
         </div>
@@ -466,7 +626,7 @@ export default function Admin() {
         <div className="bg-surface-container-low border border-outline-variant/30 rounded-2xl p-6 flex flex-col gap-4 overflow-x-auto">
           <div className="flex justify-between items-center flex-wrap gap-4 mb-2">
             <div>
-              <h3 className="text-headline-md font-headline-md text-on-surface">جدول المحتوى المنشور والمفعل</h3>
+              <h3 className="text-headline-md font-headline-md text-on-surface">جدول المحتوى المنشور والمفعل (إمكانية حذف أي مادة)</h3>
               <p className="text-label-sm text-on-surface-variant">الكتب عبر Google Drive، الفيديوهات عبر URL، والفلاش كارد عبر التحميل المباشر.</p>
             </div>
             <button
@@ -527,8 +687,103 @@ export default function Admin() {
       <AddContentModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSuccess={loadContent}
+        onSuccess={loadData}
       />
+
+      {/* Add Teacher Modal */}
+      {isAddTeacherOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="relative w-full max-w-lg bg-surface-container rounded-2xl border border-outline-variant/30 p-6 sm:p-8 shadow-2xl text-right max-h-[90vh] overflow-y-auto"
+          >
+            <h3 className="text-headline-md font-bold text-on-surface mb-4">إضافة مدرس جديد وتقييمه</h3>
+            <form onSubmit={handleAddTeacherSubmit} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-label-sm text-on-surface-variant">اسم المدرس</label>
+                <input
+                  type="text"
+                  required
+                  value={tName}
+                  onChange={(e) => setTName(e.target.value)}
+                  placeholder="مثال: أ. أحمد العوضي"
+                  className="bg-surface-container-high border border-outline-variant/40 rounded-lg p-3 text-body-md"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-label-sm text-on-surface-variant">المادة</label>
+                  <select
+                    value={tSubject}
+                    onChange={(e) => setTSubject(e.target.value)}
+                    className="bg-surface-container-high border border-outline-variant/40 rounded-lg p-3 text-body-md"
+                  >
+                    <option value="physics">الفيزياء</option>
+                    <option value="chemistry">الكيمياء</option>
+                    <option value="biology">الأحياء</option>
+                    <option value="math">الرياضيات</option>
+                    <option value="grammar">النحو والصرف</option>
+                    <option value="tawheed">التوحيد والعقيدة</option>
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-label-sm text-on-surface-variant">التقييم (من 5)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    max="5"
+                    value={tRating}
+                    onChange={(e) => setTRating(e.target.value)}
+                    className="bg-surface-container-high border border-outline-variant/40 rounded-lg p-3 text-body-md"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-label-sm text-on-surface-variant">الخبرة</label>
+                <input
+                  type="text"
+                  value={tExperience}
+                  onChange={(e) => setTExperience(e.target.value)}
+                  placeholder="مثال: 10 أعوام في تدريس الثانوي"
+                  className="bg-surface-container-high border border-outline-variant/40 rounded-lg p-3 text-body-md"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-label-sm text-on-surface-variant">نبذة ملخصة</label>
+                <textarea
+                  rows={2}
+                  required
+                  value={tSummary}
+                  onChange={(e) => setTSummary(e.target.value)}
+                  placeholder="ملخص قصير عن أسلوب الشرح..."
+                  className="bg-surface-container-high border border-outline-variant/40 rounded-lg p-3 text-body-md"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 mt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddTeacherOpen(false)}
+                  className="px-4 py-2 rounded-lg border border-outline-variant/30 text-on-surface-variant"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2 rounded-lg bg-primary text-on-primary font-medium"
+                >
+                  حفظ المدرس
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

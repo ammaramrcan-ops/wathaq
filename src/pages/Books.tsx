@@ -1,7 +1,9 @@
-import { BookOpen, FileText, LayoutList, Share2, Layers } from "lucide-react";
+import { BookOpen, FileText, LayoutList, Share2, Layers, Plus, ExternalLink } from "lucide-react";
 import { motion } from "motion/react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Flashcards from "@/pages/Flashcards";
+import { useAuth } from "@/context/AuthContext";
+import { AddContentModal } from "@/components/AddContentModal";
 
 const filters = [
   { id: "school", label: "كتب مدرسية", icon: BookOpen },
@@ -11,128 +13,197 @@ const filters = [
   { id: "flashcards", label: "فلاش كارد", icon: Layers }
 ];
 
-const books = [
+const defaultBooks = [
   {
+    id: "b1",
     title: "ملزمة الفيزياء العميقة",
     subtitle: "الفصل الدراسي الأول",
     category: "notes",
+    linkUrl: "https://drive.google.com",
     image: "https://lh3.googleusercontent.com/aida-public/AB6AXuBXWTxSXpflwWZItPL94yRgS72AE_eUXo1siiyESo1-FtlENXtwS4j5JXy150kvyqL6Pm5BDFrf3sDIzqGo4tX5STKCeKvqKMZM5BEt7Afqpdg-O7kLpY-wLOD5FlpE9YQyckPAvtZo1bOJPJDge_b-pNRmGkICV8U9A6LJ23e-go5TKE9CdYudpJH1DzZ8ZcZ1f814a8sXd37rJZtFFLaMLWddmxzm0WLnICj8-IAJcvcgGcdWPtqnsdZwqjXW9cI7-ztZZf6EI3vQ"
   },
   {
+    id: "b2",
     title: "مراجعة الرياضيات المجردة",
     subtitle: "الوحدة الثانية",
     category: "school",
+    linkUrl: "https://drive.google.com",
     image: "https://lh3.googleusercontent.com/aida-public/AB6AXuDJwM21A8mp6-EC-Gvs1QB12S910ai9i_npIp_WG2YcVE8yUFfAwYzksHTsmDFMx3HlBbv7ErLUsaJ1FNZFJ9IL5SywhrzkSXL2t2W6vXkxCy5wmo6vpOh6yY-nYErarCyr79M0J1keZDwgri3_tBylAblRgvfO5b3KKSpFpg36IGQtp3gcftoQ5nhWDtO1wyE2q_kukZ6AhWHVV_LV_XXTSneG5t-0Z3j_eRDBh1Nr6yF1iuG1InbqwigTc5aaMIZAyTirMZhp9Ejt"
   },
   {
+    id: "b3",
     title: "أصول الكيمياء العضوية",
     subtitle: "سلسلة التميز الصامت",
     category: "summaries",
+    linkUrl: "https://drive.google.com",
     image: "https://lh3.googleusercontent.com/aida-public/AB6AXuCCo8T6m-q_OtbXndHKL5sRp5tHdiGM5Koti71Ansr9VMeTv28zcqpg7HmBb7NRPVYmyULXnlZ4ko8AmbJw2UCuLVZynh85PZG6zUKQQLIO3xhxS3ytNIekqYkbcZe_e2A7R83d4Jx7IgHl-sh_m3cunSpXIXXFPNmTXvQ2pHSus_5_NBqxAIZu1zI46Z4C1qZ1JnA0C_YCXWgPzINDHDZYG_-4ONihE4wzKPc3QlUJAEEV4DDSy8Sk40P6LrvYxyaPBwGQJCEKP8K6"
-  },
-  {
-    title: "ملاحظات الأحياء الخلوية",
-    subtitle: "التركيب والوظيفة",
-    category: "notes",
-    image: "https://lh3.googleusercontent.com/aida-public/AB6AXuCymG1d7iJxfq5PAFJblJbwa8j9bPhKWO14rQ7mWFSb35GOXfzVwC4_8hizNhTERcZ7kRbUhTwpkOH6MVcBffZO1QkPCZYzkFiaM1pumSPh6pwwBYi2sTbkypxZNBJS8Eu_PFWEK3QhbVXxykoM570memsl2QsGtAbmoJ9l9PRpLy9NuediVtlNA2sidlHFBGfIIFkB-AKLl9wZ6BBJNaEVtyZCQcbUFke_PgV00e0GzOjCMQ0kpfoeVuNZ7NZnvgHY9BvNsSotfUOG"
   }
 ];
 
 export default function Books() {
+  const { user } = useAuth();
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [customBooks, setCustomBooks] = useState<any[]>([]);
+
+  // Load custom content approved
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("wathaq_custom_content") || "[]");
+      const approved = saved.filter((item: any) => item.status !== "pending" && (item.contentType === "book" || item.contentType === "mindmaps"));
+      setCustomBooks(approved);
+    } catch (e) {}
+  }, []);
+
+  const isAdmin = user?.email === "ammaramrcan@gmail.com";
 
   if (!activeFilter) {
     return (
-      <div className="flex-grow flex flex-col items-center justify-center gap-stack-lg">
-        <div className="text-center mb-stack-lg">
-          <h1 className="text-headline-lg font-headline-lg text-on-surface mb-2">اختر نوع المحتوى الأكاديمي</h1>
-          <div className="w-12 h-0.5 bg-primary/30 mx-auto"></div>
+      <div className="flex-grow flex flex-col items-center justify-center gap-stack-lg min-h-[65vh]">
+        <div className="text-center mb-stack-lg max-w-xl">
+          <h1 className="text-headline-lg font-headline-lg text-on-surface mb-2">مكتبة وثاق للكتب والملازم والخرائط الذهنية</h1>
+          <p className="text-body-md text-on-surface-variant font-light">اختر قسم المحتوى الأكاديمي لبدء التصفح أو التفاعل المباشر.</p>
+          <div className="w-12 h-0.5 bg-primary/30 mx-auto mt-4"></div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-stack-lg w-full max-w-3xl px-gutter">
-          {filters.map((filter) => (
+
+        {/* Admin Add Button inside Page */}
+        {isAdmin && (
+          <div className="mb-4">
             <button
-              key={filter.id}
-              onClick={() => setActiveFilter(filter.id)}
-              className="group flex flex-col items-center justify-center p-stack-lg bg-surface-container-low border border-outline-variant/30 rounded-2xl shadow-none hover:border-primary transition-all duration-300 ease-in-out cursor-pointer"
+              onClick={() => setIsAddModalOpen(true)}
+              className="bg-primary text-on-primary hover:bg-primary/90 px-5 py-2.5 rounded-xl text-label-sm font-medium flex items-center gap-2 shadow-lg shadow-primary/10 cursor-pointer"
             >
-              <filter.icon className="w-10 h-10 mb-stack-md text-on-surface-variant group-hover:text-primary transition-colors duration-300" />
-              <span className="text-headline-lg font-headline-lg text-on-surface group-hover:text-primary transition-colors duration-300">
-                {filter.label}
-              </span>
+              <Plus className="w-4 h-4" />
+              <span>إضافة كتاب / ملزمة جديدة (كـ أدمن)</span>
             </button>
-          ))}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-gutter w-full max-w-4xl">
+          {filters.map((filter) => {
+            const Icon = filter.icon;
+            return (
+              <button
+                key={filter.id}
+                onClick={() => setActiveFilter(filter.id)}
+                className="group flex flex-col items-center justify-center p-stack-lg rounded-2xl bg-surface-container-low border border-outline-variant/30 hover:border-primary hover:bg-surface-container transition-all duration-300 gap-stack-sm cursor-pointer shadow-lg"
+              >
+                <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center border border-primary/20 group-hover:scale-110 transition-transform">
+                  <Icon className="w-6 h-6" />
+                </div>
+                <span className="text-body-lg font-body-lg text-on-surface group-hover:text-primary transition-colors">
+                  {filter.label}
+                </span>
+              </button>
+            );
+          })}
         </div>
+
+        <AddContentModal
+          isOpen={isAddModalOpen}
+          onClose={() => setIsAddModalOpen(false)}
+          defaultContentType="book"
+        />
       </div>
     );
   }
 
   if (activeFilter === "flashcards") {
     return (
-      <div className="flex flex-col gap-stack-md">
+      <div className="flex flex-col gap-6">
         <div className="flex justify-between items-center border-b border-outline-variant/10 pb-4">
-          <h1 className="text-headline-lg font-headline-lg text-on-surface">فلاش كارد</h1>
-          <button 
+          <button
             onClick={() => setActiveFilter(null)}
-            className="text-label-sm font-label-sm text-on-surface-variant hover:text-primary transition-colors"
+            className="text-label-sm text-on-surface-variant hover:text-primary border border-outline-variant/30 px-3 py-1.5 rounded-lg"
           >
-            تغيير النوع
+            ← العودة لأقسام الكتب
           </button>
+          {isAdmin && (
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="bg-primary text-on-primary px-4 py-2 rounded-lg text-label-sm font-medium flex items-center gap-1.5"
+            >
+              <Plus className="w-4 h-4" />
+              <span>إضافة بطاقة فلاش كارد جديدة</span>
+            </button>
+          )}
         </div>
         <Flashcards />
+        <AddContentModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} defaultContentType="flashcards" />
       </div>
     );
   }
 
-  const filteredBooks = books.filter(book => book.category === activeFilter);
+  const allFilteredBooks = [
+    ...defaultBooks.filter((b) => b.category === activeFilter || activeFilter === "school"),
+    ...customBooks.map((cb) => ({
+      id: cb.id,
+      title: cb.title,
+      subtitle: cb.description || "محتوى مخصص",
+      category: cb.contentType,
+      linkUrl: cb.linkUrl,
+      image: "https://lh3.googleusercontent.com/aida-public/AB6AXuBXWTxSXpflwWZItPL94yRgS72AE_eUXo1siiyESo1-FtlENXtwS4j5JXy150kvyqL6Pm5BDFrf3sDIzqGo4tX5STKCeKvqKMZM5BEt7Afqpdg-O7kLpY-wLOD5FlpE9YQyckPAvtZo1bOJPJDge_b-pNRmGkICV8U9A6LJ23e-go5TKE9CdYudpJH1DzZ8ZcZ1f814a8sXd37rJZtFFLaMLWddmxzm0WLnICj8-IAJcvcgGcdWPtqnsdZwqjXW9cI7-ztZZf6EI3vQ"
+    }))
+  ];
 
   return (
     <div className="flex flex-col gap-stack-lg">
       <div className="flex justify-between items-center border-b border-outline-variant/10 pb-4">
-        <h1 className="text-headline-lg font-headline-lg text-on-surface">
-          {filters.find(f => f.id === activeFilter)?.label}
-        </h1>
-        <button 
+        <button
           onClick={() => setActiveFilter(null)}
-          className="text-label-sm font-label-sm text-on-surface-variant hover:text-primary transition-colors"
+          className="text-label-sm text-on-surface-variant hover:text-primary border border-outline-variant/30 px-3 py-1.5 rounded-lg cursor-pointer"
         >
-          تغيير النوع
+          ← الرجوع للأقسام الرئيسية
         </button>
+
+        {isAdmin && (
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="bg-primary text-on-primary px-4 py-2 rounded-lg text-label-sm font-medium flex items-center gap-1.5 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>إضافة كتاب / ملزمة جديدة</span>
+          </button>
+        )}
       </div>
 
-      <motion.section 
-        layout
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-stack-lg"
-      >
-        {filteredBooks.length > 0 ? (
-          filteredBooks.map((book, index) => (
-            <motion.article 
-              layout
-              key={index}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="group flex flex-col bg-surface-container-low rounded-xl border border-outline-variant/30 overflow-hidden hover:border-primary transition-colors duration-500 cursor-pointer"
-            >
-              <div className="aspect-[4/3] w-full relative overflow-hidden bg-surface">
-                <img 
-                  src={book.image} 
-                  alt={book.title}
-                  className="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity duration-500 mix-blend-luminosity"
-                />
-              </div>
-              <div className="p-stack-md flex flex-col gap-stack-sm">
-                <h3 className="text-body-lg font-body-lg text-on-surface group-hover:text-primary transition-colors duration-300">
-                  {book.title}
-                </h3>
-                <p className="text-label-sm font-label-sm text-on-surface-variant font-light">{book.subtitle}</p>
-              </div>
-            </motion.article>
-          ))
-        ) : (
-          <div className="col-span-full py-[6rem] flex flex-col items-center justify-center text-center gap-4 opacity-40">
-             <p className="text-body-lg text-on-surface-variant">لا يوجد محتوى في هذا القسم حالياً</p>
-          </div>
-        )}
-      </motion.section>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-gutter">
+        {allFilteredBooks.map((book, idx) => (
+          <motion.a
+            key={book.id || idx}
+            href={book.linkUrl || "https://drive.google.com"}
+            target="_blank"
+            rel="noreferrer"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: idx * 0.05 }}
+            className="group flex flex-col bg-surface-container-low rounded-2xl border border-outline-variant/30 overflow-hidden hover:border-primary transition-all shadow-lg"
+          >
+            <div className="aspect-[4/3] overflow-hidden relative">
+              <img
+                src={book.image}
+                alt={book.title}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              />
+              <span className="absolute top-3 left-3 bg-black/60 backdrop-blur-md text-white p-1.5 rounded-lg text-xs flex items-center gap-1">
+                <ExternalLink className="w-3.5 h-3.5" /> Google Drive
+              </span>
+            </div>
+            <div className="p-stack-md flex flex-col gap-1 text-right">
+              <h3 className="text-body-lg font-body-lg text-on-surface group-hover:text-primary transition-colors">
+                {book.title}
+              </h3>
+              <p className="text-label-sm text-on-surface-variant opacity-80">{book.subtitle}</p>
+            </div>
+          </motion.a>
+        ))}
+      </div>
+
+      <AddContentModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        defaultContentType="book"
+      />
     </div>
   );
 }

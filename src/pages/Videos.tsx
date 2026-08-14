@@ -3,8 +3,10 @@ import { motion } from "motion/react";
 import { useSearchParams } from "react-router-dom";
 import { 
   Atom, BookOpen, Compass, PlayCircle, ListVideo, 
-  ArrowRight, Sparkles, Clock, ChevronLeft, Play, User
+  ArrowRight, Sparkles, Clock, ChevronLeft, Play, User, Plus
 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { AddContentModal } from "@/components/AddContentModal";
 
 // Interfaces
 interface MainCategory {
@@ -185,7 +187,9 @@ const videoResourcesData: VideoResource[] = [
 ];
 
 export default function Videos() {
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   // Stepper State (1: Category, 2: Subject, 3: Type (Playlist vs Video), 4: Results)
   const [step, setStep] = useState<number>(1);
   const [selectedCategory, setSelectedCategory] = useState<MainCategory | null>(null);
@@ -272,14 +276,26 @@ export default function Videos() {
             </div>
           </div>
 
-          {step > 1 && (
-            <button
-              onClick={handleResetAll}
-              className="text-label-sm font-label-sm text-on-surface-variant hover:text-primary border border-outline-variant/30 px-4 py-2 rounded-lg transition-colors"
-            >
-              إعادة الاختيار من البداية
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            {user?.email === "ammaramrcan@gmail.com" && (
+              <button
+                onClick={() => setIsAddModalOpen(true)}
+                className="bg-primary text-on-primary hover:bg-primary/90 px-4 py-2 rounded-lg text-label-sm font-medium flex items-center gap-1.5 cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>إضافة فيديو جديد</span>
+              </button>
+            )}
+
+            {step > 1 && (
+              <button
+                onClick={handleResetAll}
+                className="text-label-sm font-label-sm text-on-surface-variant hover:text-primary border border-outline-variant/30 px-4 py-2 rounded-lg transition-colors cursor-pointer"
+              >
+                إعادة الاختيار من البداية
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Stepper Progress Badges */}
@@ -572,6 +588,13 @@ export default function Videos() {
           )}
         </motion.div>
       )}
+
+      {/* Admin Add Video Modal */}
+      <AddContentModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        defaultContentType="video"
+      />
     </div>
   );
 }

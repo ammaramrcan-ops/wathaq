@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { Link } from "react-router-dom";
 import { 
@@ -135,8 +135,23 @@ export default function Teachers() {
   const [step, setStep] = useState<number>(1);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
+  const [teachers, setTeachers] = useState<TeacherEvaluation[]>([]);
 
-  const availableTeachers = teachersData.filter((t) => t.subjectId === selectedSubject);
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("wathaq_teachers");
+      if (saved) {
+        setTeachers(JSON.parse(saved));
+      } else {
+        setTeachers(teachersData);
+        localStorage.setItem("wathaq_teachers", JSON.stringify(teachersData));
+      }
+    } catch (err) {
+      setTeachers(teachersData);
+    }
+  }, []);
+
+  const availableTeachers = teachers.filter((t) => t.subjectId === selectedSubject);
 
   const getSubjectTitle = (code: string) => {
     const map: Record<string, string> = {

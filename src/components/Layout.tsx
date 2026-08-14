@@ -57,15 +57,6 @@ export function Header() {
 
         {/* Header Actions */}
         <div className="flex items-center gap-2 sm:gap-3">
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="bg-primary text-on-primary hover:bg-primary/90 transition-all px-3 sm:px-4 py-2 rounded-xl text-label-sm font-medium flex items-center gap-1.5 shadow-md shadow-primary/10 cursor-pointer active:scale-95"
-          >
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">{sectionConfig.fullLabel}</span>
-            <span className="sm:hidden">{sectionConfig.label}</span>
-          </button>
-
           {!isHome && (
             <button 
               onClick={() => navigate(-1)}
