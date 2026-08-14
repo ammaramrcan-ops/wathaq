@@ -105,6 +105,15 @@ export function Header() {
                       <p className="text-xs text-on-surface-variant font-mono truncate" dir="ltr">{user.email}</p>
                     </div>
 
+                    <Link
+                      to="/profile"
+                      onClick={() => setIsUserMenuOpen(false)}
+                      className="flex items-center gap-2 p-2.5 rounded-lg text-label-sm text-on-surface hover:text-primary hover:bg-surface-container-high transition-colors my-1 font-medium"
+                    >
+                      <User className="w-4 h-4 text-primary" />
+                      <span>ملفي الشخصي ومساهماتي</span>
+                    </Link>
+
                     {user.email === "ammaramrcan@gmail.com" && (
                       <Link
                         to="/admin"

@@ -11,6 +11,7 @@ import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import Admin from "@/pages/Admin";
 import Teachers from "@/pages/Teachers";
+import Profile from "@/pages/Profile";
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
             <Route path="/subjects" element={<Subjects />} />
             <Route path="/videos" element={<Videos />} />
             <Route path="/teachers" element={<Teachers />} />
+            <Route path="/profile" element={<Profile />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/admin" element={<Admin />} />

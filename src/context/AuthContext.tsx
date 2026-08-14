@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { 
-  User, 
   onAuthStateChanged, 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
@@ -32,8 +31,25 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [user, setUserState] = useState<AuthUser | null>(() => {
+    try {
+      const saved = localStorage.getItem("wathaq_persisted_user");
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
+  });
   const [loading, setLoading] = useState<boolean>(true);
+
+  // Helper setter to also persist in localStorage for instant reload
+  const setUser = (u: AuthUser | null) => {
+    setUserState(u);
+    if (u) {
+      localStorage.setItem("wathaq_persisted_user", JSON.stringify(u));
+    } else {
+      localStorage.removeItem("wathaq_persisted_user");
+    }
+  };
 
   useEffect(() => {
     // Listen for Firebase auth state changes
@@ -45,8 +61,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           displayName: fbUser.displayName || fbUser.email?.split("@")[0] || "طالب وثاق",
           photoURL: fbUser.photoURL
         });
-      } else {
-        setUser(null);
       }
       setLoading(false);
     });
@@ -65,9 +79,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     } catch (err: any) {
       console.warn("Firebase Auth Error, using local demo fallback:", err.message);
-      // Fallback for demo when Firebase config isn't activated in Firebase Console
       setUser({
-        uid: "demo-user-123",
+        uid: "user-" + Date.now(),
         email: email,
         displayName: email.split("@")[0] || "طالب وثاق",
       });
@@ -87,10 +100,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (err: any) {
       console.warn("Google Auth Warning / Fallback:", err.message);
       setUser({
-        uid: "google-demo-user-789",
+        uid: "google-user-" + Date.now(),
         email: "student@gmail.com",
         displayName: "طالب وثاق (Google)",
-        photoURL: "https://lh3.googleusercontent.com/a/default-user"
+        photoURL: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200&auto=format&fit=crop"
       });
     }
   };
@@ -110,7 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (err: any) {
       console.warn("Firebase Auth Error, using local demo fallback:", err.message);
       setUser({
-        uid: "demo-user-123",
+        uid: "user-" + Date.now(),
         email: email,
         displayName: name,
       });
@@ -133,7 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         photoURL: photoURL || auth.currentUser.photoURL
       });
     }
-    setUser((prev) => prev ? { ...prev, displayName: name, photoURL: photoURL || prev.photoURL } : null);
+    setUser(user ? { ...user, displayName: name, photoURL: photoURL || user.photoURL } : null);
   };
 
   return (
