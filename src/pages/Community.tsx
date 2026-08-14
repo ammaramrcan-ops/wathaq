@@ -5,6 +5,7 @@ import {
   HelpCircle, Award, ChevronLeft, ArrowRight, Atom, 
   BookOpen, Compass, CheckCircle2, Star, ThumbsUp, Send
 } from "lucide-react";
+import Teachers from "@/pages/Teachers";
 
 // Types
 interface Teacher {
@@ -301,46 +302,9 @@ export default function Community() {
           animate={{ opacity: 1, y: 0 }}
           className="flex flex-col gap-stack-lg"
         >
-          {/* Top Teachers Section */}
-          <div className="flex flex-col gap-stack-md bg-surface-container-low border border-outline-variant/30 rounded-2xl p-8">
-            <div className="flex justify-between items-center flex-wrap gap-4">
-              <div>
-                <h2 className="text-headline-lg font-headline-lg text-on-surface flex items-center gap-2">
-                  <Award className="w-6 h-6 text-amber-400" />
-                  <span>دليل ترشيحات أهم المدرسين (Top Recommended Teachers)</span>
-                </h2>
-                <p className="text-body-md text-on-surface-variant font-light mt-1">
-                  المدرسون الأكثر ترشيحاً واستحساناً من طلاب المرحلة الثانوية لعام 2026.
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-stack-md mt-2">
-              {topTeachers.map((teacher) => (
-                <div key={teacher.id} className="bg-surface-container p-5 rounded-xl border border-outline-variant/20 flex flex-col justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <img src={teacher.avatar} alt={teacher.name} className="w-12 h-12 rounded-full object-cover border border-primary/30" />
-                    <div>
-                      <h3 className="text-body-lg font-medium text-on-surface">{teacher.name}</h3>
-                      <span className="text-label-sm text-primary">{teacher.subject}</span>
-                    </div>
-                  </div>
-
-                  <p className="text-label-sm text-on-surface-variant/80 leading-relaxed font-light">
-                    {teacher.bio}
-                  </p>
-
-                  <div className="flex justify-between items-center pt-3 border-t border-outline-variant/10 text-label-sm">
-                    <span className="flex items-center gap-1 text-amber-400 font-bold">
-                      <Star className="w-4 h-4 fill-amber-400" /> {teacher.rating} ({teacher.reviewsCount})
-                    </span>
-                    <span className="bg-primary/10 text-primary px-2.5 py-0.5 rounded-full text-[11px]">
-                      {teacher.tag}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
+          {/* Top Teachers Directory Section */}
+          <div className="flex flex-col gap-stack-md bg-surface-container-low border border-outline-variant/30 rounded-2xl p-6 sm:p-8">
+            <Teachers />
           </div>
 
           {/* Advice Discussions List */}

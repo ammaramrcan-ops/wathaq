@@ -46,12 +46,11 @@ export function Header() {
           </Link>
 
           {/* Desktop Nav Links */}
-          <nav className="hidden md:flex items-center gap-5 text-label-sm font-medium text-on-surface-variant">
+          <nav className="hidden md:flex items-center gap-6 text-label-sm font-medium text-on-surface-variant">
             <NavLink to="/" className={({ isActive }) => cn("hover:text-primary transition-colors", isActive && "text-primary font-bold")}>الرئيسية</NavLink>
             <NavLink to="/videos" className={({ isActive }) => cn("hover:text-primary transition-colors", isActive && "text-primary font-bold")}>الفيديوهات</NavLink>
             <NavLink to="/books" className={({ isActive }) => cn("hover:text-primary transition-colors", isActive && "text-primary font-bold")}>الكتب والملازم</NavLink>
-            <NavLink to="/teachers" className={({ isActive }) => cn("hover:text-primary transition-colors", isActive && "text-primary font-bold")}>المدرسين</NavLink>
-            <NavLink to="/community" className={({ isActive }) => cn("hover:text-primary transition-colors", isActive && "text-primary font-bold")}>المجتمع</NavLink>
+            <NavLink to="/community" className={({ isActive }) => cn("hover:text-primary transition-colors", isActive && "text-primary font-bold")}>المجتمع والنقاشات</NavLink>
           </nav>
         </div>
 
@@ -167,8 +166,7 @@ export function Footer() {
           <Link to="/" className="text-on-surface-variant hover:text-primary transition-colors text-label-sm font-label-sm opacity-80 hover:opacity-100">الرئيسية</Link>
           <Link to="/videos" className="text-on-surface-variant hover:text-primary transition-colors text-label-sm font-label-sm opacity-80 hover:opacity-100">الفيديوهات</Link>
           <Link to="/books" className="text-on-surface-variant hover:text-primary transition-colors text-label-sm font-label-sm opacity-80 hover:opacity-100">الكتب والملازم</Link>
-          <Link to="/teachers" className="text-on-surface-variant hover:text-primary transition-colors text-label-sm font-label-sm opacity-80 hover:opacity-100">دليل المدرسين</Link>
-          <Link to="/community" className="text-on-surface-variant hover:text-primary transition-colors text-label-sm font-label-sm opacity-80 hover:opacity-100">المجتمع</Link>
+          <Link to="/community" className="text-on-surface-variant hover:text-primary transition-colors text-label-sm font-label-sm opacity-80 hover:opacity-100">المجتمع والنقاشات</Link>
         </nav>
         <p className="text-body-md font-body-md text-on-surface-variant opacity-80 text-center">© وثاق للتميز الصامت</p>
       </div>
