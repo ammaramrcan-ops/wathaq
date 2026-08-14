@@ -309,7 +309,7 @@ export default function Videos() {
   };
 
   const handleSelectVideo = (vid: VideoResource) => {
-    const targetUrl = vid.videoUrl || (vid as any).linkUrl || `https://www.youtube.com/results?search_query=${encodeURIComponent(vid.title)}`;
+    const targetUrl = (vid as any).videoUrl || (vid as any).linkUrl || `https://www.youtube.com/results?search_query=${encodeURIComponent(vid.title)}`;
     window.open(targetUrl, "_blank", "noopener,noreferrer");
   };
 
@@ -352,7 +352,7 @@ export default function Videos() {
   const finalVideos = allVideos.filter(
     (v) =>
       v.subjectId === selectedSubject?.id &&
-      (v.type === selectedContentType?.id || v.type === "single")
+      ((v.type as string) === selectedContentType?.id || (v.type as string) === "video")
   );
 
   return (

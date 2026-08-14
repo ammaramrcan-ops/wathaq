@@ -89,7 +89,7 @@ export default function Books() {
         <div className="mb-4">
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="bg-primary text-on-primary hover:bg-primary/90 px-5 py-2.5 rounded-xl text-label-sm font-medium flex items-center gap-2 shadow-lg shadow-primary/10 cursor-pointer"
+            className="bg-primary text-on-primary hover:bg-primary/90 px-5 py-2.5 rounded-xl text-label-sm font-medium flex items-center gap-2 shadow-lg shadow-primary/20 cursor-pointer transition-all"
           >
             <Plus className="w-4 h-4" />
             <span>إضافة كتاب / ملزمة / مصدر جديد</span>
@@ -102,7 +102,7 @@ export default function Books() {
             return (
               <button
                 key={filter.id}
-                onClick={() => handleSelectFilter(filter.id)}
+                onClick={() => setActiveFilter(filter.id)}
                 className="group flex flex-col items-center justify-center p-stack-lg rounded-2xl bg-surface-container-low border border-outline-variant/30 hover:border-primary hover:bg-surface-container transition-all duration-300 gap-stack-sm cursor-pointer shadow-lg"
               >
                 <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center border border-primary/20 group-hover:scale-110 transition-transform">
@@ -132,7 +132,7 @@ export default function Books() {
       <div className="flex flex-col gap-6">
         <div className="flex justify-between items-center border-b border-outline-variant/10 pb-4">
           <button
-            onClick={() => handleSelectFilter(null)}
+            onClick={() => setActiveFilter(null)}
             className="text-label-sm text-on-surface-variant hover:text-primary border border-outline-variant/30 px-3 py-1.5 rounded-lg"
           >
             ← العودة لأقسام الكتب
@@ -167,7 +167,7 @@ export default function Books() {
     <div className="flex flex-col gap-stack-lg">
       <div className="flex justify-between items-center border-b border-outline-variant/10 pb-4">
         <button
-          onClick={() => handleSelectFilter(null)}
+          onClick={() => setActiveFilter(null)}
           className="text-label-sm text-on-surface-variant hover:text-primary border border-outline-variant/30 px-3 py-1.5 rounded-lg cursor-pointer"
         >
           ← الرجوع للأقسام الرئيسية
@@ -228,7 +228,6 @@ export default function Books() {
         isOpen={isAddModalOpen}
         onClose={() => {
           setIsAddModalOpen(false);
-          loadBooks();
         }}
         defaultContentType="book"
       />

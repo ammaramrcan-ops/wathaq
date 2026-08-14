@@ -389,3 +389,49 @@ export function subscribeCustomContent(
     if (unsub) unsub();
   };
 }
+
+/**
+ * Approve a pending custom content item in Firestore & LocalStorage
+ */
+export async function approveCustomContent(id: string): Promise<void> {
+  // 1. Update LocalStorage & notify React UI state instantly
+  try {
+    const current = getLocalCustomContent();
+    const updated = current.map((item) => (item.id === id ? { ...item, status: "approved" as const } : item));
+    localStorage.setItem(LOCAL_STORAGE_CUSTOM, JSON.stringify(updated));
+    notifyCustomSubscribers();
+  } catch (err) {
+    console.warn("LocalStorage approveCustomContent warning:", err);
+  }
+
+  // 2. Persist status: "approved" to Firestore Cloud
+  try {
+    const docRef = doc(db, "custom_content", id);
+    await setDoc(docRef, { status: "approved" }, { merge: true });
+  } catch (err) {
+    console.warn("Firestore approveCustomContent warning:", err);
+  }
+}
+
+/**
+ * Delete a custom content item from Firestore & LocalStorage
+ */
+export async function deleteCustomContent(id: string): Promise<void> {
+  // 1. Update LocalStorage & notify React UI state
+  try {
+    const current = getLocalCustomContent();
+    const updated = current.filter((item) => item.id !== id);
+    localStorage.setItem(LOCAL_STORAGE_CUSTOM, JSON.stringify(updated));
+    notifyCustomSubscribers();
+  } catch (err) {
+    console.warn("LocalStorage deleteCustomContent warning:", err);
+  }
+
+  // 2. Delete document from Firestore Cloud
+  try {
+    const docRef = doc(db, "custom_content", id);
+    await deleteDoc(docRef);
+  } catch (err) {
+    console.warn("Firestore deleteCustomContent warning:", err);
+  }
+}

@@ -8,6 +8,11 @@ import { useAuth } from "@/context/AuthContext";
 import { AddContentModal } from "@/components/AddContentModal";
 import { getStoredCurriculum, saveStoredCurriculum } from "@/lib/subjectsData";
 import { AdminGoogleUsersTab } from "@/components/admin/AdminGoogleUsersTab";
+import { 
+  subscribeCustomContent, 
+  approveCustomContent, 
+  deleteCustomContent 
+} from "@/lib/contentService";
 
 interface AdminUser {
   id: string;
@@ -123,23 +128,26 @@ export default function Admin() {
 
   useEffect(() => {
     loadData();
-  }, []);
+    const unsub = subscribeCustomContent(user?.uid, (items) => {
+      setContentList(items as CustomContent[]);
+    });
+    return () => unsub();
+  }, [user?.uid]);
 
   const [processingId, setProcessingId] = useState<string | null>(null);
 
-  const handleDeleteContent = (id: string) => {
-    const updated = contentList.filter((c) => c.id !== id);
-    setContentList(updated);
-    localStorage.setItem("wathaq_custom_content", JSON.stringify(updated));
+  const handleDeleteContent = async (id: string) => {
+    await deleteCustomContent(id);
   };
 
-  const handleApproveContent = (id: string) => {
+  const handleApproveContent = async (id: string) => {
     if (processingId === id) return;
     setProcessingId(id);
-    const updated = contentList.map((c) => (c.id === id ? { ...c, status: "approved" as const } : c));
-    setContentList(updated);
-    localStorage.setItem("wathaq_custom_content", JSON.stringify(updated));
-    setTimeout(() => setProcessingId(null), 1000);
+    try {
+      await approveCustomContent(id);
+    } finally {
+      setTimeout(() => setProcessingId(null), 500);
+    }
   };
 
   const handleDeleteTeacher = (id: string) => {
@@ -337,7 +345,7 @@ export default function Admin() {
           }`}
         >
           <BarChart3 className="w-4 h-4" />
-          <span>نظرة عامة والزيارات</span>
+          <span>1. نظرة عامة والزيارات</span>
         </button>
 
         {/* 2nd Option: Published Content (المحتوى المنشور) */}
@@ -350,10 +358,23 @@ export default function Admin() {
           }`}
         >
           <HardDrive className="w-4 h-4 text-emerald-400" />
-          <span>المحتوى المنشور ({approvedContent.length})</span>
+          <span>2. المحتوى المنشور ({approvedContent.length})</span>
         </button>
 
-        {/* 3rd Option: Google Registered Users (المستخدمون المسجلون بـ Google) */}
+        {/* 3rd Option: Pending Review Requests (طلبات المراجعة المعلقة) */}
+        <button
+          onClick={() => setActiveTab("pending")}
+          className={`px-4 sm:px-5 py-2.5 rounded-lg text-label-sm font-medium transition-all flex items-center gap-2 border whitespace-nowrap cursor-pointer ${
+            activeTab === "pending"
+              ? "bg-primary text-on-primary border-primary"
+              : "bg-surface-container-low text-on-surface-variant border-outline-variant/30 hover:border-primary/50"
+          }`}
+        >
+          <Clock className="w-4 h-4 text-amber-400" />
+          <span>3. طلبات المراجعة ({pendingContent.length})</span>
+        </button>
+
+        {/* 4th Option: Google Registered Users (المستخدمون المسجلون بـ Google) */}
         <button
           onClick={() => setActiveTab("users")}
           className={`px-4 sm:px-5 py-2.5 rounded-lg text-label-sm font-medium transition-all flex items-center gap-2 border whitespace-nowrap cursor-pointer ${
@@ -363,7 +384,7 @@ export default function Admin() {
           }`}
         >
           <Users className="w-4 h-4 text-blue-400" />
-          <span>المستخدمون المسجلون بـ Google 🔵</span>
+          <span>4. المستخدمون المسجلون بـ Google 🔵</span>
         </button>
 
         <button
@@ -375,19 +396,7 @@ export default function Admin() {
           }`}
         >
           <GraduationCap className="w-4 h-4 text-primary" />
-          <span>إدارة مناهج الأزهر والعام</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab("pending")}
-          className={`px-4 sm:px-5 py-2.5 rounded-lg text-label-sm font-medium transition-all flex items-center gap-2 border whitespace-nowrap cursor-pointer ${
-            activeTab === "pending"
-              ? "bg-primary text-on-primary border-primary"
-              : "bg-surface-container-low text-on-surface-variant border-outline-variant/30 hover:border-primary/50"
-          }`}
-        >
-          <Clock className="w-4 h-4 text-amber-400" />
-          <span>طلبات المراجعة ({pendingContent.length})</span>
+          <span>5. إدارة مناهج الأزهر والعام</span>
         </button>
 
         <button
@@ -399,12 +408,9 @@ export default function Admin() {
           }`}
         >
           <Award className="w-4 h-4 text-amber-400" />
-          <span>إدارة المدرسين ({teachers.length})</span>
+          <span>6. إدارة المدرسين ({teachers.length})</span>
         </button>
       </div>
-
-      {/* GOOGLE USERS TAB VIEW */}
-      {activeTab === "users" && <AdminGoogleUsersTab />}
 
       {/* DEEP HIERARCHICAL SUBJECTS & CURRICULUM MANAGEMENT TAB */}
       {activeTab === "subjects" && (
@@ -708,32 +714,113 @@ export default function Admin() {
         </div>
       )}
 
-      {/* OVERVIEW TAB */}
-      {activeTab === "overview" && (
-        <div className="bg-surface-container-low border border-outline-variant/30 rounded-2xl p-6 flex flex-col gap-4">
-          <h3 className="text-headline-md font-headline-md text-on-surface">الطلاب المسجلون حالياً</h3>
-          {users.length > 0 ? (
-            <div className="flex flex-col gap-3">
-              {users.map((u) => (
-                <div key={u.id} className="flex justify-between items-center p-3 bg-surface-container rounded-xl border border-outline-variant/10">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-primary/10 text-primary border border-primary/20 flex items-center justify-center text-label-sm font-bold">
-                      {u.name[0]}
+      {/* PUBLISHED CONTENT TAB */}
+      {activeTab === "content" && (
+        <div className="bg-surface-container-low border border-outline-variant/30 rounded-2xl p-6 flex flex-col gap-6">
+          <div className="flex justify-between items-center flex-wrap gap-4 border-b border-outline-variant/10 pb-4">
+            <div>
+              <h3 className="text-headline-md font-bold text-on-surface flex items-center gap-2">
+                <HardDrive className="w-5 h-5 text-emerald-400" />
+                <span>المحتوى المنشور والمعتمد في المنصة ({approvedContent.length})</span>
+              </h3>
+              <p className="text-xs text-on-surface-variant mt-1">المواد والكتب والفيديوهات المعتمدة التي تظهر للطلاب في المواد الشاملة.</p>
+            </div>
+          </div>
+
+          {approvedContent.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {approvedContent.map((item) => (
+                <div
+                  key={item.id}
+                  className="bg-surface-container border border-outline-variant/30 rounded-2xl p-5 flex flex-col justify-between gap-3 hover:border-primary/50 transition-all shadow-md"
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="flex flex-col gap-1 overflow-hidden">
+                      <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-0.5 rounded-full w-fit font-bold">
+                        {item.contentType === "video" ? "فيديو" : item.contentType === "book" ? "كتاب / ملزمة" : item.contentType === "mindmaps" ? "خريطة ذهنية" : "فلاش كارد"}
+                      </span>
+                      <h4 className="font-bold text-body-md text-on-surface mt-1 truncate">{item.title}</h4>
+                      <span className="text-xs text-primary font-medium">المادة: {item.subject}</span>
                     </div>
-                    <div>
-                      <h4 className="text-body-md text-on-surface font-medium">{u.name}</h4>
-                      <p className="text-[12px] text-on-surface-variant">{u.email}</p>
-                    </div>
+                    <button
+                      onClick={() => handleDeleteContent(item.id)}
+                      className="text-error hover:bg-error/10 p-2 rounded-xl border border-outline-variant/20 transition-colors cursor-pointer shrink-0"
+                      title="حذف هذا المحتوى من المنصة"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {item.description && (
+                    <p className="text-xs text-on-surface-variant/80 font-light line-clamp-2 bg-surface-container-high p-2.5 rounded-xl">
+                      {item.description}
+                    </p>
+                  )}
+
+                  <div className="flex justify-between items-center pt-2 border-t border-outline-variant/10 text-xs">
+                    <span className="text-on-surface-variant font-light">المرفِع: {item.uploaderName || "طالب مسجل"}</span>
+                    <a
+                      href={item.linkUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="bg-primary/10 text-primary border border-primary/20 hover:bg-primary hover:text-on-primary px-3 py-1.5 rounded-lg font-bold inline-flex items-center gap-1 transition-all"
+                    >
+                      <span>فتح الرابط</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="py-12 flex flex-col items-center justify-center text-center opacity-60">
-              <Users className="w-10 h-10 text-on-surface-variant mb-2" />
-              <p className="text-body-md text-on-surface-variant">لا يوجد طلاب افتراضيون حالياً. القائمة تنشأ تلقائياً مع تسجيل الطلاب.</p>
+            <div className="py-16 flex flex-col items-center justify-center text-center gap-3 border border-dashed border-outline-variant/30 rounded-2xl bg-surface-container">
+              <HardDrive className="w-12 h-12 text-primary/40 mb-1" />
+              <h4 className="text-headline-md text-on-surface font-bold">لا يوجد محتوى منشور مخصص حالياً</h4>
+              <p className="text-body-md text-on-surface-variant max-w-md">
+                يمكنك إضافة محتوى جديد عبر زر "+ إضافة محتوى كـ أدمن" أو الاعتماد من قسم طلبات المراجعة.
+              </p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* GOOGLE REGISTERED USERS TAB */}
+      {activeTab === "users" && <AdminGoogleUsersTab />}
+
+      {/* OVERVIEW TAB */}
+      {activeTab === "overview" && (
+        <div className="flex flex-col gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-surface-container-low border border-outline-variant/30 rounded-2xl p-5 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center">
+                <HardDrive className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-xs text-on-surface-variant">المحتوى المنشور والمعتمد</p>
+                <h4 className="text-headline-md font-bold text-on-surface">{approvedContent.length} عناصر</h4>
+              </div>
+            </div>
+
+            <div className="bg-surface-container-low border border-outline-variant/30 rounded-2xl p-5 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center">
+                <Clock className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-xs text-on-surface-variant">طلبات المراجعة المعلقة</p>
+                <h4 className="text-headline-md font-bold text-on-surface">{pendingContent.length} طلبات</h4>
+              </div>
+            </div>
+
+            <div className="bg-surface-container-low border border-outline-variant/30 rounded-2xl p-5 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/30 text-blue-400 flex items-center justify-center">
+                <Users className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-xs text-on-surface-variant">الحسابات المسجلة بـ Google</p>
+                <h4 className="text-headline-md font-bold text-on-surface">مزامنة سحابية حية</h4>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
