@@ -1,4 +1,4 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import { NavLink, Link, useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft, Plus, User, LogOut, ShieldCheck, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -175,6 +175,25 @@ export function Footer() {
 }
 
 export function Layout({ children }: { children: ReactNode }) {
+  const location = useLocation();
+
+  useEffect(() => {
+    const path = location.pathname;
+    if (path === "/") {
+      document.title = "وثاق - المنصة التعليمية المجمعة للكتب والملازم والشروحات";
+    } else if (path.startsWith("/videos")) {
+      document.title = "الفيديوهات والشروحات المرئية | وثاق";
+    } else if (path.startsWith("/books")) {
+      document.title = "مكتبة الكتب والملازم والخرائط الذهنية | وثاق";
+    } else if (path.startsWith("/community")) {
+      document.title = "مجتمع وثاق والأسئلة الأكاديمية ودليل المدرسين | وثاق";
+    } else if (path.startsWith("/profile")) {
+      document.title = "حسابي وتخصيص المنهج والمساهمات | وثاق";
+    } else if (path.startsWith("/admin")) {
+      document.title = "لوحة تحكم الأدمن | وثاق";
+    }
+  }, [location.pathname]);
+
   return (
     <div className="min-h-screen flex flex-col bg-background text-on-surface">
       <Header />
