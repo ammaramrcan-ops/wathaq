@@ -767,7 +767,11 @@ export default function Admin() {
                             ? `/videos?subject=${item.subject}&type=video`
                             : item.contentType === "flashcards"
                             ? "/flashcards"
-                            : `/books`
+                            : item.contentType === "mindmaps"
+                            ? `/books?subject=${item.subject}&filter=mindmaps`
+                            : item.contentType === "community"
+                            ? "/community"
+                            : `/books?subject=${item.subject}`
                         }
                         className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500 hover:text-white px-2.5 py-1.5 rounded-lg font-bold inline-flex items-center gap-1 transition-all cursor-pointer"
                       >
