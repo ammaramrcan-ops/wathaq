@@ -178,8 +178,8 @@ export function AdminCurriculumTab({
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {currentBranchSubjects.map((sub, idx) => (
-            <div key={idx} className="bg-surface-container p-4 rounded-2xl border border-outline-variant/20 flex justify-between items-center shadow-sm hover:border-primary/50 transition-all">
+          {currentBranchSubjects.map((sub) => (
+            <div key={sub} className="bg-surface-container p-4 rounded-2xl border border-outline-variant/20 flex justify-between items-center shadow-sm hover:border-primary/50 transition-all">
               <div className="flex items-center gap-3 flex-grow overflow-hidden">
                 <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center font-bold shrink-0">
                   <BookOpen className="w-4 h-4" />

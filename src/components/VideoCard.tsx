@@ -81,8 +81,8 @@ export function VideoCard({ vid, onSelectVideo, onDeleteVideo }: VideoCardProps)
         {vid.lessonsList && (
           <div className="mt-2 pt-3 border-t border-outline-variant/10 flex flex-col gap-1.5">
             <span className="text-[12px] text-primary font-medium">الدروس في السلسلة:</span>
-            {vid.lessonsList.slice(0, 3).map((lesson, idx) => (
-              <div key={idx} className="flex justify-between items-center text-[11px] text-on-surface-variant">
+            {vid.lessonsList.slice(0, 3).map((lesson) => (
+              <div key={lesson.title} className="flex justify-between items-center text-[11px] text-on-surface-variant">
                 <span className="truncate">{lesson.title}</span>
                 <span>{lesson.duration}</span>
               </div>

@@ -587,9 +587,9 @@ export default function Videos() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {selectedUnit.lessons.map((lesson, idx) => (
+                {selectedUnit.lessons.map((lesson) => (
                   <button
-                    key={lesson + idx}
+                    key={lesson}
                     onClick={() => {
                       const videoTypeObj = contentTypes.find((t) => t.id === "video") || contentTypes[0];
                       setSelectedContentType(videoTypeObj);

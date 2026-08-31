@@ -234,9 +234,9 @@ export function AdminLessonsTab() {
                         لا توجد دروس مضافة داخل هذا الباب بعد.
                       </p>
                     ) : (
-                      unit.lessons.map((lesson, lIdx) => (
+                      unit.lessons.map((lesson) => (
                         <div
-                          key={lesson + lIdx}
+                          key={lesson}
                           className="bg-surface-container-high border border-outline-variant/20 rounded-xl p-3 flex justify-between items-center gap-2 text-xs font-medium text-on-surface"
                         >
                           <div className="flex items-center gap-2 overflow-hidden">

@@ -298,8 +298,8 @@ export default function Teachers() {
                         <ThumbsUp className="w-4 h-4" /> نقاط القوة المميزة:
                       </h4>
                       <ul className="list-disc list-inside text-body-sm text-on-surface-variant space-y-1 font-light">
-                        {teacher.strengths.map((st, i) => (
-                          <li key={i}>{st}</li>
+                        {teacher.strengths.map((st) => (
+                          <li key={st}>{st}</li>
                         ))}
                       </ul>
                     </div>
@@ -310,8 +310,8 @@ export default function Teachers() {
                           <ThumbsDown className="w-4 h-4" /> ملاحظات ونقاط الانتباه:
                         </h4>
                         <ul className="list-disc list-inside text-body-sm text-on-surface-variant space-y-1 font-light">
-                          {teacher.weaknesses.map((wk, i) => (
-                            <li key={i}>{wk}</li>
+                          {teacher.weaknesses.map((wk) => (
+                            <li key={wk}>{wk}</li>
                           ))}
                         </ul>
                       </div>

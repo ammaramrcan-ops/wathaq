@@ -717,9 +717,9 @@ export default function Books() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {selectedUnit.lessons.map((lesson, idx) => (
+                {selectedUnit.lessons.map((lesson) => (
                   <button
-                    key={lesson + idx}
+                    key={lesson}
                     onClick={() => {
                       setSelectedLessonScope(lesson);
                       setStep(4);

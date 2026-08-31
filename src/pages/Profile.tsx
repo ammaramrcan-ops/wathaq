@@ -305,9 +305,9 @@ export default function Profile() {
           </span>
 
           <div className="flex flex-wrap gap-2">
-            {currentSubjects.map((sub, idx) => (
+            {currentSubjects.map((sub) => (
               <span
-                key={idx}
+                key={sub}
                 className="bg-surface-container-high text-on-surface border border-outline-variant/30 px-3.5 py-1.5 rounded-xl text-label-sm font-medium flex items-center gap-1 shadow-sm"
               >
                 <BookOpen className="w-3.5 h-3.5 text-primary" />

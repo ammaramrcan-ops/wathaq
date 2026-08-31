@@ -221,8 +221,8 @@ export function AdminLessonResourcesTab() {
               {(currentSubjectUnits.find((u) => u.id === selectedUnitId)?.lessons || []).length === 0 ? (
                 <option value="">لا توجد دروس مضافة بهذا الباب</option>
               ) : (
-                (currentSubjectUnits.find((u) => u.id === selectedUnitId)?.lessons || []).map((l, idx) => (
-                  <option key={l + idx} value={l}>
+                (currentSubjectUnits.find((u) => u.id === selectedUnitId)?.lessons || []).map((l) => (
+                  <option key={l} value={l}>
                     {l}
                   </option>
                 ))

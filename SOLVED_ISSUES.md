@@ -6,6 +6,26 @@
 
 ## 📌 سجل المشكلات والتعديلات (Historical Log)
 
+### 📅 2026-08-31 | تصحيح مفاتيح React JSX المستقرة ومنع استخدام الفهارس الرقمية المباشرة في 8 ملفات
+- **نوع الإجراء:** JSX React Key Optimization & DeepSource Anti-Pattern Cleanup
+- **السبب الجذري:**
+  1. استخدام فهارس المصفوفات الرقمية `idx` أو `i` أو التجميع غير الفريد مثل `lesson + idx` كمفاتيح عناصر JSX في قوائم المناهج، المواد، المدرسين، والدروس، مما يؤدي لمشاكل إعادة الرسم (Re-rendering) وتحذيرات DeepSource.
+- **طريقة الحل:**
+  - تحديث مفاتيح الـ JSX المباشرة لاستخدام المعرفات والمفاهيم الفرعية المستقرة (`key={lesson}`, `key={st}`, `key={wk}`, `key={sub}`) في الملفات التالية:
+    - [Books.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/pages/Books.tsx)
+    - [Teachers.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/pages/Teachers.tsx)
+    - [Profile.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/pages/Profile.tsx)
+    - [Videos.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/pages/Videos.tsx)
+    - [VideoCard.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/components/VideoCard.tsx)
+    - [AdminLessonResourcesTab.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/components/admin/AdminLessonResourcesTab.tsx)
+    - [AdminCurriculumTab.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/components/admin/AdminCurriculumTab.tsx)
+    - [AdminLessonsTab.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/components/admin/AdminLessonsTab.tsx)
+  - التأكد من البناء الشامل `npm run build` واجتياز كافّة اختبارات الوحدة (12/12).
+- **خطة الوقاية وتيسير التطوير:**
+  - استخدام القيم الفريدة أو المعرفات المستقرة دائماً لمفاتيح العناصر في مصفوفات JSX وتجنب `idx` الحركية.
+
+---
+
 ### 📅 2026-08-31 | استبدال اسم المتغير e بـ errObj وحسم تحذير JS-C1002 نهائياً
 - **نوع الإجراء:** DeepSource Code Naming Standardization (JS-C1002 Fix)
 - **السبب الجذري:**
