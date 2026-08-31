@@ -29,7 +29,7 @@ function openIDBCommunity(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     if (!window.indexedDB) return reject("No IndexedDB");
     const req = window.indexedDB.open(IDB_NAME, 5);
-    req.onupgradeneeded = (e: any) => {
+    req.onupgradeneeded = (e: IDBVersionChangeEvent) => {
       const idb = req.result;
       if (!idb.objectStoreNames.contains(IDB_DISCUSSIONS_STORE)) {
         idb.createObjectStore(IDB_DISCUSSIONS_STORE, { keyPath: "id" });
@@ -104,7 +104,7 @@ export async function addDiscussion(post: Discussion): Promise<Discussion> {
   try {
     const docRef = doc(db, "discussions", post.id);
     await setDoc(docRef, { ...post, createdAt: new Date().toISOString() }, { merge: true });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Firestore add discussion error:", err);
     throw new Error("فشل إرسال السؤال سحابياً. يرجى التأكد من تسجيل الدخول أو قوة الاتصال.");
   }
@@ -115,7 +115,7 @@ export async function addDiscussion(post: Discussion): Promise<Discussion> {
     const updated = [post, ...current.filter((d) => d.id !== post.id)];
     localStorage.setItem(LOCAL_STORAGE_DISCUSSIONS, JSON.stringify(updated));
     await saveIDBDiscussion(post);
-  } catch (e) {
+  } catch (e: unknown) {
     console.warn("LocalStorage discussion write warning:", e);
   }
 
@@ -141,7 +141,7 @@ export async function deleteDiscussion(id: string): Promise<void> {
     } catch (gErr) {
       // Non-admins cannot write to global_deleted_items; snapshot on 'discussions' handles deletion across clients natively
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Firestore delete discussion error:", err);
     throw new Error("فشل حذف المنشور سحابياً (تتطلب ملكية المنشور أو صلاحية الأدمن).");
   }

@@ -78,7 +78,7 @@ export default function Community() {
   }, []);
 
   useEffect(() => {
-    const modeParam = searchParams.get("mode") as any;
+    const modeParam: string | null = searchParams.get("mode");
     const catParam = searchParams.get("category");
     const subParam = searchParams.get("subject");
 

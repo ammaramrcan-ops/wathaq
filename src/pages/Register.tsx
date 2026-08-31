@@ -23,21 +23,31 @@ export default function Register() {
     try {
       await register(name, email, password);
       navigate("/");
-    } catch (err: any) {
-      setErrorMsg(err.message || "حدث خطأ أثناء إنشاء الحساب");
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setErrorMsg(err.message);
+      } else if (typeof err === 'string') {
+        setErrorMsg(err);
+      } else {
+        setErrorMsg("حدث خطأ أثناء إنشاء الحساب");
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoogleSignUp = async () => {
+  const handleGoogleSignUp = async (): Promise<void> => {
     setErrorMsg("");
     setLoading(true);
     try {
       await loginWithGoogle();
       navigate("/");
-    } catch (err: any) {
-      setErrorMsg(err.message || "فشل التسجيل باستخدام Google");
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setErrorMsg(err.message);
+      } else {
+        setErrorMsg("فشل التسجيل باستخدام Google");
+      }
     } finally {
       setLoading(false);
     }

@@ -104,7 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             localStorage.setItem("wathaq_deleted_user_emails", JSON.stringify(updatedDeleted));
 
             const saved = JSON.parse(localStorage.getItem("wathaq_registered_google_users") || "[]");
-            const filtered = saved.filter((item: any) => item.email !== fbUser.email);
+            const filtered = saved.filter((item: { email: string }) => item.email !== fbUser.email);
             localStorage.setItem("wathaq_registered_google_users", JSON.stringify([userRec, ...filtered]));
             await saveIDBUser(userRec);
           } catch (e) {
@@ -138,7 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, []);
 
-  const login = async (email: string, pass: string) => {
+  const login = async (email: string, pass: string): Promise<void> => {
     try {
       const res = await signInWithEmailAndPassword(auth, email, pass);
       const u = {
@@ -158,19 +158,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           provider: "البريد الإلكتروني",
           lastLogin: new Date().toLocaleDateString("ar-SA")
         };
-        const saved = JSON.parse(localStorage.getItem("wathaq_registered_google_users") || "[]");
-        const filtered = saved.filter((item: any) => item.email !== res.user.email);
+        const saved = JSON.parse(localStorage.getItem("wathaq_registered_google_users") || "[]") as Array<{
+          uid: string;
+          displayName: string;
+          email: string;
+          photoURL: string | null;
+          provider: string;
+          lastLogin: string;
+        }>;
+        const filtered = saved.filter((item) => item.email !== res.user.email);
         localStorage.setItem("wathaq_registered_google_users", JSON.stringify([userRec, ...filtered]));
         await saveIDBUser(userRec);
         await setDoc(doc(db, "users", res.user.uid), userRec, { merge: true });
       }
-    } catch (err: any) {
-      console.error("Firebase Login Error:", err.message);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        console.error("Firebase Login Error:", err.message);
+        throw err;
+      }
+      console.error("Firebase Login Error:", err);
       throw err;
     }
   };
 
-  const loginWithGoogle = async () => {
+  const loginWithGoogle = async (): Promise<void> => {
     try {
       const provider = new GoogleAuthProvider();
       const res = await signInWithPopup(auth, provider);
@@ -192,8 +203,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           lastLogin: new Date().toLocaleDateString("ar-SA")
         };
         try {
-          const saved = JSON.parse(localStorage.getItem("wathaq_registered_google_users") || "[]");
-          const filtered = saved.filter((item: any) => item.email !== res.user.email);
+          const saved = JSON.parse(localStorage.getItem("wathaq_registered_google_users") || "[]") as typeof userRec[];
+          const filtered = saved.filter(item => item.email !== res.user.email);
           localStorage.setItem("wathaq_registered_google_users", JSON.stringify([userRec, ...filtered]));
           await saveIDBUser(userRec);
         } catch (e) {
@@ -208,13 +219,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           /* ignore fallback error */
         }
       }
-    } catch (err: any) {
-      console.error("Google Auth Error:", err.message);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        console.error("Google Auth Error:", err.message);
+      } else {
+        console.error("Google Auth Error:", String(err));
+      }
       throw err;
     }
   };
 
-  const register = async (name: string, email: string, pass: string) => {
+  const register = async (name: string, email: string, pass: string): Promise<void> => {
     try {
       const res = await createUserWithEmailAndPassword(auth, email, pass);
       if (res.user) {
@@ -226,8 +241,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         displayName: name,
         photoURL: res.user.photoURL
       });
-    } catch (err: any) {
-      console.error("Firebase Registration Error:", err.message);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        console.error("Firebase Registration Error:", err.message);
+      } else {
+        console.error("Firebase Registration Error:", err);
+      }
       throw err;
     }
   };

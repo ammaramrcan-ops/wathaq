@@ -168,7 +168,7 @@ export function AdminAddTeacherModal({
               </label>
               <select
                 value={tSystemCategory}
-                onChange={(e) => setTSystemCategory(e.target.value as any)}
+                onChange={(e) => setTSystemCategory(e.target.value)}
                 className="bg-surface-container-high border border-outline-variant/40 rounded-xl p-3 text-body-md text-on-surface focus:outline-none focus:border-primary font-bold"
               >
                 <option value="azhar_scientific">الأزهر - قسم علمي 🕌</option>

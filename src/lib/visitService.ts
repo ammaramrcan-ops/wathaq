@@ -25,7 +25,7 @@ function openIDBVisits(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     if (!window.indexedDB) return reject("No IndexedDB");
     const req = window.indexedDB.open(IDB_NAME, 4);
-    req.onupgradeneeded = (e: any) => {
+    req.onupgradeneeded = (e: IDBVersionChangeEvent) => {
       const idb = req.result;
       if (!idb.objectStoreNames.contains(IDB_VISITS_STORE)) {
         idb.createObjectStore(IDB_VISITS_STORE, { keyPath: "key" });

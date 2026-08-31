@@ -28,7 +28,7 @@ function openIDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     if (!window.indexedDB) return reject("No IndexedDB");
     const req = window.indexedDB.open(IDB_NAME, 2);
-    req.onupgradeneeded = (e: any) => {
+    req.onupgradeneeded = (e: IDBVersionChangeEvent) => {
       const idb = req.result;
       if (!idb.objectStoreNames.contains(IDB_STORE)) {
         idb.createObjectStore(IDB_STORE, { keyPath: "itemId" });
@@ -61,8 +61,8 @@ export async function loadIDBDeletedItems(itemType: "video" | "book"): Promise<s
       req.onsuccess = () => {
         const records = req.result || [];
         const ids = records
-          .filter((r: any) => !r.itemType || r.itemType === itemType)
-          .map((r: any) => r.itemId);
+          .filter((r: { itemType?: string }) => !r.itemType || r.itemType === itemType)
+          .map((r: { itemId: string }) => r.itemId);
         resolve(ids);
       };
       req.onerror = () => resolve([]);
@@ -83,7 +83,7 @@ export async function saveIDBUser(userRec: { uid: string; displayName: string; e
   }
 }
 
-export async function loadIDBUsers(): Promise<any[]> {
+export async function loadIDBUsers(): Promise<unknown[]> {
   try {
     const idb = await openIDB();
     return new Promise((resolve) => {
@@ -225,7 +225,7 @@ export async function markItemAsDeleted(
     // Instantly notify active React UI subscribers
     notifyDeletedSubscribers(itemType);
     notifyCustomSubscribers();
-  } catch (err) {
+  } catch (err: unknown) {
     console.warn("LocalStorage delete write warning:", err);
   }
 
@@ -245,8 +245,10 @@ export async function markItemAsDeleted(
     try {
       const globalDeletedRef = doc(db, "global_deleted_items", itemId);
       await setDoc(globalDeletedRef, deleteRecord);
-    } catch (gErr: any) {
-      if (gErr?.code === "permission-denied" || gErr?.message?.includes("permission")) {
+    } catch (gErr: unknown) {
+      const errCode = (gErr as any)?.code;
+      const errMessage = (gErr as any)?.message;
+      if (errCode === "permission-denied" || (typeof errMessage === "string" && errMessage.includes("permission"))) {
         console.warn("🔒 عملية الحذف العام متوقفة للضيوف وغير المسؤولين (تتطلب صلاحية الأدمن في Firestore Rules).");
       } else {
         console.warn("Global deleted Firestore write error:", gErr);
@@ -257,20 +259,17 @@ export async function markItemAsDeleted(
     try {
       const userDeletedRef = doc(db, "users", effectiveUid, "deleted_items", itemId);
       await setDoc(userDeletedRef, deleteRecord);
-    } catch (uErr) {
+    } catch (uErr: unknown) {
       console.warn("User deleted Firestore write error:", uErr);
     }
 
     // If custom content, attempt to remove from custom_content collection
     const customDocRef = doc(db, "custom_content", itemId);
     await deleteDoc(customDocRef).catch(() => {});
-  } catch (err) {
+  } catch (err: unknown) {
     console.warn("Firestore sync markItemAsDeleted warning:", err);
   }
 }
-
-/**
- * Subscribe to deleted IDs from Firestore & IndexedDB & LocalStorage
  */
 export function subscribeDeletedItems(
   itemType: "video" | "book",
@@ -393,7 +392,7 @@ export async function addCustomContent(
       const userDocRef = doc(db, "users", itemWithUser.userId, "custom_content", itemWithUser.id);
       await setDoc(userDocRef, itemWithUser).catch((e) => console.warn("User custom content subcollection write warning:", e));
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Firestore addCustomContent error:", err);
     throw new Error("فشل حفظ المحتوى على السيرفر سحابياً. يرجى التأكد من صلاحية الحساب أو إعادة المحاولة.");
   }
@@ -464,7 +463,7 @@ export async function approveCustomContent(id: string): Promise<void> {
   try {
     const docRef = doc(db, "custom_content", id);
     await setDoc(docRef, { status: "approved" }, { merge: true });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Firestore approveCustomContent error:", err);
     throw new Error("فشل الموافقة على المحتوى سحابياً (تتطلب صلاحية الأدمن).");
   }
@@ -475,7 +474,7 @@ export async function approveCustomContent(id: string): Promise<void> {
     const updated = current.map((item) => (item.id === id ? { ...item, status: "approved" as const } : item));
     localStorage.setItem(LOCAL_STORAGE_CUSTOM, JSON.stringify(updated));
     notifyCustomSubscribers();
-  } catch (err) {
+  } catch (err: unknown) {
     console.warn("LocalStorage approveCustomContent warning:", err);
   }
 }
@@ -488,7 +487,7 @@ export async function deleteCustomContent(id: string): Promise<void> {
   try {
     const docRef = doc(db, "custom_content", id);
     await deleteDoc(docRef);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Firestore deleteCustomContent error:", err);
     throw new Error("فشل حذف المحتوى سحابياً (تتطلب صلاحية الأدمن أو المالك).");
   }
@@ -499,7 +498,7 @@ export async function deleteCustomContent(id: string): Promise<void> {
     const updated = current.filter((item) => item.id !== id);
     localStorage.setItem(LOCAL_STORAGE_CUSTOM, JSON.stringify(updated));
     notifyCustomSubscribers();
-  } catch (err) {
+  } catch (err: unknown) {
     console.warn("LocalStorage deleteCustomContent warning:", err);
   }
 }

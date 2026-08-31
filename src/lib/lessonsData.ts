@@ -46,7 +46,7 @@ export async function saveStoredSubjectUnits(unitsMap: SubjectUnitsMap): Promise
   try {
     const docRef = doc(db, "curriculum_meta", "subject_units");
     await setDoc(docRef, { unitsMap, updatedAt: new Date().toISOString() }, { merge: true });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Firestore save units error:", err);
     throw new Error("فشل حفظ دروس وأبواب المناهج سحابياً (تتطلب صلاحية الأدمن المصرح له).");
   }
@@ -54,7 +54,7 @@ export async function saveStoredSubjectUnits(unitsMap: SubjectUnitsMap): Promise
   // 2. Save to LocalStorage ONLY after Cloud Firestore succeeds
   try {
     localStorage.setItem(LOCAL_STORAGE_UNITS_MAP, JSON.stringify(unitsMap));
-  } catch (e) {
+  } catch (e: unknown) {
     // empty
   }
 }

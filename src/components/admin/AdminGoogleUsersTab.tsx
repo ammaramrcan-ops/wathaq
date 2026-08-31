@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Users, Search, CheckCircle2, UserCheck, RefreshCw, Trash2, ShieldCheck, Zap, Lock, Unlock } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, doc, deleteDoc, setDoc } from "firebase/firestore";
+import { collection, onSnapshot, doc, deleteDoc, setDoc, QuerySnapshot, QueryDocumentSnapshot, DocumentData } from "firebase/firestore";
 import { loadIDBUsers, saveIDBUser, deleteIDBUser } from "@/lib/contentService";
 import { 
   getUserPermissions, 
@@ -136,10 +136,10 @@ export function AdminGoogleUsersTab() {
       setLoading(false);
     };
 
-    const processSnapshot = (snap: any) => {
+    const processSnapshot = (snap: QuerySnapshot<DocumentData>): void => {
       const currentDeleted = getLocalDeletedUserEmails();
 
-      snap.docs.forEach((docSnap: any) => {
+      snap.docs.forEach((docSnap: QueryDocumentSnapshot<DocumentData>) => {
         const d = docSnap.data();
         const email = d.email || d.userEmail || d.mail;
         if (email) {
@@ -456,7 +456,7 @@ export function AdminGoogleUsersTab() {
                     <span className="text-on-surface-variant font-medium">رتبة الحساب:</span>
                     <select
                       value={perm.role}
-                      onChange={(e) => handleChangeRole(userObj, e.target.value as any)}
+                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleChangeRole(userObj, e.target.value)}
                       className="bg-surface-container-high text-on-surface border border-outline-variant/40 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-primary font-bold"
                     >
                       <option value="student">طالب 🎓</option>

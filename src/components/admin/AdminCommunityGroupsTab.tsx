@@ -172,7 +172,7 @@ export function AdminCommunityGroupsTab() {
                 <label className="text-xs font-bold text-on-surface">منصة الجروب:</label>
                 <select
                   value={platform}
-                  onChange={(e) => setPlatform(e.target.value as any)}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setPlatform(e.target.value)}
                   className="bg-surface-container-high border border-outline-variant/40 rounded-xl p-3 text-body-md text-on-surface font-bold"
                 >
                   <option value="telegram">تليجرام 📡</option>

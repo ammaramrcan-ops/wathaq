@@ -10,14 +10,18 @@ export default function Login() {
   const [errorMsg, setErrorMsg] = useState("");
   const navigate = useNavigate();
 
-  const handleGoogleSignIn = async () => {
+  const handleGoogleSignIn = async (): Promise<void> => {
     setErrorMsg("");
     setLoading(true);
     try {
       await loginWithGoogle();
       navigate("/");
-    } catch (err: any) {
-      setErrorMsg(err.message || "فشل تسجيل الدخول باستخدام Google");
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setErrorMsg(err.message);
+      } else {
+        setErrorMsg("فشل تسجيل الدخول باستخدام Google");
+      }
     } finally {
       setLoading(false);
     }
