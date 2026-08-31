@@ -6,6 +6,21 @@
 
 ## 📌 سجل المشكلات والتعديلات (Historical Log)
 
+### 📅 2026-08-31 | حسم الملاحظات السبع المتبقية لـ DeepSource وإعادة ترتيب الدوال لتفادي Hoisting
+- **نوع الإجراء:** DeepSource Final 7 Issues Resolution & Topological Order Refactoring
+- **السبب الجذري:**
+  1. ظهور تحذيرات `JS-0357` (استخدام الدوال قبل تعريفها) بسبب استدعاء `notifyDeletedSubscribers` و `notifyCustomSubscribers` أعلى الترتيب النصي للملف في [contentService.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/contentService.ts).
+  2. ارتفاع تعقيد الكود `JS-R1005` (Cyclomatic Complexity) في `markItemAsDeleted` (14) و `addCustomContent` (6) بسبب تكدس المسارات الشرطية وكتل `try/catch` المزدوجة.
+- **طريقة الحل:**
+  - إعادة الترتيب التبولوجي المنطقي للدوال في [contentService.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/contentService.ts) بحيث تُعرّف كافة الدوال المساعدة والـ Getters ومطلقي الإشعارات في البداية وقبل أي دالة أخرى تستدعيها نهائياً.
+  - تفكيك وتجزئة `markItemAsDeleted` إلى دوال فرعية مستقلة `markItemAsDeletedLocal` و `markItemAsDeletedCloud`؛ مما خفض التعقيد الخوارزمي من 14 إلى **1** فقط.
+  - تجزئة `addCustomContent` إلى `saveCustomContentCloud` و `saveCustomContentLocal`؛ مما خفض التعقيد الخوارزمي من 6 إلى **2** فقط.
+  - التأكد من نجاح البناء الشامل `npm run build` واجتياز كافّة الاختبارات التلقائية (12/12).
+- **خطة الوقاية وتيسير التطوير:**
+  - الاعتماد دائماً على الترتيب التبولوجي لدوال الملف لتفادي أخطاء النطاق ورفع مقروئية الكود.
+
+---
+
 ### 📅 2026-08-31 | حظر ومعالجة 35 ملاحظة جودة وأسلوب كود من DeepSource في contentService.ts
 - **نوع الإجراء:** DeepSource Code Quality & Refactoring Cleanup (35 Issues Resolved)
 - **السبب الجذري:**

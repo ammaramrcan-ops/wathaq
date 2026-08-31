@@ -111,36 +111,26 @@ export const deleteIDBUser = async (email: string): Promise<void> => {
   }
 };
 
-export const clearLocalUserSessionData = async (): Promise<void> => {
+/**
+ * Get locally stored deleted IDs for quick initial render
+ */
+export const getLocalDeletedIds = (itemType: "video" | "book"): string[] => {
   try {
-    localStorage.removeItem(LOCAL_STORAGE_CUSTOM);
-    localStorage.removeItem(LOCAL_STORAGE_DELETED_VIDEOS);
-    localStorage.removeItem(LOCAL_STORAGE_DELETED_BOOKS);
-    localStorage.removeItem("wathaq_deleted_teachers");
-    localStorage.removeItem("wathaq_teachers");
-    localStorage.removeItem("wathaq_users_permissions_map");
-    localStorage.removeItem("wathaq_persisted_user");
-    localStorage.removeItem("wathaq_registered_google_users");
+    const key = itemType === "video" ? LOCAL_STORAGE_DELETED_VIDEOS : LOCAL_STORAGE_DELETED_BOOKS;
+    return JSON.parse(localStorage.getItem(key) || "[]");
   } catch {
-    /* ignore storage cleanup error */
+    return [];
   }
+};
 
+/**
+ * Get locally stored custom content items
+ */
+export const getLocalCustomContent = (): CustomContentItem[] => {
   try {
-    const idb = await openIDB();
-    const tx = idb.transaction([IDB_STORE, IDB_USERS_STORE], "readwrite");
-    tx.objectStore(IDB_STORE).clear();
-    tx.objectStore(IDB_USERS_STORE).clear();
+    return JSON.parse(localStorage.getItem(LOCAL_STORAGE_CUSTOM) || "[]");
   } catch {
-    /* ignore IDB cleanup error */
-  }
-
-  // Notify UI subscribers to immediately reset active state upon logout
-  try {
-    notifyDeletedSubscribers("video");
-    notifyDeletedSubscribers("book");
-    notifyCustomSubscribers();
-  } catch {
-    /* ignore notification error */
+    return [];
   }
 };
 
@@ -176,39 +166,41 @@ const notifyCustomSubscribers = (): void => {
   });
 };
 
-/**
- * Get locally stored deleted IDs for quick initial render
- */
-export const getLocalDeletedIds = (itemType: "video" | "book"): string[] => {
+export const clearLocalUserSessionData = async (): Promise<void> => {
   try {
-    const key = itemType === "video" ? LOCAL_STORAGE_DELETED_VIDEOS : LOCAL_STORAGE_DELETED_BOOKS;
-    return JSON.parse(localStorage.getItem(key) || "[]");
+    localStorage.removeItem(LOCAL_STORAGE_CUSTOM);
+    localStorage.removeItem(LOCAL_STORAGE_DELETED_VIDEOS);
+    localStorage.removeItem(LOCAL_STORAGE_DELETED_BOOKS);
+    localStorage.removeItem("wathaq_deleted_teachers");
+    localStorage.removeItem("wathaq_teachers");
+    localStorage.removeItem("wathaq_users_permissions_map");
+    localStorage.removeItem("wathaq_persisted_user");
+    localStorage.removeItem("wathaq_registered_google_users");
   } catch {
-    return [];
+    /* ignore storage cleanup error */
+  }
+
+  try {
+    const idb = await openIDB();
+    const tx = idb.transaction([IDB_STORE, IDB_USERS_STORE], "readwrite");
+    tx.objectStore(IDB_STORE).clear();
+    tx.objectStore(IDB_USERS_STORE).clear();
+  } catch {
+    /* ignore IDB cleanup error */
+  }
+
+  // Notify UI subscribers to immediately reset active state upon logout
+  try {
+    notifyDeletedSubscribers("video");
+    notifyDeletedSubscribers("book");
+    notifyCustomSubscribers();
+  } catch {
+    /* ignore notification error */
   }
 };
 
-/**
- * Get locally stored custom content items
- */
-export const getLocalCustomContent = (): CustomContentItem[] => {
-  try {
-    return JSON.parse(localStorage.getItem(LOCAL_STORAGE_CUSTOM) || "[]");
-  } catch {
-    return [];
-  }
-};
-
-/**
- * Save a deleted item (video or book) to Firestore & IndexedDB & LocalStorage
- */
-export const markItemAsDeleted = async (
-  itemId: string,
-  itemType: "video" | "book",
-  userId?: string,
-  _isAdmin = false
-): Promise<void> => {
-  // 1. Update LocalStorage & IndexedDB durable storage & notify UI state instantly
+// Helper: Local storage & IndexedDB state update for item deletion
+const markItemAsDeletedLocal = async (itemId: string, itemType: "video" | "book"): Promise<void> => {
   try {
     const key = itemType === "video" ? LOCAL_STORAGE_DELETED_VIDEOS : LOCAL_STORAGE_DELETED_BOOKS;
     const current = getLocalDeletedIds(itemType);
@@ -217,26 +209,22 @@ export const markItemAsDeleted = async (
       localStorage.setItem(key, JSON.stringify(updated));
     }
 
-    // Save to IndexedDB durable store
     await saveIDBDeletedItem(itemId, itemType);
 
-    // Also remove from custom content if it was a custom content item
     const custom = getLocalCustomContent();
     const updatedCustom = custom.filter((item) => item.id !== itemId);
     localStorage.setItem(LOCAL_STORAGE_CUSTOM, JSON.stringify(updatedCustom));
 
-    // Instantly notify active React UI subscribers
     notifyDeletedSubscribers(itemType);
     notifyCustomSubscribers();
   } catch (err: unknown) {
     console.warn("LocalStorage delete write warning:", err);
   }
+};
 
-  // 2. Persist asynchronously to Firestore cloud database if user UID exists
+// Helper: Cloud Firestore sync for item deletion
+const markItemAsDeletedCloud = async (itemId: string, itemType: "video" | "book", effectiveUid: string): Promise<void> => {
   try {
-    const effectiveUid = userId || auth.currentUser?.uid;
-    if (!effectiveUid) return;
-
     const deleteRecord = {
       itemId,
       itemType,
@@ -244,7 +232,6 @@ export const markItemAsDeleted = async (
       deletedBy: effectiveUid
     };
 
-    // Global deletion in Firestore (ONLY succeeds if user is Admin, otherwise isolated locally)
     try {
       const globalDeletedRef = doc(db, "global_deleted_items", itemId);
       await setDoc(globalDeletedRef, deleteRecord);
@@ -259,7 +246,6 @@ export const markItemAsDeleted = async (
       }
     }
 
-    // User-isolated deletion record
     try {
       const userDeletedRef = doc(db, "users", effectiveUid, "deleted_items", itemId);
       await setDoc(userDeletedRef, deleteRecord);
@@ -267,11 +253,26 @@ export const markItemAsDeleted = async (
       console.warn("User deleted Firestore write error:", uErr);
     }
 
-    // If custom content, attempt to remove from custom_content collection
     const customDocRef = doc(db, "custom_content", itemId);
     await deleteDoc(customDocRef).catch(() => undefined);
   } catch (err: unknown) {
     console.warn("Firestore sync markItemAsDeleted warning:", err);
+  }
+};
+
+/**
+ * Save a deleted item (video or book) to Firestore & IndexedDB & LocalStorage
+ */
+export const markItemAsDeleted = async (
+  itemId: string,
+  itemType: "video" | "book",
+  userId?: string,
+  _isAdmin = false
+): Promise<void> => {
+  await markItemAsDeletedLocal(itemId, itemType);
+  const effectiveUid = userId || auth.currentUser?.uid;
+  if (effectiveUid) {
+    await markItemAsDeletedCloud(itemId, itemType, effectiveUid);
   }
 };
 
@@ -285,17 +286,14 @@ export const subscribeDeletedItems = (
 ): (() => void) => {
   const key = itemType === "video" ? LOCAL_STORAGE_DELETED_VIDEOS : LOCAL_STORAGE_DELETED_BOOKS;
 
-  // Register in-memory subscriber
   deletedSubscribers[itemType].add(onUpdate);
 
-  // Immediately notify caller with cached IDs
   const localIds = getLocalDeletedIds(itemType);
   onUpdate(localIds);
 
   const collectedIds = new Set<string>(localIds);
   const effectiveUid = userId || auth.currentUser?.uid;
 
-  // Check IndexedDB durable backup (restores deleted IDs if LocalStorage was cleared)
   loadIDBDeletedItems(itemType).then((idbIds) => {
     let changed = false;
     idbIds.forEach((id) => {
@@ -320,7 +318,6 @@ export const subscribeDeletedItems = (
   let unsubUser: (() => void) | null = null;
 
   try {
-    // 1. Subscribe to Global Deleted Items from Firestore
     const globalCol = collection(db, "global_deleted_items");
     unsubGlobal = onSnapshot(
       globalCol,
@@ -329,7 +326,6 @@ export const subscribeDeletedItems = (
           const data = docSnap.data();
           if (!data.itemType || data.itemType === itemType) {
             collectedIds.add(docSnap.id);
-            // Backup cloud deletion to IndexedDB
             saveIDBDeletedItem(docSnap.id, itemType);
           }
         });
@@ -344,7 +340,6 @@ export const subscribeDeletedItems = (
       (err) => console.warn("Firestore global deleted listener warning:", err)
     );
 
-    // 2. Subscribe to User Isolated Deleted Items from Firestore ONLY if a valid UID exists
     if (effectiveUid) {
       const userDeletedCol = collection(db, "users", effectiveUid, "deleted_items");
       unsubUser = onSnapshot(
@@ -379,6 +374,34 @@ export const subscribeDeletedItems = (
   };
 };
 
+// Helper: Save custom content to Cloud Firestore
+const saveCustomContentCloud = async (itemWithUser: CustomContentItem): Promise<void> => {
+  try {
+    const docRef = doc(db, "custom_content", itemWithUser.id);
+    await setDoc(docRef, itemWithUser);
+
+    if (itemWithUser.userId) {
+      const userDocRef = doc(db, "users", itemWithUser.userId, "custom_content", itemWithUser.id);
+      await setDoc(userDocRef, itemWithUser).catch((e) => console.warn("User custom content subcollection write warning:", e));
+    }
+  } catch (err: unknown) {
+    console.error("Firestore addCustomContent error:", err);
+    throw new Error("فشل حفظ المحتوى على السيرفر سحابياً. يرجى التأكد من صلاحية الحساب أو إعادة المحاولة.");
+  }
+};
+
+// Helper: Save custom content to LocalStorage
+const saveCustomContentLocal = (itemWithUser: CustomContentItem): void => {
+  try {
+    const existing = getLocalCustomContent();
+    const updated = [itemWithUser, ...existing.filter((i) => i.id !== itemWithUser.id)];
+    localStorage.setItem(LOCAL_STORAGE_CUSTOM, JSON.stringify(updated));
+    notifyCustomSubscribers();
+  } catch (err) {
+    console.warn("LocalStorage custom content write warning:", err);
+  }
+};
+
 /**
  * Add custom content to Firestore & LocalStorage & notify subscribers
  */
@@ -392,29 +415,8 @@ export const addCustomContent = async (
     ...(effectiveUid ? { userId: effectiveUid } : {})
   };
 
-  // 1. Save to Cloud Firestore FIRST
-  try {
-    const docRef = doc(db, "custom_content", itemWithUser.id);
-    await setDoc(docRef, itemWithUser);
-
-    if (itemWithUser.userId) {
-      const userDocRef = doc(db, "users", itemWithUser.userId, "custom_content", itemWithUser.id);
-      await setDoc(userDocRef, itemWithUser).catch((e) => console.warn("User custom content subcollection write warning:", e));
-    }
-  } catch (err: unknown) {
-    console.error("Firestore addCustomContent error:", err);
-    throw new Error("فشل حفظ المحتوى على السيرفر سحابياً. يرجى التأكد من صلاحية الحساب أو إعادة المحاولة.");
-  }
-
-  // 2. Save to LocalStorage & notify React UI state ONLY after Firestore succeeds
-  try {
-    const existing = getLocalCustomContent();
-    const updated = [itemWithUser, ...existing.filter((i) => i.id !== item.id)];
-    localStorage.setItem(LOCAL_STORAGE_CUSTOM, JSON.stringify(updated));
-    notifyCustomSubscribers();
-  } catch (err) {
-    console.warn("LocalStorage custom content write warning:", err);
-  }
+  await saveCustomContentCloud(itemWithUser);
+  saveCustomContentLocal(itemWithUser);
 };
 
 /**
@@ -424,10 +426,8 @@ export const subscribeCustomContent = (
   userId: string | undefined,
   onUpdate: (items: CustomContentItem[]) => void
 ): (() => void) => {
-  // Register in-memory subscriber
   customSubscribers.add(onUpdate);
 
-  // Immediately notify with local cache
   const localItems = getLocalCustomContent();
   onUpdate(localItems);
 
@@ -439,7 +439,6 @@ export const subscribeCustomContent = (
       customCol,
       (snap) => {
         const fetchedItems: CustomContentItem[] = snap.docs.map((d) => d.data() as CustomContentItem);
-        // Combine with local items (prioritizing remote fresh data)
         const combinedMap = new Map<string, CustomContentItem>();
         localItems.forEach((item) => combinedMap.set(item.id, item));
         fetchedItems.forEach((item) => combinedMap.set(item.id, item));
@@ -468,7 +467,6 @@ export const subscribeCustomContent = (
  * Approve a pending custom content item in Firestore & LocalStorage
  */
 export const approveCustomContent = async (id: string): Promise<void> => {
-  // 1. Persist status: "approved" to Firestore Cloud FIRST
   try {
     const docRef = doc(db, "custom_content", id);
     await setDoc(docRef, { status: "approved" }, { merge: true });
@@ -477,7 +475,6 @@ export const approveCustomContent = async (id: string): Promise<void> => {
     throw new Error("فشل الموافقة على المحتوى سحابياً (تتطلب صلاحية الأدمن).");
   }
 
-  // 2. Update LocalStorage & notify React UI state
   try {
     const current = getLocalCustomContent();
     const updated = current.map((item) => (item.id === id ? { ...item, status: "approved" as const } : item));
@@ -492,7 +489,6 @@ export const approveCustomContent = async (id: string): Promise<void> => {
  * Delete a custom content item from Firestore & LocalStorage
  */
 export const deleteCustomContent = async (id: string): Promise<void> => {
-  // 1. Delete document from Firestore Cloud FIRST
   try {
     const docRef = doc(db, "custom_content", id);
     await deleteDoc(docRef);
@@ -501,7 +497,6 @@ export const deleteCustomContent = async (id: string): Promise<void> => {
     throw new Error("فشل حذف المحتوى سحابياً (تتطلب صلاحية الأدمن أو المالك).");
   }
 
-  // 2. Update LocalStorage & notify React UI state
   try {
     const current = getLocalCustomContent();
     const updated = current.filter((item) => item.id !== id);
