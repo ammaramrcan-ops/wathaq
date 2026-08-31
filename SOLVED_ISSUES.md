@@ -6,6 +6,19 @@
 
 ## 📌 سجل المشكلات والتعديلات (Historical Log)
 
+### 📅 2026-08-31 | استخراج دالة isPermissionError وتخفيض التعقيد لـ 2 فقط (التقرير النظيف لـ DeepSource)
+- **نوع الإجراء:** DeepSource Final Cyclomatic Complexity Zero-Out (JS-R1005 Refactoring)
+- **السبب الجذري:**
+  1. بلغت نسبة التعقيد الخوارزمي في `syncGlobalDeletedItemCloud` (Cyclomatic Complexity = 7) بسبب تجميع الشروط المتعددة والتحقق من التوكنات والاستثناءات وتركيبات الـ Ternary والـ `||` في كتل الـ `catch`.
+- **طريقة الحل:**
+  - استخراج دالة فحص الصلاحية المستقلة `isPermissionError(err: unknown): boolean` وفصل فحص الأخطاء والنصوص بعيداً عن مجرى التنفيذ الرئيسي.
+  - تخفيض التعقيد الخوارزمي للدالة `syncGlobalDeletedItemCloud` من 7 إلى **2** فقط (مع جعل `isPermissionError` بنسبة تعقيد **3** آمنة وممتازة).
+  - التأكد من البناء الشامل `npm run build` واجتياز كافّة الاختبارات التلقائية (12/12).
+- **خطة الوقاية وتيسير التطوير:**
+  - فصل معالجة الأخطاء المعقدة بدوال فحص منفصلة آمنة (Predicates) لرفع النقاء النظري والمعماري للكود.
+
+---
+
 ### 📅 2026-08-31 | تفتيت markItemAsDeletedCloud وتحقيق 100% نجاح في تقرير DeepSource (0 Issues)
 - **نوع الإجراء:** DeepSource Final Complexity Elimination (JS-R1005 Refactoring)
 - **السبب الجذري:**

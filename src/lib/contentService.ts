@@ -229,16 +229,22 @@ interface DeleteRecord {
   deletedBy: string;
 }
 
+const isPermissionError = (err: unknown): boolean => {
+  if (err && typeof err === "object") {
+    const code = "code" in err ? String((err as { code?: unknown }).code) : "";
+    const msg = "message" in err ? String((err as { message?: unknown }).message) : "";
+    return code === "permission-denied" || msg.includes("permission");
+  }
+  return false;
+};
+
 // Helper: Cloud Firestore sync for global deleted item
 const syncGlobalDeletedItemCloud = async (itemId: string, deleteRecord: DeleteRecord): Promise<void> => {
   try {
     const globalDeletedRef = doc(db, "global_deleted_items", itemId);
     await setDoc(globalDeletedRef, deleteRecord);
   } catch (gErr: unknown) {
-    const errObj = gErr instanceof Error ? (gErr as Error & { code?: string }) : null;
-    const errCode = errObj?.code;
-    const errMessage = errObj?.message || (typeof gErr === "string" ? gErr : "");
-    if (errCode === "permission-denied" || errMessage.includes("permission")) {
+    if (isPermissionError(gErr)) {
       console.warn("🔒 عملية الحذف العام متوقفة للضيوف وغير المسؤولين (تتطلب صلاحية الأدمن في Firestore Rules).");
       return;
     }
