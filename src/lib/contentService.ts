@@ -270,6 +270,9 @@ export async function markItemAsDeleted(
     console.warn("Firestore sync markItemAsDeleted warning:", err);
   }
 }
+
+/**
+ * Subscribe to deleted IDs from Firestore & IndexedDB & LocalStorage
  */
 export function subscribeDeletedItems(
   itemType: "video" | "book",

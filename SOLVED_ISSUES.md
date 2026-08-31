@@ -6,6 +6,18 @@
 
 ## 📌 سجل المشكلات والتعديلات (Historical Log)
 
+### 📅 2026-08-31 | إصلاح خطأ التجميع وتفكك التعليقات الناتج عن دمج PR التعديل التلقائي لـ DeepSource (#2)
+- **نوع الإجراء:** DeepSource AutoFix PR #2 Repair & Broken Comment Restoration
+- **السبب الجذري:**
+  1. قامت أداة التعديل التلقائي من DeepSource في الـ PR رقم #2 بحذف بداية التوثيق `/**` لـ JSDoc في [contentService.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/contentService.ts)، مما ترك رمز الإغلاق `*/` عائماً دون فتح وتسبب بخطأ بناء esbuild من نوع `Unexpected "*"`.
+- **طريقة الحل:**
+  - إعادة كتابة واسترجاع الهيدر والتوثيق التوضيحي `/**` للدالة `subscribeDeletedItems` في [contentService.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/contentService.ts).
+  - إجراء البناء الشامل `npm run build` واجتياز اختبارات الوحدة `npm test` بنسبة 100%.
+- **خطة الوقاية وتيسير التطوير:**
+  - فحص أي تعديل آلي من DeepSource يستهدف تعليقات JSDoc وتوثيق الدوال لمنع حذف أقواس الفتح.
+
+---
+
 ### 📅 2026-08-31 | إصلاح خطأ البناء والتجميع الناتج عن دمج PR التعديل التلقائي لـ DeepSource (#1)
 - **نوع الإجراء:** DeepSource AutoFix Syntax Repair & CI Build Restoration
 - **السبب الجذري:**
