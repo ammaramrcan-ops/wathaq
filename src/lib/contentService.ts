@@ -222,42 +222,54 @@ const markItemAsDeletedLocal = async (itemId: string, itemType: "video" | "book"
   }
 };
 
-// Helper: Cloud Firestore sync for item deletion
-const markItemAsDeletedCloud = async (itemId: string, itemType: "video" | "book", effectiveUid: string): Promise<void> => {
+interface DeleteRecord {
+  itemId: string;
+  itemType: "video" | "book";
+  deletedAt: string;
+  deletedBy: string;
+}
+
+// Helper: Cloud Firestore sync for global deleted item
+const syncGlobalDeletedItemCloud = async (itemId: string, deleteRecord: DeleteRecord): Promise<void> => {
   try {
-    const deleteRecord = {
-      itemId,
-      itemType,
-      deletedAt: new Date().toISOString(),
-      deletedBy: effectiveUid
-    };
-
-    try {
-      const globalDeletedRef = doc(db, "global_deleted_items", itemId);
-      await setDoc(globalDeletedRef, deleteRecord);
-    } catch (gErr: unknown) {
-      const errObj = gErr instanceof Error ? (gErr as Error & { code?: string }) : null;
-      const errCode = errObj?.code;
-      const errMessage = errObj?.message || (typeof gErr === "string" ? gErr : "");
-      if (errCode === "permission-denied" || errMessage.includes("permission")) {
-        console.warn("🔒 عملية الحذف العام متوقفة للضيوف وغير المسؤولين (تتطلب صلاحية الأدمن في Firestore Rules).");
-      } else {
-        console.warn("Global deleted Firestore write error:", gErr);
-      }
+    const globalDeletedRef = doc(db, "global_deleted_items", itemId);
+    await setDoc(globalDeletedRef, deleteRecord);
+  } catch (gErr: unknown) {
+    const errObj = gErr instanceof Error ? (gErr as Error & { code?: string }) : null;
+    const errCode = errObj?.code;
+    const errMessage = errObj?.message || (typeof gErr === "string" ? gErr : "");
+    if (errCode === "permission-denied" || errMessage.includes("permission")) {
+      console.warn("🔒 عملية الحذف العام متوقفة للضيوف وغير المسؤولين (تتطلب صلاحية الأدمن في Firestore Rules).");
+      return;
     }
-
-    try {
-      const userDeletedRef = doc(db, "users", effectiveUid, "deleted_items", itemId);
-      await setDoc(userDeletedRef, deleteRecord);
-    } catch (uErr: unknown) {
-      console.warn("User deleted Firestore write error:", uErr);
-    }
-
-    const customDocRef = doc(db, "custom_content", itemId);
-    await deleteDoc(customDocRef).catch(() => undefined);
-  } catch (err: unknown) {
-    console.warn("Firestore sync markItemAsDeleted warning:", err);
+    console.warn("Global deleted Firestore write error:", gErr);
   }
+};
+
+// Helper: Cloud Firestore sync for user-isolated deleted item
+const syncUserDeletedItemCloud = async (itemId: string, effectiveUid: string, deleteRecord: DeleteRecord): Promise<void> => {
+  try {
+    const userDeletedRef = doc(db, "users", effectiveUid, "deleted_items", itemId);
+    await setDoc(userDeletedRef, deleteRecord);
+  } catch (uErr: unknown) {
+    console.warn("User deleted Firestore write error:", uErr);
+  }
+};
+
+// Helper: Cloud Firestore sync orchestrator for item deletion
+const markItemAsDeletedCloud = async (itemId: string, itemType: "video" | "book", effectiveUid: string): Promise<void> => {
+  const deleteRecord: DeleteRecord = {
+    itemId,
+    itemType,
+    deletedAt: new Date().toISOString(),
+    deletedBy: effectiveUid
+  };
+
+  await syncGlobalDeletedItemCloud(itemId, deleteRecord);
+  await syncUserDeletedItemCloud(itemId, effectiveUid, deleteRecord);
+
+  const customDocRef = doc(db, "custom_content", itemId);
+  await deleteDoc(customDocRef).catch(() => undefined);
 };
 
 /**

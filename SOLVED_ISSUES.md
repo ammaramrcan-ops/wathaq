@@ -6,6 +6,19 @@
 
 ## 📌 سجل المشكلات والتعديلات (Historical Log)
 
+### 📅 2026-08-31 | تفتيت markItemAsDeletedCloud وتحقيق 100% نجاح في تقرير DeepSource (0 Issues)
+- **نوع الإجراء:** DeepSource Final Complexity Elimination (JS-R1005 Refactoring)
+- **السبب الجذري:**
+  1. ارتفاع التعقيد الخوارزمي (Cyclomatic Complexity = 9) بـ [contentService.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/contentService.ts) في `markItemAsDeletedCloud` نتيجة وجود كتل `try/catch` متداخلة وشروط متعددة لمزامنة العناصر المحذوفة عاماً وشخصياً في Firestore.
+- **طريقة الحل:**
+  - تفتيت وتجزئة `markItemAsDeletedCloud` إلى دالتين مساعِدتين مسطحتين ومباشرتين: `syncGlobalDeletedItemCloud` (تُعنى بالحذف العام) و `syncUserDeletedItemCloud` (تُعنى بالحذف الخاص للمستخدم).
+  - تحويل `markItemAsDeletedCloud` إلى موجه مباشر بسيط (Cyclomatic Complexity = 1).
+  - التأكد من البناء الشامل `npm run build` واجتياز اختبارات الوحدة (12/12) بنسبة 100%.
+- **خطة الوقاية وتيسير التطوير:**
+  - المحافظة على دالة واحدة لمهمة واحدة (Single Responsibility Principle) لتفادي أي ارتفاع في التعقيد الخوارزمي مستقبلاً.
+
+---
+
 ### 📅 2026-08-31 | حسم الملاحظات السبع المتبقية لـ DeepSource وإعادة ترتيب الدوال لتفادي Hoisting
 - **نوع الإجراء:** DeepSource Final 7 Issues Resolution & Topological Order Refactoring
 - **السبب الجذري:**
