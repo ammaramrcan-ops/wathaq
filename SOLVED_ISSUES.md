@@ -6,6 +6,20 @@
 
 ## 📌 سجل المشكلات والتعديلات (Historical Log)
 
+### 📅 2026-08-31 | إصلاح خطأ البناء والتجميع الناتج عن دمج PR التعديل التلقائي لـ DeepSource (#1)
+- **نوع الإجراء:** DeepSource AutoFix Syntax Repair & CI Build Restoration
+- **السبب الجذري:**
+  1. قامت أداة التعديل التلقائي من DeepSource (PR #1) بالتعامل الخاطئ مع كتل الاستثناءات الفاضية `catch (e) {}` واستبدالها نصياً بـ `catch (e) { // empty }` على سطر واحد؛ مما أدى لابتلاع قوس الإغلاق `}` بواسطة التعليق السطري `//` والتسبب بخطأ بناء TypeScript/esbuild من نوع `Unexpected "catch"`.
+  2. أضافت الأداة أيضاً كسر نصوص الهروب (escaping) لبعض النصوص العربية مثل `throw new Error("... \");` في [communityService.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/communityService.ts) مما تسبب بخطأ `Unterminated string literal`.
+- **طريقة الحل:**
+  - معالجة نصوص التعليقات داخل كتل `catch` بتنسيق كتل متعددة الأسطر آمنة `/* ignore fallback error */` ومنع التعليقات السطرية المباشرة بجانب أقواس الإغلاق في [AuthContext.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/context/AuthContext.tsx), [communityService.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/communityService.ts), [lessonsData.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/lessonsData.ts), و [teacherService.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/teacherService.ts).
+  - تصحيح الهروب النصي المكسور وعلامات التنصيص في [communityService.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/communityService.ts).
+  - التحقق من نجاح التجميع `npm run build` واجتياز كافّة اختبارات الوحدة `npm test` بنسبة 100%.
+- **خطة الوقاية وتيسير التطوير:**
+  - مراجعة أي Pull Request تلقائي من DeepSource بدقة قبل الدمج للتأكد من عدم كسر قواعد بناء TypeScript أو نصوص الهروب العربي.
+
+---
+
 ### 📅 2026-08-31 | (مراجعة كود مستقلة - المرحلة 4) مزامنة الصلاحيات الإدارية للأدمن الفرعيين والناشرين المعتمدين محلياً
 - **نوع الإجراء:** RBAC Authorization & Multi-Admin Sync Fix
 - **السبب الجذري:** اقتصار الدالة التزامنية `getUserPermissions` بـ [userPermissionsService.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/userPermissionsService.ts) على البريد الرئيسي `ammaramrcan@gmail.com` وتجريد أي بريد آخر من الصلاحيات الإدارية كـ Fallback تزامني؛ مما أدى لميض شاشة القفل بصفحة `/admin` وحجب ميزة النشر المباشر عن الأدمن الفرعيين والناشرين المعتمدين.

@@ -55,7 +55,8 @@ async function deleteIDBDiscussion(id: string): Promise<void> {
     const idb = await openIDBCommunity();
     const tx = idb.transaction(IDB_DISCUSSIONS_STORE, "readwrite");
     tx.objectStore(IDB_DISCUSSIONS_STORE).delete(id);
-  } catch (e) { // empty
+  } catch (e) {
+    /* ignore IDB error */
   }
 }
 
@@ -142,7 +143,7 @@ export async function deleteDiscussion(id: string): Promise<void> {
     }
   } catch (err: any) {
     console.error("Firestore delete discussion error:", err);
-    throw new Error("فشل حذف المنشور سحابياً (تتطلب ملكية المنشور أو صلاحية الأدمن).\");
+    throw new Error("فشل حذف المنشور سحابياً (تتطلب ملكية المنشور أو صلاحية الأدمن).");
   }
 
   // 2. Update LocalStorage & IndexedDB ONLY after Cloud deletion succeeds

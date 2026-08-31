@@ -51,7 +51,9 @@ export function saveStoredTeachers(list: TeacherEvaluation[]): void {
 export function subscribeTeachers(onUpdate: (teachers: TeacherEvaluation[]) => void): () => void {
   try {
     localStorage.removeItem("wathaq_teacher_evaluations_list");
-  } catch (e) { // empty }
+  } catch (e) {
+    /* ignore storage error */
+  }
 
   onUpdate(getStoredTeachers());
 

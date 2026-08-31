@@ -130,7 +130,9 @@ export function subscribeUnits(onUpdate: (unitsMap: SubjectUnitsMap) => void): (
           const cloudUnitsMap = snap.data().unitsMap as SubjectUnitsMap;
           try {
             localStorage.setItem(LOCAL_STORAGE_UNITS_MAP, JSON.stringify(cloudUnitsMap));
-          } catch (e) { // empty }
+          } catch (e) {
+            /* ignore storage error */
+          }
           onUpdate(cloudUnitsMap);
         } else {
           onUpdate(getStoredSubjectUnits());
@@ -138,7 +140,9 @@ export function subscribeUnits(onUpdate: (unitsMap: SubjectUnitsMap) => void): (
       },
       (err) => console.warn("Units snapshot warning:", err)
     );
-  } catch (e) { // empty }
+  } catch (e) {
+    /* ignore subscription error */
+  }
 
   return () => {
     if (unsub) unsub();
