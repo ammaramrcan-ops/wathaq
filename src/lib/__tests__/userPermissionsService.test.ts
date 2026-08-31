@@ -55,4 +55,20 @@ describe('userPermissionsService', () => {
     expect(retrieved.role).toBe('trusted_publisher');
     expect(retrieved.canDirectPublish).toBe(true);
   });
+
+  it('should retrieve secondary admin permissions when granted', () => {
+    const secondaryAdminPerms = {
+      uid: 'uid999',
+      email: 'coadmin@example.com',
+      role: 'admin' as const,
+      canDirectPublish: true,
+      canAccessAdmin: true
+    };
+
+    savePermissionsMap({ 'coadmin@example.com': secondaryAdminPerms });
+    const retrieved = getUserPermissions('uid999', 'coadmin@example.com');
+    expect(retrieved.role).toBe('admin');
+    expect(retrieved.canAccessAdmin).toBe(true);
+    expect(retrieved.canDirectPublish).toBe(true);
+  });
 });

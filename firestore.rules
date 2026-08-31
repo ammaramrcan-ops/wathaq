@@ -33,37 +33,120 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // 3. بيانات مستندات المستخدمين الشخصية (محصورة للمالك أو الأدمن)
-    match /users/{userId}/{document=**} {
+    match /teacher_evaluations/{document=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 3. بيانات مستندات المستخدمين الشخصية (محصورة للمالك أو الأدمن مع حظر تعديل الصلاحيات للمستخدم العادي)
+    match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-      allow write: if isOwner(userId) || isAdmin();
+      allow create: if (
+        isOwner(userId) && (
+          !request.resource.data.keys().hasAny(['role', 'canAccessAdmin', 'canDirectPublish', 'permissions']) ||
+          (request.resource.data.role == "student" && !request.resource.data.keys().hasAny(['canAccessAdmin', 'canDirectPublish', 'permissions']))
+        )
+      ) || isAdmin();
+      allow update: if (
+        isOwner(userId) && 
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'canAccessAdmin', 'canDirectPublish', 'permissions'])
+      ) || isAdmin();
+      allow delete: if isAdmin();
+
+      match /{document=**} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
     }
 
-    match /google_registered_users/{document=**} {
-      allow read: if isOwner(document) || isAdmin();
-      allow write: if isOwner(document) || isAdmin();
-    }
-
-    match /global_registered_users/{document=**} {
-      allow read: if isOwner(document) || isAdmin();
-      allow write: if isOwner(document) || isAdmin();
-    }
-
-    // 4. المحتوى المخصص (الرفع للمسجلين بشرط حالة المعاينة pending ما لم يكن أدمن)
-    match /custom_content/{document=**} {
-      allow read: if true;
-      allow create: if isSignedIn() && (request.resource.data.status == "pending" || isAdmin());
-      allow update, delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
-    }
-
-    // 5. التحليلات العامة (تحديث العدادات للمسجلين والضيوف، ولا يمكن الحذف إلا للأدمن)
-    match /analytics_summary/{document=**} {
-      allow read: if true;
-      allow create, update: if true;
+    match /google_registered_users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if (
+        isOwner(userId) && (
+          !request.resource.data.keys().hasAny(['role', 'canAccessAdmin', 'canDirectPublish', 'permissions']) ||
+          (request.resource.data.role == "student" && !request.resource.data.keys().hasAny(['canAccessAdmin', 'canDirectPublish', 'permissions']))
+        )
+      ) || isAdmin();
+      allow update: if (
+        isOwner(userId) && 
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'canAccessAdmin', 'canDirectPublish', 'permissions'])
+      ) || isAdmin();
       allow delete: if isAdmin();
     }
 
-    // 6. قواعد افتراضية آمنة لباقي المستندات
+    match /global_registered_users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if (
+        isOwner(userId) && (
+          !request.resource.data.keys().hasAny(['role', 'canAccessAdmin', 'canDirectPublish', 'permissions']) ||
+          (request.resource.data.role == "student" && !request.resource.data.keys().hasAny(['canAccessAdmin', 'canDirectPublish', 'permissions']))
+        )
+      ) || isAdmin();
+      allow update: if (
+        isOwner(userId) && 
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'canAccessAdmin', 'canDirectPublish', 'permissions'])
+      ) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // 3.5. الحسابات المحظورة (متاحة للقراءة للمستخدم للتحقق من حالة حسابه عند الدخول، وحصرية للكتابة للأدمن)
+    match /banned_users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // 4. المحتوى المخصص (الرفع للمسجلين بشرط حالة المعاينة pending ما لم يكن أدمن، ويُحظر إبقاء الحالة approved عند تعديل المستخدم العادي)
+    match /custom_content/{document=**} {
+      allow read: if true;
+      allow create: if isSignedIn() && (request.resource.data.status == "pending" || isAdmin());
+      allow update: if isAdmin() || (
+        isSignedIn() && 
+        resource.data.userId == request.auth.uid && 
+        request.resource.data.status == "pending"
+      );
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+    }
+
+    // 5. التحليلات العامة (تحديث العدادات للمسجلين والضيوف بالحقول المعتمدة فقط، ولا يمكن الحذف إلا للأدمن)
+    match /analytics_summary/{document=**} {
+      allow read: if true;
+      allow create, update: if isSignedIn() &&
+        request.resource.data.keys().hasOnly(['totalVisits', 'dailyVisits', 'weeklyVisits', 'recurringVisits', 'uniqueVisitorsCount', 'repeatVisitorRate', 'lastDate', 'lastVisitTimestamp']) &&
+        (request.resource.data.totalVisits is number && request.resource.data.totalVisits >= 0) &&
+        (request.resource.data.dailyVisits is number && request.resource.data.dailyVisits >= 0);
+      allow delete: if isAdmin();
+    }
+
+    // 6. مناقشات المجتمع واقتراحات الطلاب (محمية ومتاحة للمستخدمين المصرح لهم)
+    match /discussions/{document=**} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin() || (isSignedIn() && resource.data.authorUid == request.auth.uid);
+    }
+
+    match /suggestions/{document=**} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn() &&
+        request.resource.data.keys().hasAny(['title', 'details']) &&
+        (!request.resource.data.keys().hasAny(['title']) || (request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 300)) &&
+        (!request.resource.data.keys().hasAny(['details']) || (request.resource.data.details is string && request.resource.data.details.size() <= 2000));
+      allow update, delete: if isAdmin();
+    }
+
+    match /academic_profiles/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+
+    match /community_groups/{document=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /curriculum_meta/{document=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 7. قواعد افتراضية آمنة لباقي المستندات (قراءة للجميع وتعديل للأدمن)
     match /{document=**} {
       allow read: if true;
       allow write: if isAdmin();

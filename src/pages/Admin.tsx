@@ -2,9 +2,9 @@ import { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { 
   HardDrive, Trash2, ExternalLink, Plus, ShieldCheck, BarChart3, 
-  CheckCircle, Clock, Lock, Award, Users, GraduationCap, Star
+  CheckCircle, Clock, Lock, Award, Users, GraduationCap, Star, Layers, Lightbulb
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { AddContentModal } from "@/components/AddContentModal";
 import { getStoredCurriculum, saveStoredCurriculum } from "@/lib/subjectsData";
@@ -13,6 +13,10 @@ import { AdminVisitsOverviewTab } from "@/components/admin/AdminVisitsOverviewTa
 import { AdminAddSubjectModal } from "@/components/admin/AdminAddSubjectModal";
 import { AdminAddTeacherModal } from "@/components/admin/AdminAddTeacherModal";
 import { AdminCurriculumTab } from "@/components/admin/AdminCurriculumTab";
+import { AdminSuggestionsTab } from "@/components/admin/AdminSuggestionsTab";
+import { AdminLessonsTab } from "@/components/admin/AdminLessonsTab";
+import { AdminLessonResourcesTab } from "@/components/admin/AdminLessonResourcesTab";
+import { AdminCommunityGroupsTab } from "@/components/admin/AdminCommunityGroupsTab";
 import { 
   subscribeCustomContent, 
   approveCustomContent, 
@@ -59,7 +63,14 @@ export default function Admin() {
   const [isAddTeacherOpen, setIsAddTeacherOpen] = useState(false);
   const [isAddSubjectOpen, setIsAddSubjectOpen] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<"overview" | "pending" | "teachers" | "subjects" | "users" | "content">("overview");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const validTabs = ["overview", "pending", "teachers", "subjects", "users", "content", "lessons", "suggestions", "resources", "groups"];
+  const tabParam = searchParams.get("tab");
+  const activeTab = (tabParam && validTabs.includes(tabParam)) ? tabParam : "overview";
+
+  const handleTabChange = (tabKey: string) => {
+    setSearchParams({ tab: tabKey });
+  };
   const [processingId, setProcessingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -206,7 +217,7 @@ export default function Admin() {
       {/* Tabs Selector */}
       <div className="flex gap-2 sm:gap-3 border-b border-outline-variant/10 pb-3 overflow-x-auto">
         <button
-          onClick={() => setActiveTab("overview")}
+          onClick={() => handleTabChange("overview")}
           className={`px-4 sm:px-5 py-2.5 rounded-lg text-label-sm font-medium transition-all flex items-center gap-2 border whitespace-nowrap cursor-pointer ${
             activeTab === "overview" ? "bg-primary text-on-primary border-primary" : "bg-surface-container-low text-on-surface-variant border-outline-variant/30 hover:border-primary/50"
           }`}
@@ -216,7 +227,7 @@ export default function Admin() {
         </button>
 
         <button
-          onClick={() => setActiveTab("content")}
+          onClick={() => handleTabChange("content")}
           className={`px-4 sm:px-5 py-2.5 rounded-lg text-label-sm font-medium transition-all flex items-center gap-2 border whitespace-nowrap cursor-pointer ${
             activeTab === "content" ? "bg-primary text-on-primary border-primary" : "bg-surface-container-low text-on-surface-variant border-outline-variant/30 hover:border-primary/50"
           }`}
@@ -226,7 +237,7 @@ export default function Admin() {
         </button>
 
         <button
-          onClick={() => setActiveTab("pending")}
+          onClick={() => handleTabChange("pending")}
           className={`px-4 sm:px-5 py-2.5 rounded-lg text-label-sm font-medium transition-all flex items-center gap-2 border whitespace-nowrap cursor-pointer ${
             activeTab === "pending" ? "bg-primary text-on-primary border-primary" : "bg-surface-container-low text-on-surface-variant border-outline-variant/30 hover:border-primary/50"
           }`}
@@ -236,7 +247,7 @@ export default function Admin() {
         </button>
 
         <button
-          onClick={() => setActiveTab("users")}
+          onClick={() => handleTabChange("users")}
           className={`px-4 sm:px-5 py-2.5 rounded-lg text-label-sm font-medium transition-all flex items-center gap-2 border whitespace-nowrap cursor-pointer ${
             activeTab === "users" ? "bg-primary text-on-primary border-primary" : "bg-surface-container-low text-on-surface-variant border-outline-variant/30 hover:border-primary/50"
           }`}
@@ -246,7 +257,7 @@ export default function Admin() {
         </button>
 
         <button
-          onClick={() => setActiveTab("subjects")}
+          onClick={() => handleTabChange("subjects")}
           className={`px-4 sm:px-5 py-2.5 rounded-lg text-label-sm font-medium transition-all flex items-center gap-2 border whitespace-nowrap cursor-pointer ${
             activeTab === "subjects" ? "bg-primary text-on-primary border-primary" : "bg-surface-container-low text-on-surface-variant border-outline-variant/30 hover:border-primary/50"
           }`}
@@ -256,7 +267,7 @@ export default function Admin() {
         </button>
 
         <button
-          onClick={() => setActiveTab("teachers")}
+          onClick={() => handleTabChange("teachers")}
           className={`px-4 sm:px-5 py-2.5 rounded-lg text-label-sm font-medium transition-all flex items-center gap-2 border whitespace-nowrap cursor-pointer ${
             activeTab === "teachers" ? "bg-primary text-on-primary border-primary" : "bg-surface-container-low text-on-surface-variant border-outline-variant/30 hover:border-primary/50"
           }`}
@@ -264,7 +275,59 @@ export default function Admin() {
           <Award className="w-4 h-4 text-amber-400" />
           <span>6. إدارة المدرسين ({teachers.length})</span>
         </button>
+
+        <button
+          onClick={() => handleTabChange("lessons")}
+          className={`px-4 sm:px-5 py-2.5 rounded-lg text-label-sm font-medium transition-all flex items-center gap-2 border whitespace-nowrap cursor-pointer ${
+            activeTab === "lessons" ? "bg-primary text-on-primary border-primary" : "bg-surface-container-low text-on-surface-variant border-outline-variant/30 hover:border-primary/50"
+          }`}
+        >
+          <Layers className="w-4 h-4 text-emerald-400" />
+          <span>7. إدارة دروس المناهج</span>
+        </button>
+
+        <button
+          onClick={() => handleTabChange("suggestions")}
+          className={`px-4 sm:px-5 py-2.5 rounded-lg text-label-sm font-medium transition-all flex items-center gap-2 border whitespace-nowrap cursor-pointer ${
+            activeTab === "suggestions" ? "bg-primary text-on-primary border-primary" : "bg-surface-container-low text-on-surface-variant border-outline-variant/30 hover:border-primary/50"
+          }`}
+        >
+          <Lightbulb className="w-4 h-4 text-amber-400" />
+          <span>8. سجل الاقتراحات 💡</span>
+        </button>
+
+        <button
+          onClick={() => handleTabChange("resources")}
+          className={`px-4 sm:px-5 py-2.5 rounded-lg text-label-sm font-medium transition-all flex items-center gap-2 border whitespace-nowrap cursor-pointer ${
+            activeTab === "resources" ? "bg-primary text-on-primary border-primary" : "bg-surface-container-low text-on-surface-variant border-outline-variant/30 hover:border-primary/50"
+          }`}
+        >
+          <ExternalLink className="w-4 h-4 text-blue-400" />
+          <span>9. إدارة مرفقات الدروس (PDF / خرائط / CSV) 🔗</span>
+        </button>
+
+        <button
+          onClick={() => handleTabChange("groups")}
+          className={`px-4 sm:px-5 py-2.5 rounded-lg text-label-sm font-medium transition-all flex items-center gap-2 border whitespace-nowrap cursor-pointer ${
+            activeTab === "groups" ? "bg-primary text-on-primary border-primary" : "bg-surface-container-low text-on-surface-variant border-outline-variant/30 hover:border-primary/50"
+          }`}
+        >
+          <Users className="w-4 h-4 text-emerald-400" />
+          <span>10. جروبات تليجرام/واتساب 💬</span>
+        </button>
       </div>
+
+      {/* LESSON RESOURCES TAB */}
+      {activeTab === "resources" && <AdminLessonResourcesTab />}
+
+      {/* COMMUNITY GROUPS TAB */}
+      {activeTab === "groups" && <AdminCommunityGroupsTab />}
+
+      {/* LESSONS TAB */}
+      {activeTab === "lessons" && <AdminLessonsTab />}
+
+      {/* SUGGESTIONS TAB */}
+      {activeTab === "suggestions" && <AdminSuggestionsTab />}
 
       {/* CURRICULUM TAB */}
       {activeTab === "subjects" && (
@@ -297,32 +360,64 @@ export default function Admin() {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {teachers.map((t) => (
-              <div key={t.id} className="bg-surface-container p-5 rounded-2xl border border-outline-variant/20 flex flex-col justify-between gap-4">
-                <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/30 text-primary flex items-center justify-center text-body-lg font-bold">
-                      {t.name.replace("أ. ", "").replace("د. ", "")[0]}
+          {teachers.length === 0 ? (
+            <div className="p-12 text-center bg-surface-container rounded-3xl border border-outline-variant/20 text-on-surface-variant flex flex-col items-center gap-3">
+              <Award className="w-12 h-12 text-on-surface-variant/40" />
+              <h4 className="text-headline-md font-bold text-on-surface">لا يوجد مدرسون مضافون حالياً 👨‍🏫</h4>
+              <p className="text-body-md text-on-surface-variant font-light">
+                جميع المدرسين ديناميكيون ومحفوظون سحابياً 100%. يمكنك إضافة أي مدرس جديد الآن عبر زر الإضافة أعلاه.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {teachers.map((t) => (
+                <div key={t.id} className="bg-surface-container p-5 rounded-2xl border border-outline-variant/20 flex flex-col justify-between gap-4">
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-3">
+                      {t.avatar ? (
+                        <img src={t.avatar} alt={t.name} className="w-12 h-12 rounded-xl object-cover border border-outline-variant/30 shrink-0" />
+                      ) : (
+                        <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/30 text-primary flex items-center justify-center text-body-lg font-bold shrink-0">
+                          {t.name.replace("أ. ", "").replace("د. ", "")[0]}
+                        </div>
+                      )}
+                      <div>
+                        <h4 className="text-body-lg font-bold text-on-surface">{t.name}</h4>
+                        <span className="text-label-sm text-primary font-bold">{t.subjectTitle} • {t.experience}</span>
+                        {t.youtubeLessonsCount ? (
+                          <span className="text-[11px] text-emerald-400 font-bold block mt-0.5">
+                            🎥 {t.youtubeLessonsCount} شرح مرئي على يوتيوب
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="text-body-lg font-bold text-on-surface">{t.name}</h4>
-                      <span className="text-label-sm text-primary">{t.subjectTitle} • {t.experience}</span>
-                    </div>
+                    <button
+                      onClick={() => handleDeleteTeacher(t.id)}
+                      className="text-error hover:bg-error/10 p-2 rounded-lg transition-colors cursor-pointer"
+                      title="حذف هذا المدرس"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
-                  <button
-                    onClick={() => handleDeleteTeacher(t.id)}
-                    className="text-error hover:bg-error/10 p-2 rounded-lg transition-colors cursor-pointer"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <p className="text-label-sm text-on-surface-variant font-light bg-surface-container-high p-3 rounded-xl">
+                    "{t.summary}"
+                  </p>
+                  <div className="flex items-center gap-3 flex-wrap text-xs pt-1 border-t border-outline-variant/10">
+                    {t.youtubeChannelUrl ? (
+                      <a href={t.youtubeChannelUrl} target="_blank" rel="noreferrer" className="text-red-400 hover:underline flex items-center gap-1 font-bold">
+                        <ExternalLink className="w-3.5 h-3.5" /> قناة يوتيوب
+                      </a>
+                    ) : null}
+                    {t.externalLectureUrl ? (
+                      <a href={t.externalLectureUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline flex items-center gap-1 font-bold">
+                        <ExternalLink className="w-3.5 h-3.5" /> {t.externalLectureTitle || "المحاضرة المنفصلة"}
+                      </a>
+                    ) : null}
+                  </div>
                 </div>
-                <p className="text-label-sm text-on-surface-variant font-light bg-surface-container-high p-3 rounded-xl">
-                  "{t.summary}"
-                </p>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

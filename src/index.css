@@ -45,6 +45,29 @@
   --spacing-stack-lg: 3rem;
 }
 
+:root[data-theme="light"], html.light {
+  --color-background: #F8FAFC;
+  --color-surface: #FFFFFF;
+  --color-surface-dim: #F1F5F9;
+  --color-surface-bright: #FFFFFF;
+  --color-surface-container-lowest: #FFFFFF;
+  --color-surface-container-low: #FFFFFF;
+  --color-surface-container: #F1F5F9;
+  --color-surface-container-high: #E2E8F0;
+  --color-surface-container-highest: #CBD5E1;
+  --color-on-surface: #0F172A;
+  --color-on-surface-variant: #475569;
+  --color-inverse-surface: #1E293B;
+  --color-inverse-on-surface: #F8FAFC;
+  --color-outline: #94A3B8;
+  --color-outline-variant: #CBD5E1;
+  --color-primary: #15803D;
+  --color-on-primary: #FFFFFF;
+  --color-primary-container: #DCFCE7;
+  --color-on-primary-container: #14532D;
+  --color-inverse-primary: #86EFAC;
+}
+
 @layer base {
   body {
     @apply bg-background text-on-surface font-ibm-plex-arabic antialiased;
@@ -53,13 +76,14 @@
 }
 
 @layer components {
+
   /* Ultra-smooth interactive buttons & cards */
   .btn-interactive {
     @apply transition-all duration-200 ease-out active:scale-95 cursor-pointer;
   }
-  
+
   .btn-primary {
-    @apply bg-primary text-on-primary font-bold rounded-xl transition-all duration-200 hover:bg-primary/90 hover:shadow-[0_0_20px_rgba(181,205,182,0.3)] hover:-translate-y-0.5 active:scale-95 active:translate-y-0 cursor-pointer;
+    @apply bg-primary text-on-primary font-bold rounded-xl transition-all duration-200 hover:bg-primary/90 hover:shadow-lg hover:-translate-y-0.5 active:scale-95 active:translate-y-0 cursor-pointer;
   }
 
   .btn-secondary {
@@ -82,30 +106,35 @@
     line-height: 1.2;
     letter-spacing: 0;
   }
+
   .text-headline-lg {
     font-size: 28px;
     font-weight: 500;
     line-height: 1.4;
     letter-spacing: 0;
   }
+
   .text-headline-md {
     font-size: 22px;
     font-weight: 400;
     line-height: 1.4;
     letter-spacing: 0;
   }
+
   .text-body-lg {
     font-size: 18px;
     font-weight: 300;
     line-height: 1.8;
     letter-spacing: 0;
   }
+
   .text-body-md {
     font-size: 16px;
     font-weight: 300;
     line-height: 1.7;
     letter-spacing: 0;
   }
+
   .text-label-sm {
     font-size: 13px;
     font-weight: 400;

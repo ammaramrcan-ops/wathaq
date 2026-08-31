@@ -3,40 +3,86 @@ import { motion } from "motion/react";
 import { Link } from "react-router-dom";
 import { 
   Atom, BookOpen, Compass, Star, CheckCircle2, AlertTriangle, 
-  ChevronLeft, ArrowRight, Play, Award, Sparkles, ThumbsUp, ThumbsDown
+  ChevronLeft, ArrowRight, Play, Award, Sparkles, ThumbsUp, ThumbsDown,
+  Youtube, PlayCircle, ExternalLink
 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 import { subscribeTeachers, TeacherEvaluation } from "@/lib/teacherService";
+import { 
+  subscribeStudentProfile, 
+  filterCategoriesForProfile, 
+  filterSubjectsForProfile, 
+  StudentAcademicProfile 
+} from "@/lib/subjectsData";
+
+const teacherMainCategories = [
+  {
+    id: "scientific",
+    title: "مدرسو المواد العلمية",
+    subtitle: "الفيزياء، الكيمياء، الأحياء، والرياضيات",
+    icon: Atom,
+    color: "bg-blue-500/10 text-blue-400 border-blue-500/20"
+  },
+  {
+    id: "arabic",
+    title: "مدرسو المواد العربية والثقافية",
+    subtitle: "النحو والصرف، الأدب والنصوص، البلاغة، والإنجليزية",
+    icon: BookOpen,
+    color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+  },
+  {
+    id: "islamic",
+    title: "مدرسو المواد الشرعية",
+    subtitle: "التوحيد، الفقه، التفسير، والحديث الشريف",
+    icon: Compass,
+    color: "bg-amber-500/10 text-amber-400 border-amber-500/20"
+  }
+];
+
+const teacherSubjects = [
+  { id: "physics", title: "مدرسو الفيزياء", categoryId: "scientific", description: "الكهربية، الحركة والفيزياء الحديثة" },
+  { id: "chemistry", title: "مدرسو الكيمياء", categoryId: "scientific", description: "الكيمياء العضوية والتحليلية والحرارية" },
+  { id: "biology", title: "مدرسو الأحياء", categoryId: "scientific", description: "الوراثة، الخلايا ووظائف الأعضاء" },
+  { id: "math", title: "مدرسو الرياضيات", categoryId: "scientific", description: "التفاضل والتكامل، الديناميكا والهندسة" },
+  { id: "grammar", title: "مدرسو النحو والصرف", categoryId: "arabic", description: "قواعد الإعراب والصرف والأساليب" },
+  { id: "literature", title: "مدرسو الأدب والنصوص", categoryId: "arabic", description: "شرح المدارس الأدبية والنصوص" },
+  { id: "rhetoric", title: "مدرسو البلاغة والتعبير", categoryId: "arabic", description: "البيان، البديع، والمعاني" },
+  { id: "english", title: "مدرسو اللغة الإنجليزية", categoryId: "arabic", description: "الجرامر والمفردات والترجمة والمهارات" },
+  { id: "tawheed", title: "مدرسو التوحيد والعقيدة", categoryId: "islamic", description: "أصول العقيدة الإسلامية والإلهيات" },
+  { id: "fiqh", title: "مدرسو الفقه وأصوله", categoryId: "islamic", description: "أحكام المعاملات والعبادات المذهبية" },
+  { id: "tafseer", title: "مدرسو التفسير وعلوم القرآن", categoryId: "islamic", description: "تدبر السور وعلوم نزول القرآن" },
+  { id: "hadith", title: "مدرسو الحديث الشريف", categoryId: "islamic", description: "مصطلح الحديث وشرح الأحاديث المقررة" }
+];
 
 export default function Teachers() {
+  const { user } = useAuth();
   const [step, setStep] = useState<number>(1);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   const [teachers, setTeachers] = useState<TeacherEvaluation[]>([]);
+  const [academicProfile, setAcademicProfile] = useState<StudentAcademicProfile | null>(null);
 
   useEffect(() => {
-    const unsub = subscribeTeachers((list) => {
+    const unsubTeachers = subscribeTeachers((list) => {
       setTeachers(list);
     });
-    return () => unsub();
-  }, []);
+    const unsubProf = subscribeStudentProfile(user?.uid, (prof) => {
+      setAcademicProfile(prof);
+    });
 
+    return () => {
+      unsubTeachers();
+      unsubProf();
+    };
+  }, [user?.uid]);
+
+  const availableCategories = filterCategoriesForProfile(academicProfile, teacherMainCategories);
+  const availableSubjects = filterSubjectsForProfile(academicProfile, teacherSubjects);
   const availableTeachers = teachers.filter((t) => t.subjectId === selectedSubject);
 
   const getSubjectTitle = (code: string) => {
-    const map: Record<string, string> = {
-      physics: "الفيزياء",
-      chemistry: "الكيمياء",
-      biology: "الأحياء",
-      math: "الرياضيات",
-      grammar: "النحو والصرف",
-      literature: "الأدب والنصوص",
-      rhetoric: "البلاغة والتعبير",
-      tawheed: "التوحيد والعقيدة",
-      fiqh: "الفقه وأصوله",
-      tafseer: "التفسير وعلوم القرآن",
-      hadith: "الحديث الشريف"
-    };
-    return map[code] || code;
+    const found = teacherSubjects.find((s) => s.id === code);
+    return found ? found.title : code;
   };
 
   return (
@@ -52,7 +98,7 @@ export default function Teachers() {
           <div>
             <h1 className="text-display-ar font-display-ar text-on-surface">تقييم ونقاط قوة/ضعف المدرسين</h1>
             <p className="text-body-lg font-body-lg text-on-surface-variant">
-              دليل موضوعي شفاف يساعدك في اختيار المدرس الأنسب لأسلوب تعلمك.
+              دليل موضوعي شفاف يساعدك في اختيار المدرس الأنسب لشعبتك ومادتك الدراسية.
             </p>
           </div>
 
@@ -63,7 +109,7 @@ export default function Teachers() {
                 setSelectedCategory(null);
                 setSelectedSubject(null);
               }}
-              className="text-label-sm font-label-sm text-on-surface-variant hover:text-primary border border-outline-variant/30 px-4 py-2 rounded-lg transition-colors"
+              className="text-label-sm font-label-sm text-on-surface-variant hover:text-primary border border-outline-variant/30 px-4 py-2 rounded-lg transition-colors cursor-pointer"
             >
               إعادة الاختيار من البداية
             </button>
@@ -71,10 +117,10 @@ export default function Teachers() {
         </div>
 
         {/* Stepper Progress */}
-        <div className="flex items-center gap-2 mt-4 overflow-x-auto pb-1">
+        <div className="flex items-center gap-2 mt-4 overflow-x-auto pb-1 text-label-sm">
           <div
             onClick={() => setStep(1)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-label-sm cursor-pointer transition-all border ${
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full cursor-pointer transition-all border ${
               step === 1
                 ? "bg-primary text-on-primary border-primary font-medium"
                 : selectedCategory
@@ -82,14 +128,14 @@ export default function Teachers() {
                 : "bg-surface-container text-on-surface-variant border-outline-variant/20"
             }`}
           >
-            <span>1. نوع القسم</span>
+            <span>1. المجال الأكاديمي</span>
           </div>
 
-          <ChevronLeft className="w-4 h-4 text-on-surface-variant/40" />
+          <ChevronLeft className="w-4 h-4 text-on-surface-variant/40 shrink-0" />
 
           <div
             onClick={() => selectedCategory && setStep(2)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-label-sm transition-all border ${
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all border ${
               step === 2
                 ? "bg-primary text-on-primary border-primary font-medium cursor-pointer"
                 : selectedSubject
@@ -100,10 +146,10 @@ export default function Teachers() {
             <span>2. المادة ({selectedSubject ? getSubjectTitle(selectedSubject) : "اختر"})</span>
           </div>
 
-          <ChevronLeft className="w-4 h-4 text-on-surface-variant/40" />
+          <ChevronLeft className="w-4 h-4 text-on-surface-variant/40 shrink-0" />
 
           <div
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-label-sm transition-all border ${
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all border ${
               step === 3
                 ? "bg-primary text-on-primary border-primary font-medium"
                 : "bg-surface-container/50 text-on-surface-variant/50 border-outline-variant/10"
@@ -121,59 +167,29 @@ export default function Teachers() {
           animate={{ opacity: 1, y: 0 }}
           className="grid grid-cols-1 md:grid-cols-3 gap-stack-lg max-w-4xl mx-auto w-full my-auto"
         >
-          <button
-            onClick={() => {
-              setSelectedCategory("scientific");
-              setStep(2);
-            }}
-            className="group text-right p-8 rounded-2xl bg-surface-container-low border border-outline-variant/30 hover:border-primary hover:bg-surface-container transition-all cursor-pointer shadow-lg flex flex-col gap-4"
-          >
-            <div className="w-14 h-14 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center border border-blue-500/20 group-hover:scale-110 transition-transform">
-              <Atom className="w-7 h-7" />
-            </div>
-            <div>
-              <h3 className="text-headline-lg font-headline-lg text-on-surface group-hover:text-primary transition-colors mb-1">
-                مدرسو المواد العلمية
-              </h3>
-              <p className="text-body-md text-on-surface-variant font-light">الفيزياء، الكيمياء، الأحياء، والرياضيات</p>
-            </div>
-          </button>
-
-          <button
-            onClick={() => {
-              setSelectedCategory("arabic");
-              setStep(2);
-            }}
-            className="group text-right p-8 rounded-2xl bg-surface-container-low border border-outline-variant/30 hover:border-primary hover:bg-surface-container transition-all cursor-pointer shadow-lg flex flex-col gap-4"
-          >
-            <div className="w-14 h-14 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center border border-emerald-500/20 group-hover:scale-110 transition-transform">
-              <BookOpen className="w-7 h-7" />
-            </div>
-            <div>
-              <h3 className="text-headline-lg font-headline-lg text-on-surface group-hover:text-primary transition-colors mb-1">
-                مدرسو المواد العربية
-              </h3>
-              <p className="text-body-md text-on-surface-variant font-light">النحو والصرف، الأدب والنصوص، البلاغة</p>
-            </div>
-          </button>
-
-          <button
-            onClick={() => {
-              setSelectedCategory("islamic");
-              setStep(2);
-            }}
-            className="group text-right p-8 rounded-2xl bg-surface-container-low border border-outline-variant/30 hover:border-primary hover:bg-surface-container transition-all cursor-pointer shadow-lg flex flex-col gap-4"
-          >
-            <div className="w-14 h-14 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center border border-amber-500/20 group-hover:scale-110 transition-transform">
-              <Compass className="w-7 h-7" />
-            </div>
-            <div>
-              <h3 className="text-headline-lg font-headline-lg text-on-surface group-hover:text-primary transition-colors mb-1">
-                مدرسو المواد الشرعية
-              </h3>
-              <p className="text-body-md text-on-surface-variant font-light">التوحيد، الفقه، التفسير، والحديث</p>
-            </div>
-          </button>
+          {availableCategories.map((cat) => {
+            const Icon = cat.icon;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => {
+                  setSelectedCategory(cat.id);
+                  setStep(2);
+                }}
+                className="group text-right p-8 rounded-2xl bg-surface-container-low border border-outline-variant/30 hover:border-primary hover:bg-surface-container transition-all cursor-pointer shadow-lg flex flex-col gap-4"
+              >
+                <div className={`w-14 h-14 rounded-xl flex items-center justify-center border group-hover:scale-110 transition-transform ${cat.color}`}>
+                  <Icon className="w-7 h-7" />
+                </div>
+                <div>
+                  <h3 className="text-headline-lg font-headline-lg text-on-surface group-hover:text-primary transition-colors mb-1">
+                    {cat.title}
+                  </h3>
+                  <p className="text-body-md text-on-surface-variant font-light">{cat.subtitle}</p>
+                </div>
+              </button>
+            );
+          })}
         </motion.div>
       )}
 
@@ -184,160 +200,160 @@ export default function Teachers() {
           animate={{ opacity: 1, y: 0 }}
           className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-stack-md"
         >
-          {selectedCategory === "scientific" && (
-            <>
-              <button onClick={() => { setSelectedSubject("physics"); setStep(3); }} className="p-6 bg-surface-container-low rounded-xl border border-outline-variant/30 hover:border-primary text-right cursor-pointer">
-                <h4 className="text-headline-md text-on-surface mb-1">مدرسو الفيزياء</h4>
-                <p className="text-label-sm text-on-surface-variant">الكهربية، الحركة والفيزياء الحديثة</p>
-              </button>
-              <button onClick={() => { setSelectedSubject("chemistry"); setStep(3); }} className="p-6 bg-surface-container-low rounded-xl border border-outline-variant/30 hover:border-primary text-right cursor-pointer">
-                <h4 className="text-headline-md text-on-surface mb-1">مدرسو الكيمياء</h4>
-                <p className="text-label-sm text-on-surface-variant">الكيمياء العضوية والتحليلية</p>
-              </button>
-              <button onClick={() => { setSelectedSubject("biology"); setStep(3); }} className="p-6 bg-surface-container-low rounded-xl border border-outline-variant/30 hover:border-primary text-right cursor-pointer">
-                <h4 className="text-headline-md text-on-surface mb-1">مدرسو الأحياء</h4>
-                <p className="text-label-sm text-on-surface-variant">الوراثة، الخلايا ووظائف الأعضاء</p>
-              </button>
-              <button onClick={() => { setSelectedSubject("math"); setStep(3); }} className="p-6 bg-surface-container-low rounded-xl border border-outline-variant/30 hover:border-primary text-right cursor-pointer">
-                <h4 className="text-headline-md text-on-surface mb-1">مدرسو الرياضيات</h4>
-                <p className="text-label-sm text-on-surface-variant">التفاضل والتكامل والهندسة</p>
-              </button>
-            </>
-          )}
-
-          {selectedCategory === "arabic" && (
-            <>
-              <button onClick={() => { setSelectedSubject("grammar"); setStep(3); }} className="p-6 bg-surface-container-low rounded-xl border border-outline-variant/30 hover:border-primary text-right cursor-pointer">
-                <h4 className="text-headline-md text-on-surface mb-1">مدرسو النحو والصرف</h4>
-                <p className="text-label-sm text-on-surface-variant">القواعد والإعراب والبلاغة</p>
-              </button>
-            </>
-          )}
-
-          {selectedCategory === "islamic" && (
-            <>
-              <button onClick={() => { setSelectedSubject("tawheed"); setStep(3); }} className="p-6 bg-surface-container-low rounded-xl border border-outline-variant/30 hover:border-primary text-right cursor-pointer">
-                <h4 className="text-headline-md text-on-surface mb-1">مدرسو التوحيد والعقيدة</h4>
-                <p className="text-label-sm text-on-surface-variant">العقيدة وأصول الدين</p>
-              </button>
-            </>
-          )}
+          {availableSubjects.filter((s) => s.categoryId === selectedCategory).map((sub) => (
+            <button
+              key={sub.id}
+              onClick={() => {
+                setSelectedSubject(sub.id);
+                setStep(3);
+              }}
+              className="p-6 bg-surface-container-low rounded-2xl border border-outline-variant/30 hover:border-primary hover:bg-surface-container transition-all text-right cursor-pointer shadow-md flex flex-col justify-between h-[150px]"
+            >
+              <div>
+                <h4 className="text-headline-md text-on-surface mb-1 font-bold">{sub.title}</h4>
+                <p className="text-label-sm text-on-surface-variant/80 font-light">{sub.description}</p>
+              </div>
+              <span className="text-xs text-primary font-bold flex items-center gap-1">
+                <span>تصفح المدرسين</span>
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </span>
+            </button>
+          ))}
         </motion.div>
       )}
 
-      {/* STEP 3: Display Teachers Evaluation Cards */}
+      {/* STEP 3: Teacher Cards List */}
       {step === 3 && (
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col gap-stack-lg"
+          className="flex flex-col gap-stack-md"
         >
           <div className="flex justify-between items-center flex-wrap gap-4 border-b border-outline-variant/10 pb-4">
             <h2 className="text-headline-lg font-headline-lg text-on-surface">
-              دليل معلمي مادة: {getSubjectTitle(selectedSubject || "")}
+              دليل مدرسين مادة ({getSubjectTitle(selectedSubject || "")})
             </h2>
-            <Link
-              to={`/videos?subject=${selectedSubject}`}
-              className="bg-primary/10 text-primary border border-primary/20 hover:bg-primary hover:text-on-primary px-4 py-2 rounded-lg text-label-sm font-medium flex items-center gap-2 transition-colors"
+
+            <button
+              onClick={() => setStep(2)}
+              className="text-label-sm text-primary hover:underline flex items-center gap-1 cursor-pointer font-bold"
             >
-              <Play className="w-4 h-4" />
-              <span>مشاهدة شروحات المدرسين المرئية ←</span>
-            </Link>
+              <span>اختر مادة أخرى</span>
+              <ChevronLeft className="w-4 h-4" />
+            </button>
           </div>
 
-          {availableTeachers.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-stack-lg">
+          {availableTeachers.length === 0 ? (
+            <div className="bg-surface-container-low border border-outline-variant/30 rounded-2xl p-12 text-center">
+              <p className="text-body-lg text-on-surface-variant font-light">
+                لا يوجد مدرسون مضافون لهذه المادة حالياً. يمكنك الإضافة من لوحة التحكم.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-stack-md">
               {availableTeachers.map((teacher) => (
                 <div
                   key={teacher.id}
-                  className="bg-surface-container-low border border-outline-variant/30 rounded-2xl p-6 flex flex-col justify-between gap-6 shadow-xl hover:border-primary/50 transition-all"
+                  className="bg-surface-container-low border border-outline-variant/30 rounded-2xl p-6 flex flex-col justify-between gap-6 hover:border-primary/50 transition-all shadow-xl"
                 >
-                  {/* Top Profile Header */}
-                  <div className="flex justify-between items-start gap-4">
-                    <div className="flex gap-4 items-center">
-                      <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/30 text-primary flex items-center justify-center text-headline-md font-bold shrink-0 shadow-md">
-                        {teacher.name.replace("أ. ", "").replace("د. ", "")[0]}
+                  <div className="flex items-start gap-4">
+                    {teacher.avatar ? (
+                      <img
+                        src={teacher.avatar}
+                        alt={teacher.name}
+                        className="w-16 h-16 rounded-2xl object-cover border border-outline-variant/30 shrink-0"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center font-bold text-2xl shrink-0">
+                        {teacher.name[0]}
                       </div>
-                      <div>
-                        <h3 className="text-headline-md font-bold text-on-surface mb-1">{teacher.name}</h3>
-                        <p className="text-label-sm text-primary">{teacher.subjectTitle} • {teacher.experience}</p>
+                    )}
+                    <div className="flex flex-col gap-1.5 overflow-hidden">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-headline-md font-bold text-on-surface">{teacher.name}</h3>
+                        <span className="bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2.5 py-0.5 rounded-full text-xs font-bold flex items-center gap-1">
+                          <Star className="w-3 h-3 fill-amber-400" /> {teacher.rating}
+                        </span>
                       </div>
-                    </div>
+                      <p className="text-label-sm text-on-surface-variant font-light">{teacher.experience}</p>
 
-                    <div className="flex flex-col items-end">
-                      <span className="flex items-center gap-1 text-amber-400 font-bold text-headline-md">
-                        <Star className="w-5 h-5 fill-amber-400" /> {teacher.rating}
-                      </span>
-                      <span className="text-[11px] text-on-surface-variant/70">
-                        {teacher.reviewsCount} تقييم طالب
-                      </span>
+                      {teacher.youtubeLessonsCount ? (
+                        <div className="mt-1">
+                          <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1.5">
+                            <PlayCircle className="w-3.5 h-3.5" />
+                            <span>{teacher.youtubeLessonsCount} شرح مرئي نازل على يوتيوب 🎥</span>
+                          </span>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
 
-                  {/* Summary */}
-                  <p className="text-body-md text-on-surface-variant leading-relaxed font-light bg-surface-container p-4 rounded-xl border border-outline-variant/10">
-                    "{teacher.summary}"
+                  <p className="text-body-md text-on-surface-variant leading-relaxed font-light">
+                    {teacher.summary}
                   </p>
 
-                  {/* Strengths (نقاط القوة والميزات) */}
-                  <div className="flex flex-col gap-2">
-                    <h4 className="text-label-sm font-bold text-emerald-400 flex items-center gap-1.5">
-                      <ThumbsUp className="w-4 h-4 text-emerald-400" />
-                      <span>نقاط القوة والميزات الممتازة:</span>
-                    </h4>
-                    <ul className="flex flex-col gap-1.5 pl-2">
-                      {teacher.strengths.map((str, idx) => (
-                        <li key={idx} className="text-body-md text-on-surface flex items-start gap-2 text-sm font-light">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-1" />
-                          <span>{str}</span>
-                        </li>
-                      ))}
-                    </ul>
+                  <div className="grid grid-cols-1 gap-3 pt-4 border-t border-outline-variant/10">
+                    <div>
+                      <h4 className="text-label-sm font-bold text-emerald-400 flex items-center gap-1.5 mb-1.5">
+                        <ThumbsUp className="w-4 h-4" /> نقاط القوة المميزة:
+                      </h4>
+                      <ul className="list-disc list-inside text-body-sm text-on-surface-variant space-y-1 font-light">
+                        {teacher.strengths.map((st, i) => (
+                          <li key={i}>{st}</li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {teacher.weaknesses && teacher.weaknesses.length > 0 && (
+                      <div>
+                        <h4 className="text-label-sm font-bold text-amber-400 flex items-center gap-1.5 mb-1.5">
+                          <ThumbsDown className="w-4 h-4" /> ملاحظات ونقاط الانتباه:
+                        </h4>
+                        <ul className="list-disc list-inside text-body-sm text-on-surface-variant space-y-1 font-light">
+                          {teacher.weaknesses.map((wk, i) => (
+                            <li key={i}>{wk}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Weaknesses (نقاط الضعف والملاحظات) */}
-                  <div className="flex flex-col gap-2 pt-3 border-t border-outline-variant/10">
-                    <h4 className="text-label-sm font-bold text-amber-400 flex items-center gap-1.5">
-                      <ThumbsDown className="w-4 h-4 text-amber-400" />
-                      <span>نقاط الضعف والملاحظات التي يجب الانتباه لها:</span>
-                    </h4>
-                    <ul className="flex flex-col gap-1.5 pl-2">
-                      {teacher.weaknesses.map((weak, idx) => (
-                        <li key={idx} className="text-body-md text-on-surface-variant flex items-start gap-2 text-sm font-light">
-                          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-1" />
-                          <span>{weak}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+                  {/* Direct Action Buttons: YouTube Channel & Separate Lecture Platform */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4 border-t border-outline-variant/10">
+                    {teacher.youtubeChannelUrl ? (
+                      <a
+                        href={teacher.youtubeChannelUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 p-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-sm"
+                      >
+                        <Youtube className="w-4 h-4 text-red-500" />
+                        <span>قناة اليوتيوب الرسمية</span>
+                      </a>
+                    ) : (
+                      <div className="bg-surface-container-high/50 border border-outline-variant/20 p-3 rounded-xl text-xs text-on-surface-variant/60 text-center">
+                        قناة يوتيوب غير مضافة
+                      </div>
+                    )}
 
-                  {/* Action Link */}
-                  <div className="pt-2">
-                    <Link
-                      to={`/videos?subject=${teacher.subjectId}`}
-                      className="w-full py-3 rounded-xl bg-surface-container-high border border-outline-variant/30 hover:border-primary text-on-surface hover:text-primary transition-colors text-label-sm font-medium flex items-center justify-center gap-2"
-                    >
-                      <Play className="w-4 h-4" />
-                      <span>مشاهدة شروحات {teacher.name} المرئية</span>
-                    </Link>
+                    {teacher.externalLectureUrl ? (
+                      <a
+                        href={teacher.externalLectureUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-primary text-on-primary hover:bg-primary/90 p-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-md shadow-primary/20 cursor-pointer"
+                      >
+                        <span>{teacher.externalLectureTitle || "دخول إلى المحاضرة المنفصلة 🚀"}</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    ) : (
+                      <div className="bg-surface-container-high/50 border border-outline-variant/20 p-3 rounded-xl text-xs text-on-surface-variant/60 text-center">
+                        محاضرة منفصلة غير مضافة
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
-            </div>
-          ) : (
-            <div className="py-16 flex flex-col items-center justify-center text-center gap-3 bg-surface-container-low border border-outline-variant/20 rounded-2xl">
-              <Sparkles className="w-12 h-12 text-primary/40 mb-1" />
-              <h3 className="text-headline-md text-on-surface">جارٍ إضافة المزيد من تقييمات المدرسين لمادة {getSubjectTitle(selectedSubject || "")}</h3>
-              <p className="text-body-md text-on-surface-variant max-w-md">
-                يمكنك الانتقال لقسم الفيديوهات لاستكشاف دروس هذه المادة.
-              </p>
-              <Link
-                to={`/videos?subject=${selectedSubject}`}
-                className="mt-2 bg-primary text-on-primary px-5 py-2.5 rounded-lg text-label-sm font-medium flex items-center gap-2"
-              >
-                <Play className="w-4 h-4" />
-                <span>الانتقال لفيديوهات المادة</span>
-              </Link>
             </div>
           )}
         </motion.div>

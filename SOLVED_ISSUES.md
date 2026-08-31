@@ -6,6 +6,235 @@
 
 ## 📌 سجل المشكلات والتعديلات (Historical Log)
 
+### 📅 2026-08-31 | (مراجعة كود مستقلة - المرحلة 4) مزامنة الصلاحيات الإدارية للأدمن الفرعيين والناشرين المعتمدين محلياً
+- **نوع الإجراء:** RBAC Authorization & Multi-Admin Sync Fix
+- **السبب الجذري:** اقتصار الدالة التزامنية `getUserPermissions` بـ [userPermissionsService.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/userPermissionsService.ts) على البريد الرئيسي `ammaramrcan@gmail.com` وتجريد أي بريد آخر من الصلاحيات الإدارية كـ Fallback تزامني؛ مما أدى لميض شاشة القفل بصفحة `/admin` وحجب ميزة النشر المباشر عن الأدمن الفرعيين والناشرين المعتمدين.
+- **طريقة الحل:**
+  - تعديل دالة `getUserPermissions` لتتحقق من الصلاحيات المسجلة سحابياً والمحفوظة في الكاش المحلي المعتمد (`cached.role === "admin"` أو `cached.canAccessAdmin === true`) وتمرير رتبة الأدمن والناشر الموثوق للعميل بسلاسة دون حصرها نصياً بالمالك فقط.
+  - إضافة اختبار وحدة تلقائي بـ `userPermissionsService.test.ts` لتأكيد صحة قراءة واسترجاع صلاحيات الأدمن الفرعيين.
+- **خطة الوقاية وتيسير التطوير:**
+  - دعم تمثيل الصلاحيات الممنوحة سحابياً في الذاكرة المحلية بمرونة لتيسير العمل الجماعي والـ Multi-Admin Delegation.
+
+---
+
+### 📅 2026-08-31 | (مراجعة كود مستقلة - المرحلة 3) توحيد معمارية المزامنة السحابية أولاً لخدمات المناهج والمرفقات والجروبات
+- **نوع الإجراء:** Cloud-First Architecture & Data Sync Consistency Fix
+- **السبب الجذري:** كتابة وتعديل بيانات مرفقات الدروس وجروبات تليجرام/واتساب وأبواب المناهج وروابط NotebookLM في `LocalStorage` محلياً أولاً قبل التأكد من نجاح Cloud Firestore وبلع أخطاء السيرفر صامتاً (`console.warn`) مما أدى إلى تباعد البيانات بين الأجهزة عند الفشل السحابي (Data Desync).
+- **طريقة الحل:**
+  - تعديل دوال `saveLessonResource`, `addCommunityGroup`, `deleteCommunityGroup`, `saveStoredSubjectUnits`, `saveSubjectNotebookLmLink` في [lessonResourcesService.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/lessonResourcesService.ts)، [communityGroupsService.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/communityGroupsService.ts)، [lessonsData.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/lessonsData.ts)، و [subjectNotebookLmService.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/subjectNotebookLmService.ts) لإجراء العمليات السحابية أولاً، وإلقاء استثناءات صريحة تمنع تعديل الذاكرة المحلية عند الرفض السحابي.
+- **خطة الوقاية وتيسير التطوير:**
+  - الاعتماد دائماً على السلسلة السحابية أولاً (Cloud-First Sync) لجميع خدمات المشروع دون استثناء لمنع التعارض السحابي/المحلي.
+
+---
+
+### 📅 2026-08-31 | (مراجعة كود مستقلة - المرحلة 2) تقييد إنشاء الاقتراحات بالمصادقة وفحص الحقول من البوتات الـ Spam
+- **نوع الإجراء:** Security Hardening & Firestore Anti-Spam Rule
+- **السبب الجذري:** السماح لإنشاء الاقتراحات في `firestore.rules` بشرط `allow create: if true;` دون مصادقة ودون فحص أحجام وأنواع الحقول، مما عرض مجموعة `suggestions` لإغراق بالبيانات الوهمية والـ Spam.
+- **طريقة الحل:**
+  - تعديل قاعدة `match /suggestions/{document=**}` في [firestore.rules](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/firestore.rules) باشتراط التوثيق `isSignedIn()` وفحص وجود حقول `title` و `details` بأسماء نصية محددة وأحجام منطقية (أقصى طول للعنوان 300 حرف والتفاصيل 2000 حرف).
+- **خطة الوقاية وتيسير التطوير:**
+  - حظر استخدام `allow create: if true;` المفتوحة بدون فحص مصادقة التوكن `isSignedIn()` وضوابط أحجام النصوص المرفوعة.
+
+---
+
+### 📅 2026-08-31 | (مراجعة كود مستقلة - المرحلة 1) سد ثغرة تعديل المحتوى المعتمد وتمرير الروابط الخبيثة
+- **نوع الإجراء:** Critical Security Hardening & Firestore Authorization Rule Fix
+- **السبب الجذري:** السماح لمالك المستند الاصلي غير الأدمن بتحديث مستند `custom_content` في `firestore.rules` بشرط `request.resource.data.status == resource.data.status`؛ مما أتاح تعديل الرابط أو البيانات بعد موافقة الأدمن مع الإبقاء على الحالة `approved` وتجاوز خطوة إعادة المعاينة.
+- **طريقة الحل:**
+  - تعديل قاعدة `match /custom_content/{document=**}` في [firestore.rules](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/firestore.rules) باشتراط `request.resource.data.status == "pending"` لأي طلب تعديل من مستخدم عادي غير أدمن؛ مما يجبر أي تعديل جديد على العودة التلقائية لحالة المعاينة والانتظار لحين إعادة اعتماد الأدمن.
+- **خطة الوقاية وتيسير التطوير:**
+  - عدم السماح مطلقاً بتمرير دالة `request.resource.data.status == resource.data.status` على القوائم المعتمدة من الأدمن لمنع أي تلاعب لاحق بالروابط والبيانات.
+
+---
+
+### 📅 2026-08-31 | (مراجعة الكود - المرحلة 3) توحيد نمط المزامنة السحابية وإلغاء التعديل المحلي المتفائل غير المسترد
+- **نوع الإجراء:** Architecture Refactoring & Data Sync Consistency Fix
+- **السبب الجذري:** كتابة المنشورات والاقتراحات في `LocalStorage` و `IndexedDB` محلياً أولاً قبل التأكد من نجاح Cloud Firestore وبلع أخطاء السيرفر صامتاً (`console.warn`) مما أدى إلى تباعد وتعارض البيانات بين الأجهزة عند الفشل السحابي (Data Desync).
+- **طريقة الحل:**
+  - توحيد معمارية المزامنة في [communityService.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/communityService.ts) و [suggestionService.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/suggestionService.ts) لإجراء العمليات السحابية أولاً، وإلقاء استثناءات صريحة تمنع تعديل الذاكرة المحلية وتُخطر المستخدم فوراً برفض أو فشل عملية السيرفر.
+
+---
+
+### 📅 2026-08-31 | (مراجعة الكود - المرحلة 2) تجريد التخزين المحلي من الصلاحيات الإدارية واشتراط التوثيق السحابي
+- **نوع الإجراء:** Client Storage Privilege Elimination & Live Authorization Hardening
+- **السبب الجذري:** الاعتماد على `isVerifiedServerAdmin` أو `canAccessAdmin` المحفوظة في `LocalStorage` لمنح الصلاحيات الإدارية، مما أتاح إمكانية التلاعب بها عبر أدوات المتصفح (F12) لكشف واجهة لوحة التحكم ورؤية البيانات الحساسة أو إرسال المحتوى بوضع الاعتماد المباشر.
+- **طريقة الحل:**
+  - تعديل دالة `getUserPermissions` في [userPermissionsService.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/userPermissionsService.ts) بفرض `canAccessAdmin: false` نهائياً وعدم إرجاع `role: "admin"` لأي بريد غير الإيميل المعتمد لمالك المنصة `ammaramrcan@gmail.com` من الذاكرة المحلية.
+  - قصر منح الصلاحية الإدارية على البث المباشر الموثوق من خادم Firestore عبر `subscribeUserPermissions` لمنع أي محاولة تحايل بالذاكرة المحلية من الوصول للوحة التحكم.
+
+---
+
+### 📅 2026-08-31 | (مراجعة الكود - المرحلة 1) تأمين قواعد بيانات Firestore لمجموعة analytics_summary
+- **نوع الإجراء:** Security Hardening & Firestore Authorization Rule Fix
+- **السبب الجذري:** السماح لطلبات التعديل والإنشاء على `analytics_summary` دون مصادقة ودون التحقق من القيم والمساحات الرقمية للعدادات مما عرض البيانات للتلاعب غير المصرح به.
+- **طريقة الحل:**
+  - تعديل [firestore.rules](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/firestore.rules) بفرض شرط المصادقة (`isSignedIn()`) وشرط إيجابية العدادات (`is number && >= 0`) لمنع تلاعب أي طرف غريب ببيانات التحليلات الإحصائية للمنصة.
+
+---
+
+### 📅 2026-08-31 | فحص شامل وتنظيف كافة الخدمات من البيانات المبدئية الثابتة قبل النشر
+- **نوع الإجراء:** Production Codebase Cleanup & 100% Dynamic Cloud Sync Audit
+- **السبب الجذري:** مراجعة جميع ملفات الخدمات وتصفية البيانات المبدئية لضمان عدم ظهور أي بيانات وهمية أو غير قابلة للحذف عند إطلاق المنصة رسميًا.
+- **التعديلات والحلول:**
+  1. **المدرسون ([teacherService.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/teacherService.ts)):** تفريغ `DEFAULT_TEACHERS = []` وتصفية المعرفات القديمة وحذف المدرسين وهمياً، وتوفير واجهات فارغة أنيقة.
+  2. **مجتمع وثاق والنقاشات ([communityService.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/communityService.ts)):** تفريغ `DEFAULT_DISCUSSIONS = []` وتصفية المعرفات القديمة.
+  3. **جروبات تليجرام/واتساب ([communityGroupsService.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/communityGroupsService.ts)):** تفريغ `DEFAULT_COMMUNITY_GROUPS = []`.
+  4. **دروس وأبواب المناهج ([lessonsData.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/lessonsData.ts)):** ربط أبواب ودروس المناهج بـ Firestore `curriculum_meta/subject_units`.
+
+---
+
+### 📅 2026-08-31 | إزالة الجروبات المبدئية الثابتة وجعل تجمعات المجتمع سحابية 100%
+- **نوع الإجراء:** 100% Dynamic Cloud Community Groups Architecture
+- **السبب الجذري:** كانت توجد بيانات تجريبية مبدئية `DEFAULT_COMMUNITY_GROUPS` تحتوي على 3 جروبات ثابتة بـ [communityGroupsService.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/communityGroupsService.ts)، مما منع حذفها عند تفريغ القائمة من قبل الأدمن.
+- **طريقة الحل:**
+  1. تفريغ `DEFAULT_COMMUNITY_GROUPS = []` نهائياً.
+  2. مسح المعرفات القديمة تلقائياً من التخزين المحلي والربط المباشر بـ Firestore collection `community_groups`.
+  3. إضافة واجهة تنبيه أنيقة في حال عدم وجود جروبات تتيح للأدمن إضافة أول جروب سحابي بديناميكية تامة.
+
+---
+
+### 📅 2026-08-31 | إصلاح عدم استجابة النقر على تبويبات "مرفقات الدروس" و "جروبات تليجرام/واتساب" بالـ Admin
+- **نوع الإجراء:** Admin Routing & Valid Tabs Fix
+- **السبب الجذري:** مصفوفة التبويبات المسموحة `validTabs` بـ [Admin.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/pages/Admin.tsx) لم تكن تحتوي على `resources` و `groups`، مما أدى إلى إعادة توجيه المستخدم تلقائياً لـ `"overview"` فور النقر عليهما.
+- **طريقة الحل:** تم تحديث مصفوفة `validTabs` لتشمل `"resources"` و `"groups"`.
+
+---
+
+### 📅 2026-08-31 | تخصيص رابط معلّم NotebookLM المباشر لكل مادة دراسية
+- **نوع الإجراء:** Subject-Specific NotebookLM Integration
+- **التفاصيل والهدف:**
+  1. إنشاء خدمة [subjectNotebookLmService.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/subjectNotebookLmService.ts) لحفظ واسترجاع روابط نوت بوك NotebookLM المخصصة لكل مادة سحابياً بـ Firestore ومحلياً.
+  2. توفير حقل مخصص بـ [AdminLessonResourcesTab.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/components/admin/AdminLessonResourcesTab.tsx) لوضع رابط NotebookLM الخاص بالمادة المحددة.
+  3. تحديث [Books.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/pages/Books.tsx) بحيث تفتح كارت معلّم AI NotebookLM 🤖 النوت بوك المخصص المباشر للمادة فور النقر عليها، مع استخدام الرابط العام كـ fallback.
+- **طريقة الحل:**
+  - إضافة `subscribeSubjectNotebookLmMap` و `saveSubjectNotebookLmLink`.
+
+---
+
+### 📅 2026-08-31 | إدارة مرفقات الدروس (PDF/خرائط/CSV) + تجمعات وجروبات تليجرام/واتساب
+- **نوع الإجراء:** Lesson-Level Attachment Architecture & Community Study Groups
+- **التفاصيل والهدف:**
+  1. ربط كل درس بالمنهج بمرفقاته الخاصة عبر [lessonResourcesService.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/lessonResourcesService.ts):
+     - **📄 ملفات الـ PDF للملخصات.**
+     - **🖼️ الخرائط الذهنية البصرية.**
+     - **📊 ملفات الـ CSV للفلاش كارد المخصص.**
+  2. إضافة تبويب مخصص في لوحة التحكم **"9. إدارة مرفقات الدروس (PDF / خرائط / CSV) 🔗"** يتيح للأدمن اختيار المادة ➔ الباب ➔ الدرس وضع روابط مرفقاته لتعرض فورياً للطالب فور اختيار الدرس بـ [Books.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/pages/Books.tsx).
+  3. إضافة تبويب لوحة التحكم **"10. جروبات تليجرام/واتساب 💬"** عبر [communityGroupsService.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/communityGroupsService.ts) مع عرض قائمة التجمعات الموصى بها بـ [Community.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/pages/Community.tsx).
+- **طريقة الحل:**
+  - بناء المكونات `AdminLessonResourcesTab.tsx` و `AdminCommunityGroupsTab.tsx`.
+  - تحديث `Books.tsx` و `Community.tsx` و `Admin.tsx`.
+
+---
+
+### 📅 2026-08-31 | السؤال التفاعلي للملازم + تصفية مواد المدرسين ديناميكياً حسب القطاع
+- **نوع الإجراء:** Interactive Content Scope & Dynamic Admin Dropdown Filtering
+- **التفاصيل والهدف:**
+  1. تطبيق **سلسلة الأسئلة التفاعلية (السؤال عن كامل المنهج أم درس مخصص)** بـ [Books.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/pages/Books.tsx) لجميع الأقسام (كتب مدرسية، ملازم دراسية، ملخصات، خرائط ذهنية، وفلاش كارد) مماثلة لصفحة الشروحات لتوحيد تجربة المستخدم.
+  2. ربط قائمة المواد بـ [AdminAddTeacherModal.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/components/admin/AdminAddTeacherModal.tsx) لتتغير ديناميكياً فور اختيار أو تغيير القطاع (أزهر علمي/أدبي، عام علمي/أدبي/رياضة).
+  3. إضافة محدد نوع المدرس (قناة يوتيوب 🔴 أم منصة خاصة 🚀 أم كلاهما 🌐) وإظهار الحقول المخصصة فور اختيار النوع.
+- **طريقة الحل:**
+  - إضافة `interactiveStep` وسؤال `كامل المنهج أو درس معين` في `Books.tsx`.
+  - تحديث `masterSubjectsList` و `filteredSubjects` و `tPlatformType` بـ `AdminAddTeacherModal.tsx`.
+
+---
+
+### 📅 2026-08-31 | تحويل NotebookLM لمربع قسم ضمن الشبكة + ترقية دليل وإدارة المدرسين
+- **نوع الإجراء:** Feature Upgrade & UI Restructuring
+- **التفاصيل والهدف:**
+  1. إزالة المربع/البنر العلوي الثابت الخاص بـ NotebookLM في [Books.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/pages/Books.tsx) وتحويله إلى **مربع قسم مستقل (Grid Section Card)** يظهر جنباً إلى جنب مع باقي الأقسام (كتب، ملازم، ملخصات، خرائط، فلاش كارد)، وعند النقر عليه يفتح منصة `NotebookLM AI` فورياً.
+  2. ترقية نموذج **"إضافة مدرس جديد"** في [AdminAddTeacherModal.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/components/admin/AdminAddTeacherModal.tsx) ليتضمن:
+     - قائمة خيارات جاهزة لاختيار المادة والقطاع (أزهر علمي/أدبي، عام علمي/أدبي/رياضة).
+     - إمكانية إضافة رابط صورة بروفايل المدرس الشخصية (`avatar`).
+     - إمكانية إضافة رابط قناة يوتيوب الرسمية ومؤشر إحصائيات عدد الشروحات النازلة عليها (`youtubeLessonsCount`).
+     - إضافة زر مستقل وخاص للانتقال للمحاضرة / المنصة المستقلة للشركاء الخارجية (`externalLectureUrl`).
+  3. تحديث عرض بطاقة المدرسين في كل من [Teachers.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/pages/Teachers.tsx) و [Admin.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/pages/Admin.tsx) لعرض كافة هذه البيانات والروابط المباشرة بصورة أنيقة ومستقلة.
+- **طريقة الحل:**
+  - تعديل `bookFilters` وإضافة `notebooklm` كقسم رئيسي بـ `Books.tsx`.
+  - تحديث `teacherService.ts` و `AdminAddTeacherModal.tsx` و `Teachers.tsx` و `Admin.tsx`.
+
+---
+
+### 📅 2026-08-31 | القضاء على جلتش الانتقال اللحظي + تحويل المناهج إلى نظام ديناميكي 100%
+- **نوع الإجراء:** UI Flicker Elimination & Dynamic Curriculum Architecture
+- **التفاصيل والهدف:**
+  1. القضاء التام على الجلتش/الرمشة اللحظية عند الانتقال لصفحة أي درس عبر تحسين دالة `useEffect` المراقبة للرابط واستخدام `functional state updaters` لمنع إعادة البناء والتنقل بين الخطوات دون داعٍ.
+  2. إلغاء البيانات الاسترشادية الثابتة للمناهج بـ [lessonsData.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/lessonsData.ts) وتفريع إدارة الأبواب والدروس لتكون ديناميكية بنسبة 100% ومحفوظة سحابياً بـ Firestore ومحلياً ليعتمد النظام بالكامل على ما يضيفه الأدمن في لوحة التحكم دون إجبار على بيانات افتراضية غير دقيقة.
+- **طريقة الحل:**
+  - تعديل `setStep((prev) => (prev === targetStep ? prev : targetStep))` في [Videos.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/pages/Videos.tsx).
+  - ضبط `DEFAULT_SUBJECT_UNITS = {}` في `lessonsData.ts`.
+
+---
+
+### 📅 2026-08-31 | مزامنة روابط URL بالكامل للدروس والتبويبات + إعادة زر إدارة المدرسين
+- **نوع الإجراء:** Full URL State Sync & Admin UI Alignment
+- **التفاصيل والهدف:**
+  1. إعادة زر **"6. إدارة المدرسين"** لشريط تبويبات لوحة التحكم [Admin.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/pages/Admin.tsx) ومزامنته بـ `?tab=teachers`.
+  2. مزامنة جميع تبويبات لوحة التحكم الـ 8 بـ `useSearchParams` بالرابط (`?tab=overview`, `?tab=content`, `?tab=pending`, `?tab=users`, `?tab=subjects`, `?tab=teachers`, `?tab=lessons`, `?tab=suggestions`) لتسهيل مشاركة وحفظ رابط أي تبويب.
+  3. مزامنة اسم الدرس المحدد برابط صفحة الشروحات `?category=...&subject=...&lesson=...&type=video` بـ [Videos.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/pages/Videos.tsx) لضمان ثبات وحفظ واسترجاع صفحة الدرس المحددة عبر الرابط فورياً.
+- **طريقة الحل:**
+  - تحديث معالجات `handleTabChange` و `setSearchParams` بصفحتي `Admin.tsx` و `Videos.tsx`.
+
+---
+
+### 📅 2026-08-31 | إصلاح التحويل التلقائي وتثبيت الدخول لصفحة الدرس (حتى لو كانت فارغة)
+- **نوع المشكلة:** Navigation Bug / SearchParams State Desync
+- **المشكلة / الملاحظة:** عند اختيار درس محدد في صفحة الشروحات، تُفتح صفحة الدرس لجزء من الثانية ثم تُعيد المستخدم تلقائياً لصفحة قائمة الدروس.
+- **السبب الجذري:** عدم تحديث معاملات الرابط `searchParams` بقيمة `type: video` عند النقر على بطاقات الدروس في الخطوة التفاعلية، مما جعل دالة `useEffect` المراقبة للرابط تعتبر `typeParam` غير موجود فتُعيد تعيين الخطوة لـ `step 3`.
+- **طريقة الحل:**
+  - تحديث معالجات النقر في [Videos.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/pages/Videos.tsx) لتحديد `setSelectedContentType` ومزامنة `setSearchParams` بالرابط بـ `type: video`.
+  - تحسين واجهة صفحة الدرس الفارغة لتظل ثابته وتُظهر اسم الدرس المحدد، وتُتيح زراً ثابتاً لإضافة أول فيديو لهذا الدرس مباشرة أو التبديل لدرس آخر.
+- **إجراءات الوقاية مستقبلاً:**
+  - المزامنة الكاملة لكل متغيرات التصفح بالرابط `searchParams` لمنع أي صراع بين الحالة المحلية ومراقبات التأثيرات الشاطئة `useEffect`.
+
+---
+
+### 📅 2026-08-31 | دعم هيكلية الأبواب/الفصول الشجرية وتصفية الدروس بأسئلة تفاعلية
+- **نوع الإجراء:** New Architecture Feature & Interactive UI Step Wizard
+- **التفاصيل والهدف:**
+  1. إلغاء الشريط المربع العلوي الثابت بصفحات الشروحات والكتب.
+  2. إضافة تسلسل أسئلة تفاعلية عند النقر على "فيديو شرح لدرس معين":
+     - **الخطوة الأولى:** سؤال عن الباب/الفصل الدراسي المحدد لمادة المنهج (مثل "الباب الأول: الفيزياء الكهربية").
+     - **الخطوة الثانية:** سؤال عن الدرس المحدد داخل هذا الباب (مثل "الدرس الأول: التيار الكهربي وقانون أوم").
+     - **الخطوة الثالثة:** عرض الفيديوهات والمحتوى الخاص بهذا الدرس بدقة.
+  3. تحديث [lessonsData.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/lessonsData.ts) لدعم الهيكلية الشجرية (`SubjectUnitsMap` و `SubjectUnit`).
+  4. إعادة هيكلة تبويب "إدارة دروس المناهج" في لوحة التحكم [AdminLessonsTab.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/components/admin/AdminLessonsTab.tsx) لإضافة وحذف الأبواب/الفصول إضافةً إلى إضافة وحذف الدروس التابعة لكل باب.
+- **طريقة الحل:**
+  - تعديل `lessonsData.ts` لإدارة الأبواب والدروس الفرعية سحابياً بـ Firestore على المستند `curriculum_meta/subject_units`.
+  - تحديث [Videos.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/pages/Videos.tsx) و [Books.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/pages/Books.tsx) لدعم التصفح والأسئلة التفاعلية بدلاً من العرض الثابت.
+
+---
+
+### 📅 2026-08-31 | تصفير عداد الزيارات الإجمالية إلى 7 واستبعاد الزيارات المتكررة
+- **نوع المشكلة:** Analytics Reset & Excluded Recurring Visits
+- **المشكلة / الملاحظة:** تضخم عداد الزيارات الإجمالية ليظهر 245 زيارة، وهي زيارات مبالغ فيها بسبب احتساب الزيارات المتكررة لكل مستخدم.
+- **السبب الجذري:** احتساب `increment(1)` لـ `totalVisits` حتى عندما تكون `isRecurring === true`.
+- **طريقة الحل:**
+  - إنشاء ودعوة دالة `resetVisitsAnalytics(7)` في [visitService.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/visitService.ts) لتصفير القراءة السحابية بـ Firestore والمحلية بـ IndexedDB & LocalStorage إلى 7 زيارات حقيقية.
+  - تعديل دالة `trackVisit()` بحيث لا تزيد `totalVisits` إلا عند وصول **زائر فريد جديد فقط** (`isRecurring === false`)؛ بينما تُميز الزيارات المتكررة تحت بند `recurringVisits` فقط دون زيادة الإجمالي.
+  - إضافة زر "تصفير العداد (7) 🔄" بتبويب التحليلات في لوحة التحكم [AdminVisitsOverviewTab.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/components/admin/AdminVisitsOverviewTab.tsx).
+- **إجراءات الوقاية مستقبلاً:**
+  - استبعاد أي حركة متكررة من العداد الإجمالي لضمان بقاء الزيارات واقعية ودقيقة تماماً.
+
+---
+
+### 📅 2026-08-31 | إضافة الوضع الفاتح والداكن + تصفية وإدارة الدروس + دليل المدرسين المفلتر + NotebookLM AI + سجل الاقتراحات
+- **نوع الإجراء:** New Features & Architecture Upgrade
+- **التفاصيل والهدف:**
+  1. إضافة زر التبديل بين **الوضع الفاتح والداكن (Light/Dark Theme)** وحفظ الاختيار بـ LocalStorage مع تطبيقه على الجذر.
+  2. جعل **"أزهري - قسم علمي (الصف الثالث الثانوي)"** هو النظام والفرع الافتراضي للمستخدمين الجدد.
+  3. إعادة هيكلة دليل المدرسين في المجتمع [Teachers.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/pages/Teachers.tsx) ليتدرج بتصفية المدرسين حسب القطاع والمادة المحددة ببروفايل الطالب بدلاً من عرض الجميع دفعة واحدة.
+  4. دمج أداة **NotebookLM** التفاعلية الذكية مع شارة **"معلّم AI 🤖"** بصفحة الكتب والخرائط الذهنية.
+  5. إنشاء نظام وإدارة دروس المناهج [lessonsData.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/lessonsData.ts) وتخيير الطالب بين (كامل المنهج أم درس معين) في الكتب والمرئيات والرفع، وإضافة تبويب **"دروس المناهج"** في لوحة التحكم [AdminLessonsTab.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/components/admin/AdminLessonsTab.tsx).
+  6. إنشاء خدمة وسجل الاقتراحات [suggestionService.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/suggestionService.ts) ونموذج تقديم اقتراح بالمجتمع، وإضافة تبويب **"سجل الاقتراحات 💡"** في لوحة التحكم [AdminSuggestionsTab.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/components/admin/AdminSuggestionsTab.tsx).
+- **طريقة الحل والتركيب:**
+  - إنشاء `suggestionService.ts` و `lessonsData.ts` مع الربط السحابي بـ Firestore والحفظ المحلّي بـ IndexedDB.
+  - إدراج متغيرات الألوان للوضع الفاتح بـ `index.css` وتعديل زر التبديل بـ `Profile.tsx`.
+  - تحديث [Admin.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/pages/Admin.tsx) و [Books.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/pages/Books.tsx) و [Videos.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/pages/Videos.tsx) و [Community.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/pages/Community.tsx) و [AddContentModal.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/components/AddContentModal.tsx).
+- **خطة الوقاية مستقبلاً:**
+  - استخدام `subscribeLessons` و `subscribeSuggestions` لمزامنة أي دروس أو اقتراحات جديدة لحظياً عبر كافة الأجهزة.
+
+---
+
 ### 📅 2026-08-14 | إصلاح انضغاط صورة البروفايل على الهواتف المحمولة (Avatar Squeezing Fix)
 - **نوع المشكلة:** UI Bug / Mobile Responsiveness
 - **المشكلة / الملاحظة:** انضغاط صورة البروفايل لتصبح بيضاوية ضيقة جداً في شريط الحساب عند تصفح المنصة من الهواتف المحمولة وتطابقها مع الأسماء الطويلة.
@@ -208,8 +437,69 @@
 - **إجراءات الوقاية مستقبلاً:**
   - التقيد التلقائي بإنشاء مكونات فرعية فور اقتراب أي ملف من سقف ~400 سطر.
 
+---
 
+### 📅 2026-08-31 | إصلاح النواة الأمنية لقواعد Firestore والتخويل ضد انتحال الصلاحيات (المشاكل الحرجة)
+- **نوع المشكلة:** Security Architecture & Authorization Hardening
+- **المشكلة / الملاحظة:** 
+  1. وجود ثغرات في `firestore.rules` تسمح بعمل `update` لـ `custom_content` وتغيير `status` من `"pending"` إلى `"approved"` وتكشف مستندات المستخدمين `/users/{userId}` وتترك `analytics_summary` دون حماية هيكلية.
+  2. اعتماد الواجهة على `localStorage` في تحديد `isAuthorizedAdmin` مما يتيح انتحال الصلاحيات عبر DevTools.
+- **السبب الجذري:** 
+  1. عدم صياغة القيود على حقل `status` في Firestore rules وافتراض مطابقة `/users/{userId}/{document=**}` للمستند الرئيسي.
+  2. ثقة `getUserPermissions` في `localStorage` غير الموثوق بدلاً من الاشتراط السحابي.
+- **طريقة الحل:**
+  - تعديل [firestore.rules](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/firestore.rules):
+    - تقييد `update` لـ `custom_content` بحيث `request.resource.data.status == resource.data.status` لغير الأدمن.
+    - تقييد `match /users/{userId}` و subcollections لضمان عدم تسريب الإيميلات العامة.
+    - تحديد حقول مسموحة فقط لـ `analytics_summary` وإضافة قواعد لـ `discussions` و `suggestions`.
+  - تعديل [userPermissionsService.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/userPermissionsService.ts):
+    - اشتراط التوثيق السحابي `isVerifiedServerAdmin` لمنح صلاحية الأدمن ومنع الانتحال عبر `localStorage`.
+- **إجراءات الوقاية مستقبلاً:**
+  - عدم اعتماد أي صلاحية إدارية محلياً دون مطابقة Firestore Server Document أو البريد الرسمي الإداري المعتمد.
 
+---
 
+### 📅 2026-08-31 | إصلاح عزل بيانات الضيوف وإلغاء التصفير التكراري للتحليلات (المشاكل المهمة)
+- **نوع المشكلة:** Data Isolation & Side-Effect Prevention
+- **المشكلة / الملاحظة:**
+  1. تداخل وتزامن تخصصات الضيوف غير المسجلين بسبب الكتابة والمزامنة على المسار المشترك `guest_academic_profile` في Firestore.
+  2. إعادة تصفير إحصائيات الزيارات إلى 7 زوار تلقائياً عند كل استيراد لـ `visitService.ts`.
+- **السبب الجذري:**
+  1. عدم الالتزام بعزل بيانات المستخدمين محلياً وتعديل مسار سحابي موحد للضيوف.
+  2. وجود استدعاء دالة `resetVisitsAnalytics(7)` في المستوى الخارجي للملف (Module level).
+- **طريقة الحل:**
+  - تعديل [subjectsData.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/subjectsData.ts):
+    - إلغاء المسار المشترك `guest_academic_profile` وقصر المزامنة السحابية على الحسابات المسجلة بـ `userId` الحقيقي فقط مع حفظ تخصص الضيف محلياً بـ `localStorage`.
+  - تعديل [visitService.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/visitService.ts):
+    - إزالة الاستدعاء المباشر `resetVisitsAnalytics(7)` لمنع تصفير الإحصائيات عند التحميل.
+- **إجراءات الوقاية مستقبلاً:**
+  - منع كتابة أي مسارات سحابية موحدة تجمع أكثر من زائر/ضيف بدون `userId` فريد، وتجنب أي side-effects خارجية عند تحميل الملفات.
 
+---
+
+### 📅 2026-08-31 | الإصلاح الجذري الشامل للنواة الأمنية ومزامنة التخزين وآلية الحظر السحابية
+- **نوع المشكلة:** Security Architecture / Privilege Escalation / Cloud Sync / User Revocation Mechanism
+- **المشكلة / الملاحظة:**
+  1. ثغرة أمنية حرج تسمح لأي مستخدم بتغيير `role: "admin"` بمستنده الشخصي في Firestore وتصعيد صلاحياته لأدمن سحابي كامل.
+  2. ظهور أخطاء `permission-denied` صامتة عند حذف مناقشات الطلاب بسبب كتابة غير مصرح بها على `global_deleted_items`.
+  3. تنفيذ تحديثات التخزين المحلي قبل التحقق من موافقة Firestore في خدمات البيانات.
+  4. حذف مستندات Firestore دون حظر حسابات Firebase Auth مما يتيح للمستخدمين المحذوفين إعادة التسجيل والتواجد التلقائي.
+- **السبب الجذري:**
+  1. السماح بكتابة أي حقول بـ `/users/{userId}` لمالك المستند في Firestore rules دون حظر الحقول الحساسة.
+  2. افتراض كتابة الطلاب لعلامات الحذف العامة `global_deleted_items`.
+  3. التحديث المسبق لـ LocalStorage والاعتماد على `console.warn` صامت عند فشل السيرفر.
+  4. غياب مجموعة ومراقبة الحظر الفعلي `banned_users`.
+- **طريقة الحل:**
+  - تعديل [firestore.rules](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/firestore.rules):
+    - حظر تعديل حقول `role`, `canAccessAdmin`, `canDirectPublish`, `permissions` في `/users/{userId}` لغير الأدمن الأصلي.
+    - إضافة مجموعة `banned_users` بحظور قراءة/كتابة صارمة.
+  - تعديل [userPermissionsService.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/userPermissionsService.ts) و [teacherService.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/teacherService.ts) و [communityService.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/communityService.ts):
+    - تنفيذ عمليات Firestore السحابية أولاً ورمي استثناء صريح عند رفض السيرفر قبل التعديل المحلي.
+    - حصر كتابة `global_deleted_items` للأدمن، بينما يعتمد الطلاب على `deleteDoc` للـ `discussions` الذي يلغي المستند تلقائياً عبر `onSnapshot`.
+  - تعديل [AuthContext.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/context/AuthContext.tsx) و [AdminGoogleUsersTab.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/components/admin/AdminGoogleUsersTab.tsx):
+    - فحص الحظر السحابي بـ `onAuthStateChanged` وطرد الحساب المحظور فوراً مع تنبيه باللغة العربية وتطهير جلساته.
+    - إضافة سبر الحظر السحابي بـ `banned_users` وإزالة المصفوفات الصلبة التجريبية.
+- **إجراءات الوقاية مستقبلاً:**
+  - فحص أي حقول صلاحيات جديدة وحظر تعديلها مطلقاً في قواعد Firestore rules لغير الأدمن.
+  - التأكد دائماً من اشتراط نجاح Firestore أولاً في جميع ملفات الخدمات وتوفير آلية طرد تلقائية لأي حساب محظور.
 

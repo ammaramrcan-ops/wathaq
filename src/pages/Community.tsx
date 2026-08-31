@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { 
   MessageSquare, User, Plus, Sparkles, Lightbulb, 
   HelpCircle, Award, ChevronLeft, ArrowRight, Atom, 
-  BookOpen, Compass, CheckCircle2, Star, ThumbsUp, Send, Trash2
+  BookOpen, Compass, CheckCircle2, Star, ThumbsUp, Send, Trash2, ExternalLink
 } from "lucide-react";
 import Teachers from "@/pages/Teachers";
 import { useAuth } from "@/context/AuthContext";
@@ -20,6 +20,8 @@ import {
   filterSubjectsForProfile, 
   StudentAcademicProfile 
 } from "@/lib/subjectsData";
+import { addSuggestion } from "@/lib/suggestionService";
+import { subscribeCommunityGroups, CommunityGroupItem } from "@/lib/communityGroupsService";
 
 const mainCategories = [
   { id: "scientific", title: "مواد علمية", icon: Atom },
@@ -60,11 +62,19 @@ export default function Community() {
   const availableCategories = filterCategoriesForProfile(academicProfile, mainCategories);
   const availableSubjects = filterSubjectsForProfile(academicProfile, subjects);
 
+  const [communityGroups, setCommunityGroups] = useState<CommunityGroupItem[]>([]);
+
   useEffect(() => {
     const unsub = subscribeDiscussions((list) => {
       setDiscussions(list);
     });
-    return () => unsub();
+    const unsubGroups = subscribeCommunityGroups((list) => {
+      setCommunityGroups(list);
+    });
+    return () => {
+      unsub();
+      unsubGroups();
+    };
   }, []);
 
   useEffect(() => {
@@ -100,6 +110,36 @@ export default function Community() {
   const [newExcerpt, setNewExcerpt] = useState("");
   const [newCategory, setNewCategory] = useState<"advice" | "question">("advice");
   const [newSubject, setNewSubject] = useState("physics");
+
+  // Suggestion Modal State
+  const [isSuggestionModalOpen, setIsSuggestionModalOpen] = useState(false);
+  const [suggestionTitle, setSuggestionTitle] = useState("");
+  const [suggestionDetails, setSuggestionDetails] = useState("");
+  const [isSubmittingSuggestion, setIsSubmittingSuggestion] = useState(false);
+
+  const handleAddSuggestionSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!suggestionTitle.trim() || !suggestionDetails.trim()) return;
+
+    setIsSubmittingSuggestion(true);
+    try {
+      await addSuggestion({
+        id: "sug-" + Date.now(),
+        title: suggestionTitle.trim(),
+        details: suggestionDetails.trim(),
+        userName: user?.displayName || user?.email?.split("@")[0] || "طالب وثاق",
+        userEmail: user?.email || undefined,
+        createdAt: new Date().toISOString(),
+        status: "new"
+      });
+      alert("تم إرسال اقتراحك للإدارة بنجاح، شكراً لمساهمتك في تطوير المنصة! 💡");
+      setIsSuggestionModalOpen(false);
+      setSuggestionTitle("");
+      setSuggestionDetails("");
+    } finally {
+      setIsSubmittingSuggestion(false);
+    }
+  };
 
   const handleAddDiscussion = async (e: FormEvent) => {
     e.preventDefault();
@@ -165,19 +205,27 @@ export default function Community() {
             </div>
           </div>
 
-          {mode !== "select" && (
-            <button
-              onClick={() => {
-                setMode("select");
-                setWizardStep(1);
-                setSelectedCategory(null);
-                setSelectedSubject(null);
-              }}
-              className="text-label-sm font-label-sm text-on-surface-variant hover:text-primary border border-outline-variant/30 px-4 py-2 rounded-xl transition-colors cursor-pointer"
-            >
-              ← العودة للخيارات الرئيسية
-            </button>
-          )}
+          {mode !== "select" ? (
+              <button
+                onClick={() => {
+                  setMode("select");
+                  setWizardStep(1);
+                  setSelectedCategory(null);
+                  setSelectedSubject(null);
+                }}
+                className="text-label-sm font-label-sm text-on-surface-variant hover:text-primary border border-outline-variant/30 px-4 py-2 rounded-xl transition-colors cursor-pointer"
+              >
+                ← العودة للخيارات الرئيسية
+              </button>
+            ) : (
+              <button
+                onClick={() => setIsSuggestionModalOpen(true)}
+                className="bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 px-4 py-2 rounded-xl text-label-sm font-bold flex items-center gap-2 transition-all cursor-pointer shadow-sm"
+              >
+                <Lightbulb className="w-4 h-4" />
+                <span>لديك اقتراح لتحسين المنصة؟</span>
+              </button>
+            )}
         </div>
       </section>
 
@@ -254,6 +302,64 @@ export default function Community() {
               </div>
             </button>
           </div>
+
+          {/* Recommended Study Groups Section */}
+          {communityGroups.length > 0 && (
+            <div className="flex flex-col gap-6 border-t border-outline-variant/10 pt-8 w-full max-w-5xl text-right mt-4">
+              <div className="flex justify-between items-center flex-wrap gap-2">
+                <div>
+                  <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full text-xs font-bold w-fit mb-2">
+                    <Send className="w-3.5 h-3.5" />
+                    <span>تجمعات ومجتمعات الطلاب 📡</span>
+                  </div>
+                  <h3 className="text-headline-md font-bold text-on-surface">جروبات ومجتمعات موصى بها (تليجرام / واتساب)</h3>
+                  <p className="text-body-md text-on-surface-variant font-light mt-0.5">
+                    تجمعات موثوقة ونشطة نوصي الطلاب بالانضمام إليها لتبادل الملخصات والحلول والمراجعات.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {communityGroups.map((group) => (
+                  <div
+                    key={group.id}
+                    className="bg-surface-container-low border border-outline-variant/30 hover:border-primary/50 p-5 rounded-2xl flex flex-col justify-between gap-4 transition-all shadow-lg text-right"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`w-11 h-11 rounded-xl flex items-center justify-center border shrink-0 ${
+                        group.platform === "telegram"
+                          ? "bg-blue-500/10 text-blue-400 border-blue-500/30"
+                          : "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                      }`}>
+                        {group.platform === "telegram" ? <Send className="w-5 h-5 text-blue-400" /> : <MessageSquare className="w-5 h-5 text-emerald-400" />}
+                      </div>
+
+                      <div>
+                        <h4 className="font-bold text-body-lg text-on-surface line-clamp-1">{group.title}</h4>
+                        <span className="text-xs text-on-surface-variant font-medium">
+                          منصة: {group.platform === "telegram" ? "تليجرام 📡" : "واتساب 💬"} {group.membersCount ? `• ${group.membersCount}` : ""}
+                        </span>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-on-surface-variant font-light line-clamp-2 leading-relaxed bg-surface-container-high/60 p-3 rounded-xl">
+                      {group.description}
+                    </p>
+
+                    <a
+                      href={group.linkUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="bg-primary/10 hover:bg-primary text-primary hover:text-on-primary border border-primary/20 p-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm cursor-pointer mt-auto"
+                    >
+                      <span>الانضمام للمجموعة المباشرة</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </motion.div>
       )}
 
@@ -545,6 +651,70 @@ export default function Community() {
                   className="px-6 py-2.5 rounded-xl bg-primary text-on-primary font-bold hover:bg-primary/90 transition-all cursor-pointer shadow-lg shadow-primary/20"
                 >
                   نشر الآن
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Suggestion Submission Modal */}
+      {isSuggestionModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-surface-container-low border border-amber-500/30 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl flex flex-col gap-6"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center">
+                <Lightbulb className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-headline-md font-bold text-on-surface">تقديم اقتراح لتحسين المنصة</h3>
+                <p className="text-xs text-on-surface-variant font-light mt-0.5">رأيك واقتراحاتك تصل مباشرة لمطورة المنصة للتحسين المستمر.</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleAddSuggestionSubmit} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-on-surface">عنوان الاقتراح / التحسين:</label>
+                <input
+                  type="text"
+                  required
+                  value={suggestionTitle}
+                  onChange={(e) => setSuggestionTitle(e.target.value)}
+                  placeholder="مثال: إدراج قسم اختبارات تفاعلية، تحسين الخطوط..."
+                  className="bg-surface-container-high border border-outline-variant/40 rounded-xl p-3 text-body-md text-on-surface focus:outline-none focus:border-amber-400"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-on-surface">تفاصيل الاقتراح وسياق الفكرة:</label>
+                <textarea
+                  required
+                  rows={4}
+                  value={suggestionDetails}
+                  onChange={(e) => setSuggestionDetails(e.target.value)}
+                  placeholder="اكتب شرحاً متكاملاً لاقتراحك ولماذا يخدم زملائك الطلاب..."
+                  className="bg-surface-container-high border border-outline-variant/40 rounded-xl p-3 text-body-md text-on-surface focus:outline-none focus:border-amber-400"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 mt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsSuggestionModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl border border-outline-variant/30 text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingSuggestion}
+                  className="px-6 py-2.5 rounded-xl bg-amber-400 text-slate-950 font-bold hover:bg-amber-300 transition-all cursor-pointer shadow-lg shadow-amber-500/20"
+                >
+                  إرسال الاقتراح 💡
                 </button>
               </div>
             </form>

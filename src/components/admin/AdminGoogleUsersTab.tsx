@@ -63,38 +63,7 @@ export function AdminGoogleUsersTab() {
     const userMap = new Map<string, GoogleRegisteredUser>();
     const cloudPermissionsMap: Record<string, UserPermissions> = {};
 
-    const firebaseConsoleAccounts: GoogleRegisteredUser[] = [
-      {
-        uid: "fZRozjpgrZMZhiJyLPjGqMfW",
-        displayName: "عمار الشامي",
-        email: "proammarelshamy@gmail.com",
-        provider: "Google",
-        lastLogin: "مُزامن سحابياً"
-      },
-      {
-        uid: "n63NjR2AAeaQh86G2gO2vO",
-        displayName: "عمار الشامي",
-        email: "ammargr40@gmail.com",
-        provider: "Google",
-        lastLogin: "مُزامن سحابياً"
-      },
-      {
-        uid: "34Nfyd2n6RgFmAxHU8OB28",
-        displayName: "عمار الشامي",
-        email: "ammarahmedelshamy@gmail.com",
-        provider: "Google",
-        lastLogin: "مُزامن سحابياً"
-      }
-    ];
-
     const deletedEmails = getLocalDeletedUserEmails();
-
-    firebaseConsoleAccounts.forEach((u) => {
-      const key = u.email.toLowerCase();
-      if (!deletedEmails.includes(key)) {
-        userMap.set(key, u);
-      }
-    });
 
     try {
       const saved = JSON.parse(localStorage.getItem("wathaq_registered_google_users") || "[]");
@@ -281,7 +250,7 @@ export function AdminGoogleUsersTab() {
   };
 
   const handleDeleteUser = async (userObj: GoogleRegisteredUser) => {
-    if (!window.confirm(`هل أنت تأكد من رغبتك في حذف المستخدم (${userObj.email}) من لوحة التحكم وقواعد البيانات؟`)) {
+    if (!window.confirm(`هل أنت تأكد من رغبتك في حظر وتجريد المستخدم (${userObj.email}) من المنصة وقواعد البيانات؟`)) {
       return;
     }
 
@@ -295,10 +264,18 @@ export function AdminGoogleUsersTab() {
     const updated = googleUsers.filter((u) => u.email.toLowerCase() !== emailKey);
     setGoogleUsers(updated);
 
-    // 3. Delete from Cloud Firestore & set global deletion record
+    // 3. Persist Cloud Ban Record in banned_users collection & delete user docs from Firestore
     try {
       localStorage.setItem("wathaq_registered_google_users", JSON.stringify(updated));
+
       if (userObj.uid) {
+        // Record server ban marker so AuthContext auto-rejects future logins
+        await setDoc(doc(db, "banned_users", userObj.uid), {
+          uid: userObj.uid,
+          email: userObj.email,
+          bannedAt: new Date().toISOString()
+        }, { merge: true }).catch(() => {});
+
         await deleteDoc(doc(db, "global_registered_users", userObj.uid)).catch(() => {});
         await deleteDoc(doc(db, "google_registered_users", userObj.uid)).catch(() => {});
         await deleteDoc(doc(db, "users", userObj.uid)).catch(() => {});

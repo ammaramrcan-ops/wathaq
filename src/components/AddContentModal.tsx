@@ -10,6 +10,7 @@ import { auth } from "@/lib/firebase";
 import { addCustomContent } from "@/lib/contentService";
 import { getUserPermissions } from "@/lib/userPermissionsService";
 import { extractYouTubeThumbnail, getSubjectTitle, getContentTypeTitle } from "@/lib/utils";
+import { getStoredLessons } from "@/lib/lessonsData";
 
 interface AddContentModalProps {
   isOpen: boolean;
@@ -37,6 +38,7 @@ export function AddContentModal({
   const [contentType, setContentType] = useState<"book" | "video" | "flashcards" | "mindmaps">(defaultContentType);
   const [title, setTitle] = useState("");
   const [subject, setSubject] = useState(defaultSubject);
+  const [selectedLesson, setSelectedLesson] = useState<string>("all");
   const [linkUrl, setLinkUrl] = useState("");
   const [description, setDescription] = useState("");
   const [success, setSuccess] = useState(false);
@@ -137,6 +139,9 @@ export function AddContentModal({
       setSubmittedStatus(status);
 
       const ytThumb = contentType === "video" ? extractYouTubeThumbnail(linkUrl) : null;
+      const finalDescription = selectedLesson !== "all" 
+        ? `[درس: ${selectedLesson}] ${description}`.trim()
+        : description;
 
       const newContentItem = {
         id: "user-item-" + Date.now(),
@@ -145,7 +150,7 @@ export function AddContentModal({
         contentType,
         linkUrl,
         image: ytThumb || "",
-        description,
+        description: finalDescription,
         status,
         uploaderName: isUserAdmin ? (userPerms?.role === "admin" ? "أدمن المنصة" : "ناشر معتمد") : "طالب مسجل",
         createdAt: new Date().toLocaleDateString("ar-SA"),
@@ -411,20 +416,35 @@ export function AddContentModal({
                   <div className="flex flex-col gap-1.5">
                     <label className="text-headline-sm font-bold text-on-surface flex items-center gap-2">
                       <HelpCircle className="w-5 h-5 text-primary" />
-                      <span>السؤال 3: هل ترغب في إضافة وصف أو ملاحظات؟</span>
+                      <span>السؤال 3: هل هذا محتوى لكامل المنهج أم درس معين؟</span>
                     </label>
                     <p className="text-body-sm text-on-surface-variant">
-                      (اختياري) يمكنك كتابة نبذة مختصرة عن أهم الفوائد أو التخطي فوراً.
+                      اختر نطاق المادة للتسهيل على زملائك العثور على الدرس المحدد.
                     </p>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold text-on-surface">نطاق المحتوى:</label>
+                    <select
+                      value={selectedLesson}
+                      onChange={(e) => setSelectedLesson(e.target.value)}
+                      className="w-full bg-surface-container-high text-on-surface border border-outline-variant/50 rounded-2xl p-3 text-body-md focus:outline-none focus:border-primary"
+                    >
+                      <option value="all">كامل المنهج الشامل</option>
+                      {(getStoredLessons()[subject] || []).map((les) => (
+                        <option key={les} value={les}>
+                          درس معين: {les}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   <textarea
                     rows={3}
-                    autoFocus
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    placeholder="ملاحظات توضيحية للطلاب..."
-                    className="w-full bg-surface-container-high text-on-surface border border-outline-variant/50 rounded-2xl p-4 text-body-md focus:outline-none focus:border-primary transition-all shadow-inner"
+                    placeholder="ملاحظات توضيحية إضافية للطلاب (اختياري)..."
+                    className="w-full bg-surface-container-high text-on-surface border border-outline-variant/50 rounded-2xl p-4 text-body-md focus:outline-none focus:border-primary transition-all shadow-inner mt-1"
                   />
 
                   <div className="flex justify-between items-center mt-4">

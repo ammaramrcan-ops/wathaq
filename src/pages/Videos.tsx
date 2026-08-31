@@ -23,6 +23,7 @@ import {
   filterSubjectsForProfile, 
   StudentAcademicProfile 
 } from "@/lib/subjectsData";
+import { subscribeLessons, subscribeUnits, SubjectUnitsMap, SubjectUnit } from "@/lib/lessonsData";
 
 interface MainCategory {
   id: string;
@@ -157,6 +158,11 @@ export default function Videos() {
   const [isDeletedLoaded, setIsDeletedLoaded] = useState(false);
 
   const [academicProfile, setAcademicProfile] = useState<StudentAcademicProfile | null>(null);
+  const [lessonsMap, setLessonsMap] = useState<Record<string, string[]>>({});
+  const [unitsMap, setUnitsMap] = useState<SubjectUnitsMap>({});
+  const [selectedUnit, setSelectedUnit] = useState<SubjectUnit | null>(null);
+  const [selectedLessonScope, setSelectedLessonScope] = useState<string>("all");
+  const [interactiveStep, setInteractiveStep] = useState<"type" | "unit" | "lesson">("type");
 
   useEffect(() => {
     const unsubProf = subscribeStudentProfile(user?.uid, (prof) => {
@@ -172,10 +178,20 @@ export default function Videos() {
       setCustomItems(items);
     });
 
+    const unsubLessons = subscribeLessons((map) => {
+      setLessonsMap(map);
+    });
+
+    const unsubUnits = subscribeUnits((map) => {
+      setUnitsMap(map);
+    });
+
     return () => {
       unsubProf();
       unsubDeleted();
       unsubCustom();
+      unsubLessons();
+      unsubUnits();
     };
   }, [user?.uid]);
 
@@ -223,6 +239,11 @@ export default function Videos() {
       cat = mainCategories.find((c) => c.id === categoryParam) || null;
     }
 
+    const lessonParam = searchParams.get("lesson");
+    if (lessonParam) {
+      setSelectedLessonScope(lessonParam);
+    }
+
     if (typeParam) {
       typeItem = contentTypes.find((t) => t.id === typeParam) || null;
     }
@@ -231,20 +252,13 @@ export default function Videos() {
       vid = allVideos.find((v) => v.id === videoParam) || null;
     }
 
-    setSelectedCategory(cat);
-    setSelectedSubject(sub);
-    setSelectedContentType(typeItem);
-    setActiveVideo(vid);
+    setSelectedCategory((prev) => (prev?.id === cat?.id ? prev : cat));
+    setSelectedSubject((prev) => (prev?.id === sub?.id ? prev : sub));
+    setSelectedContentType((prev) => (prev?.id === typeItem?.id ? prev : typeItem));
+    setActiveVideo((prev) => (prev?.id === vid?.id ? prev : vid));
 
-    if (sub && typeItem) {
-      setStep(4);
-    } else if (sub) {
-      setStep(3);
-    } else if (cat) {
-      setStep(2);
-    } else {
-      setStep(1);
-    }
+    const targetStep = (sub && (typeItem || lessonParam)) ? 4 : sub ? 3 : cat ? 2 : 1;
+    setStep((prev) => (prev === targetStep ? prev : targetStep));
   }, [searchParams, allVideos]);
 
   const handleSelectCategory = (cat: MainCategory) => setSearchParams({ category: cat.id });
@@ -276,14 +290,26 @@ export default function Videos() {
     }
     if (step === 4) {
       setSearchParams({ category: selectedCategory?.id || "", subject: selectedSubject?.id || "" });
+      setInteractiveStep("type");
     } else if (step === 3) {
-      setSearchParams({ category: selectedCategory?.id || "" });
+      if (interactiveStep === "lesson") {
+        setInteractiveStep("unit");
+      } else if (interactiveStep === "unit") {
+        setInteractiveStep("type");
+      } else {
+        setSearchParams({ category: selectedCategory?.id || "" });
+      }
     } else if (step === 2) {
       setSearchParams({});
     }
   };
 
-  const handleResetAll = () => setSearchParams({});
+  const handleResetAll = () => {
+    setSearchParams({});
+    setSelectedLessonScope("all");
+    setInteractiveStep("type");
+    setSelectedUnit(null);
+  };
 
   const handleDeleteVideo = async (id: string) => {
     if (window.confirm("هل أنت تأكد من رغبتك في حذف هذا الفيديو أو قائمة التشغيل نهائياً؟")) {
@@ -425,35 +451,170 @@ export default function Videos() {
         </motion.div>
       )}
 
-      {/* STEP 3: Content Type (Playlist vs Video) */}
+      {/* STEP 3: Interactive Question Wizard for Content Type, Units & Lessons */}
       {step === 3 && (
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          className="grid grid-cols-1 md:grid-cols-2 gap-stack-lg max-w-3xl mx-auto w-full my-auto"
+          className="flex flex-col gap-6 max-w-4xl mx-auto w-full my-auto"
         >
-          {contentTypes.map((type) => {
-            const Icon = type.icon;
-            return (
-              <button
-                key={type.id}
-                onClick={() => handleSelectType(type)}
-                className="group text-right p-8 rounded-2xl bg-surface-container-low border border-outline-variant/30 hover:border-primary hover:bg-surface-container transition-all duration-300 flex flex-col gap-4 cursor-pointer"
-              >
-                <div className="w-14 h-14 rounded-xl bg-primary/10 text-primary flex items-center justify-center border border-primary/20 group-hover:scale-110 transition-transform">
-                  <Icon className="w-7 h-7" />
-                </div>
+          {/* Sub-step 1: Select Type (Playlist vs Lesson Video) */}
+          {interactiveStep === "type" && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-stack-lg w-full">
+              {contentTypes.map((type) => {
+                const Icon = type.icon;
+                return (
+                  <button
+                    key={type.id}
+                    onClick={() => {
+                      if (type.id === "video") {
+                        setSelectedContentType(type);
+                        setInteractiveStep("unit");
+                      } else {
+                        handleSelectType(type);
+                        setSelectedLessonScope("all");
+                      }
+                    }}
+                    className="group text-right p-8 rounded-2xl bg-surface-container-low border border-outline-variant/30 hover:border-primary hover:bg-surface-container transition-all duration-300 flex flex-col gap-4 cursor-pointer shadow-xl"
+                  >
+                    <div className="w-14 h-14 rounded-xl bg-primary/10 text-primary flex items-center justify-center border border-primary/20 group-hover:scale-110 transition-transform">
+                      <Icon className="w-7 h-7" />
+                    </div>
+                    <div>
+                      <h3 className="text-headline-lg font-headline-lg text-on-surface group-hover:text-primary transition-colors mb-2">
+                        {type.title}
+                      </h3>
+                      <p className="text-body-md text-on-surface-variant font-light leading-relaxed">
+                        {type.subtitle}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Sub-step 2: Select Unit / Chapter */}
+          {interactiveStep === "unit" && selectedSubject && (
+            <div className="flex flex-col gap-6">
+              <div className="text-center max-w-xl mx-auto">
+                <span className="text-xs font-bold text-primary bg-primary/10 px-3 py-1 rounded-full border border-primary/20">
+                  الخطوة 3.1: تحديد الباب أو الفصل
+                </span>
+                <h2 className="text-headline-lg font-bold text-on-surface mt-2 mb-1">
+                  اختر الباب أو الفصل الأكاديمي لمادة ({selectedSubject.title})
+                </h2>
+                <p className="text-body-md text-on-surface-variant font-light">
+                  حدد الباب لتضييق نطاق الشروحات والوصول للدرس المطلوب مباشرة.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Full Curriculum Card */}
+                <button
+                  onClick={() => {
+                    const videoTypeObj = contentTypes.find((t) => t.id === "video") || contentTypes[0];
+                    setSelectedContentType(videoTypeObj);
+                    setSelectedLessonScope("all");
+                    setStep(4);
+                    if (selectedSubject) {
+                      setSearchParams({
+                        category: selectedSubject.categoryId,
+                        subject: selectedSubject.id,
+                        type: videoTypeObj.id
+                      });
+                    }
+                  }}
+                  className="group text-right p-6 rounded-2xl bg-primary/10 border border-primary/30 hover:bg-primary/20 transition-all cursor-pointer shadow-lg flex justify-between items-center"
+                >
+                  <div>
+                    <h3 className="text-headline-md font-bold text-primary mb-1">شروحات كامل المنهج الشامل</h3>
+                    <p className="text-label-sm text-on-surface-variant">عرض جميع الفيديوهات المتاحة دون تقييد بدرس معين</p>
+                  </div>
+                  <ChevronLeft className="w-5 h-5 text-primary group-hover:-translate-x-1 transition-transform" />
+                </button>
+
+                {/* Unit Cards */}
+                {(unitsMap[selectedSubject.id] || []).map((unit) => (
+                  <button
+                    key={unit.id}
+                    onClick={() => {
+                      setSelectedUnit(unit);
+                      setInteractiveStep("lesson");
+                    }}
+                    className="group text-right p-6 rounded-2xl bg-surface-container-low border border-outline-variant/30 hover:border-primary hover:bg-surface-container transition-all cursor-pointer shadow-lg flex justify-between items-center"
+                  >
+                    <div>
+                      <h3 className="text-headline-md font-bold text-on-surface group-hover:text-primary transition-colors mb-1">
+                        {unit.unitTitle}
+                      </h3>
+                      <p className="text-label-sm text-on-surface-variant font-light">
+                        يحتوي على {(unit.lessons || []).length} دروس مقررة
+                      </p>
+                    </div>
+                    <ChevronLeft className="w-5 h-5 text-primary group-hover:-translate-x-1 transition-transform" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Sub-step 3: Select Specific Lesson inside Unit */}
+          {interactiveStep === "lesson" && selectedUnit && (
+            <div className="flex flex-col gap-6">
+              <div className="flex justify-between items-center border-b border-outline-variant/10 pb-4">
                 <div>
-                  <h3 className="text-headline-lg font-headline-lg text-on-surface group-hover:text-primary transition-colors mb-2">
-                    {type.title}
-                  </h3>
-                  <p className="text-body-md text-on-surface-variant font-light leading-relaxed">
-                    {type.subtitle}
-                  </p>
+                  <span className="text-xs font-bold text-primary bg-primary/10 px-3 py-1 rounded-full border border-primary/20">
+                    الخطوة 3.2: تحديد الدرس
+                  </span>
+                  <h2 className="text-headline-lg font-bold text-on-surface mt-2">
+                    اختر الدرس المحدد في ({selectedUnit.unitTitle})
+                  </h2>
                 </div>
-              </button>
-            );
-          })}
+
+                <button
+                  onClick={() => setInteractiveStep("unit")}
+                  className="text-label-sm text-primary hover:underline flex items-center gap-1 font-bold cursor-pointer"
+                >
+                  <span>العودة لاختيار باب آخر</span>
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {selectedUnit.lessons.map((lesson, idx) => (
+                  <button
+                    key={lesson + idx}
+                    onClick={() => {
+                      const videoTypeObj = contentTypes.find((t) => t.id === "video") || contentTypes[0];
+                      setSelectedContentType(videoTypeObj);
+                      setSelectedLessonScope(lesson);
+                      setStep(4);
+                      if (selectedSubject) {
+                        setSearchParams({
+                          category: selectedSubject.categoryId,
+                          subject: selectedSubject.id,
+                          lesson: lesson,
+                          type: videoTypeObj.id
+                        });
+                      }
+                    }}
+                    className="group text-right p-6 rounded-2xl bg-surface-container-low border border-outline-variant/30 hover:border-primary hover:bg-surface-container transition-all cursor-pointer shadow-lg flex justify-between items-center"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="w-8 h-8 rounded-xl bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0 border border-primary/20">
+                        {idx + 1}
+                      </span>
+                      <h3 className="text-headline-md font-bold text-on-surface group-hover:text-primary transition-colors">
+                        {lesson}
+                      </h3>
+                    </div>
+                    <ChevronLeft className="w-5 h-5 text-primary group-hover:-translate-x-1 transition-transform" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </motion.div>
       )}
 
@@ -464,6 +625,29 @@ export default function Videos() {
           animate={{ opacity: 1, y: 0 }}
           className="flex flex-col gap-stack-lg"
         >
+          {selectedLessonScope !== "all" && (
+            <div className="bg-primary/10 border border-primary/30 rounded-2xl p-4 flex justify-between items-center flex-wrap gap-2 mb-2">
+              <div className="flex items-center gap-2">
+                <span className="bg-primary text-on-primary text-xs font-bold px-3 py-1 rounded-xl">
+                  صفحة الدرس الحالي
+                </span>
+                <h3 className="text-headline-sm font-bold text-on-surface">
+                  عرض محتوى درس: ({selectedLessonScope})
+                </h3>
+              </div>
+              <button
+                onClick={() => {
+                  setStep(3);
+                  setInteractiveStep("unit");
+                }}
+                className="text-xs text-primary hover:underline font-bold cursor-pointer flex items-center gap-1"
+              >
+                <span>اختيار درس آخر</span>
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
           {finalVideos.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-stack-lg">
               {finalVideos.map((vid) => (
@@ -476,15 +660,38 @@ export default function Videos() {
               ))}
             </div>
           ) : (
-            <div className="py-[6rem] flex flex-col items-center justify-center text-center gap-4 bg-surface-container-low rounded-2xl border border-outline-variant/20">
-              <Sparkles className="w-12 h-12 text-primary/40 mb-2" />
-              <h3 className="text-headline-md text-on-surface">لا تتوفر فيديوهات متطابقة لخياراتك حالياً</h3>
-              <button
-                onClick={() => setSearchParams({ category: selectedCategory?.id || "" })}
-                className="mt-2 px-6 py-2.5 rounded-lg border border-primary text-primary hover:bg-primary hover:text-on-primary transition-colors text-label-sm font-medium cursor-pointer"
-              >
-                تغيير المادة أو خيارات الفيديو
-              </button>
+            <div className="py-16 px-6 flex flex-col items-center justify-center text-center gap-4 bg-surface-container-low rounded-3xl border border-outline-variant/30 shadow-xl">
+              <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center">
+                <PlayCircle className="w-8 h-8" />
+              </div>
+              <h3 className="text-headline-md font-bold text-on-surface">
+                {selectedLessonScope !== "all" 
+                  ? `صفحة درس (${selectedLessonScope})` 
+                  : "لا تتوفر فيديوهات متطابقة لخياراتك حالياً"}
+              </h3>
+              <p className="text-body-md text-on-surface-variant font-light max-w-md">
+                {selectedLessonScope !== "all"
+                  ? `لا تتوفر فيديوهات مضافة لهذا الدرس بعد. يمكنك التكرم بإضافة أول فيديو لمساعدة زملائك.`
+                  : "تغيير المادة أو خيارات الفيديو للبحث مجدداً."}
+              </p>
+              <div className="flex items-center gap-3 flex-wrap justify-center mt-2">
+                <button
+                  onClick={() => setIsAddModalOpen(true)}
+                  className="bg-primary text-on-primary hover:bg-primary/90 px-5 py-2.5 rounded-xl font-bold text-label-sm flex items-center gap-2 cursor-pointer shadow-lg shadow-primary/20"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>إضافة فيديو لهذا الدرس الآن</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setStep(3);
+                    setInteractiveStep("unit");
+                  }}
+                  className="bg-surface-container-high border border-outline-variant/40 text-on-surface hover:text-primary px-5 py-2.5 rounded-xl font-bold text-label-sm flex items-center gap-2 cursor-pointer transition-colors"
+                >
+                  <span>اختيار درس أو باب آخر</span>
+                </button>
+              </div>
             </div>
           )}
         </motion.div>

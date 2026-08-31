@@ -7,40 +7,18 @@ export interface Discussion {
   author: string;
   authorEmail?: string;
   authorUid?: string;
-  subjectId?: string;
   category: "advice" | "question";
+  subjectId?: string;
   replies: number;
   time: string;
-  createdAt?: string;
   excerpt: string;
   tags: string[];
 }
 
-export const DEFAULT_DISCUSSIONS: Discussion[] = [
-  {
-    id: "d1",
-    title: "أفضل جدول مراجعة نهائية للثانوية في 60 يوماً؟",
-    author: "أحمد طارق",
-    category: "advice",
-    replies: 18,
-    time: "منذ ساعتين",
-    excerpt: "كيف تقسم يومك بين المواد العلمية والنظرية بدون توتر؟ إليك التجربة النمطية المثبتة...",
-    tags: ["نصائح مراجعة", "تنظيم الوقت"]
-  },
-  {
-    id: "d2",
-    title: "طريقة إتقان قوانين كيرشوف في الفيزياء بدون تلعثم؟",
-    author: "سارة علي",
-    category: "question",
-    subjectId: "physics",
-    replies: 12,
-    time: "منذ 4 ساعات",
-    excerpt: "عند تطبيق القانون الثاني على العروة المغلقة، متى نختار الإشارة الموجبة والسالبة بدقة؟",
-    tags: ["فيزياء", "قوانين كيرشوف"]
-  }
-];
+// 100% Dynamic - No Hardcoded Default Discussions
+export const DEFAULT_DISCUSSIONS: Discussion[] = [];
 
-const LOCAL_STORAGE_DISCUSSIONS = "wathaq_community_discussions";
+const LOCAL_STORAGE_DISCUSSIONS = "wathaq_community_discussions_v2";
 const LOCAL_STORAGE_DELETED_DISCUSSIONS = "wathaq_deleted_discussions";
 
 // IndexedDB Helper for Community Discussions
@@ -62,34 +40,20 @@ function openIDBCommunity(): Promise<IDBDatabase> {
   });
 }
 
-export async function saveIDBDiscussion(item: Discussion): Promise<void> {
+async function saveIDBDiscussion(post: Discussion): Promise<void> {
   try {
     const idb = await openIDBCommunity();
     const tx = idb.transaction(IDB_DISCUSSIONS_STORE, "readwrite");
-    tx.objectStore(IDB_DISCUSSIONS_STORE).put(item);
+    tx.objectStore(IDB_DISCUSSIONS_STORE).put(post);
   } catch (e) {}
 }
 
-export async function deleteIDBDiscussion(id: string): Promise<void> {
+async function deleteIDBDiscussion(id: string): Promise<void> {
   try {
     const idb = await openIDBCommunity();
     const tx = idb.transaction(IDB_DISCUSSIONS_STORE, "readwrite");
     tx.objectStore(IDB_DISCUSSIONS_STORE).delete(id);
   } catch (e) {}
-}
-
-export async function loadIDBDiscussions(): Promise<Discussion[]> {
-  try {
-    const idb = await openIDBCommunity();
-    return new Promise((resolve) => {
-      const tx = idb.transaction(IDB_DISCUSSIONS_STORE, "readonly");
-      const req = tx.objectStore(IDB_DISCUSSIONS_STORE).getAll();
-      req.onsuccess = () => resolve(req.result || []);
-      req.onerror = () => resolve([]);
-    });
-  } catch (e) {
-    return [];
-  }
 }
 
 export function getStoredDeletedDiscussions(): string[] {
@@ -103,32 +67,26 @@ export function getStoredDeletedDiscussions(): string[] {
 
 export function markDiscussionAsDeleted(id: string): void {
   try {
-    const deleted = getStoredDeletedDiscussions();
-    if (!deleted.includes(id)) {
-      const updated = [...deleted, id];
+    const current = getStoredDeletedDiscussions();
+    if (!current.includes(id)) {
+      const updated = [...current, id];
       localStorage.setItem(LOCAL_STORAGE_DELETED_DISCUSSIONS, JSON.stringify(updated));
     }
   } catch (e) {}
 }
 
+/**
+ * Retrieve saved discussions from LocalStorage
+ */
 export function getStoredDiscussions(): Discussion[] {
   const deletedIds = getStoredDeletedDiscussions();
   try {
     const saved = localStorage.getItem(LOCAL_STORAGE_DISCUSSIONS);
-    const customList: Discussion[] = saved ? JSON.parse(saved) : [];
-    
-    // Merge custom list and default discussions while filtering deleted IDs
-    const mergedMap = new Map<string, Discussion>();
-    DEFAULT_DISCUSSIONS.forEach((d) => {
-      if (!deletedIds.includes(d.id)) mergedMap.set(d.id, d);
-    });
-    customList.forEach((d) => {
-      if (!deletedIds.includes(d.id)) mergedMap.set(d.id, d);
-    });
-
-    return Array.from(mergedMap.values());
+    if (!saved) return [];
+    const customList: Discussion[] = JSON.parse(saved);
+    return customList.filter((d) => !deletedIds.includes(d.id) && !["d1", "d2"].includes(d.id));
   } catch (e) {
-    return DEFAULT_DISCUSSIONS.filter((d) => !deletedIds.includes(d.id));
+    return [];
   }
 }
 
@@ -136,30 +94,53 @@ export function getStoredDiscussions(): Discussion[] {
  * Add a new community discussion/question and sync to Cloud Firestore
  */
 export async function addDiscussion(post: Discussion): Promise<Discussion> {
-  // 1. Save to LocalStorage & IndexedDB
+  // 1. Save to Cloud Firestore FIRST (server authorization check)
+  try {
+    const docRef = doc(db, "discussions", post.id);
+    await setDoc(docRef, { ...post, createdAt: new Date().toISOString() }, { merge: true });
+  } catch (err: any) {
+    console.error("Firestore add discussion error:", err);
+    throw new Error("فشل إرسال السؤال سحابياً. يرجى التأكد من تسجيل الدخول أو قوة الاتصال.");
+  }
+
+  // 2. Save to LocalStorage & IndexedDB ONLY after Cloud Firestore succeeds
   try {
     const current = getStoredDiscussions();
     const updated = [post, ...current.filter((d) => d.id !== post.id)];
     localStorage.setItem(LOCAL_STORAGE_DISCUSSIONS, JSON.stringify(updated));
     await saveIDBDiscussion(post);
-  } catch (e) {}
-
-  // 2. Save to Cloud Firestore
-  try {
-    const docRef = doc(db, "discussions", post.id);
-    await setDoc(docRef, { ...post, createdAt: new Date().toISOString() }, { merge: true });
-  } catch (err) {
-    console.warn("Firestore add discussion warning:", err);
+  } catch (e) {
+    console.warn("LocalStorage discussion write warning:", e);
   }
 
   return post;
 }
 
 /**
- * Delete a community discussion and sync deletion to Cloud Firestore
- */
+ * Delete a community discussion and sync deletion to Cloud Firestore */
 export async function deleteDiscussion(id: string): Promise<void> {
-  // 1. Blacklist locally & delete from IndexedDB
+  // 1. Delete from Cloud Firestore FIRST (Server authorization check)
+  try {
+    await deleteDoc(doc(db, "discussions", id));
+
+    // Save global deletion marker in Firestore ONLY if authorized (Admin), fail silently for standard users
+    try {
+      const globalMarkerRef = doc(db, "global_deleted_items", `disc-${id}`);
+      await setDoc(globalMarkerRef, {
+        itemId: `disc-${id}`,
+        discussionId: id,
+        itemType: "discussion",
+        timestamp: new Date().toISOString()
+      });
+    } catch (gErr) {
+      // Non-admins cannot write to global_deleted_items; snapshot on 'discussions' handles deletion across clients natively
+    }
+  } catch (err: any) {
+    console.error("Firestore delete discussion error:", err);
+    throw new Error("فشل حذف المنشور سحابياً (تتطلب ملكية المنشور أو صلاحية الأدمن).");
+  }
+
+  // 2. Update LocalStorage & IndexedDB ONLY after Cloud deletion succeeds
   markDiscussionAsDeleted(id);
   await deleteIDBDiscussion(id);
 
@@ -168,47 +149,17 @@ export async function deleteDiscussion(id: string): Promise<void> {
     const updated = current.filter((d) => d.id !== id);
     localStorage.setItem(LOCAL_STORAGE_DISCUSSIONS, JSON.stringify(updated));
   } catch (e) {}
-
-  // 2. Delete from Cloud Firestore
-  try {
-    await deleteDoc(doc(db, "discussions", id));
-
-    // Save global deletion marker in Firestore
-    await setDoc(doc(db, "global_deleted_items", `disc-${id}`), {
-      itemId: `disc-${id}`,
-      discussionId: id,
-      itemType: "discussion",
-      deletedAt: new Date().toISOString()
-    }, { merge: true });
-  } catch (err) {
-    console.warn("Firestore delete discussion warning:", err);
-  }
 }
 
 /**
- * Subscribe to real-time community discussions from Cloud Firestore
+ * Real-time subscription to community discussions from Cloud Firestore
  */
 export function subscribeDiscussions(onUpdate: (discussions: Discussion[]) => void): () => void {
-  // Emit initial local state
-  onUpdate(getStoredDiscussions());
+  try {
+    localStorage.removeItem("wathaq_community_discussions");
+  } catch (e) {}
 
-  // Restore IndexedDB backup if LocalStorage was cleared
-  loadIDBDiscussions().then((idbList) => {
-    if (idbList.length > 0) {
-      const deletedIds = getStoredDeletedDiscussions();
-      const current = getStoredDiscussions();
-      const mergedMap = new Map<string, Discussion>();
-      current.forEach((d) => mergedMap.set(d.id, d));
-      idbList.forEach((d) => {
-        if (!deletedIds.includes(d.id)) mergedMap.set(d.id, d);
-      });
-      const finalArr = Array.from(mergedMap.values());
-      try {
-        localStorage.setItem(LOCAL_STORAGE_DISCUSSIONS, JSON.stringify(finalArr));
-      } catch (e) {}
-      onUpdate(finalArr);
-    }
-  });
+  onUpdate(getStoredDiscussions());
 
   let unsubDiscussions: (() => void) | null = null;
   let unsubDeleted: (() => void) | null = null;
@@ -238,16 +189,11 @@ export function subscribeDiscussions(onUpdate: (discussions: Discussion[]) => vo
         const deletedIds = getStoredDeletedDiscussions();
         const cloudMap = new Map<string, Discussion>();
 
-        // Load default items
-        DEFAULT_DISCUSSIONS.forEach((d) => {
-          if (!deletedIds.includes(d.id)) cloudMap.set(d.id, d);
-        });
-
         // Merge Firestore snapshot items
         snap.docs.forEach((docSnap) => {
           const data = docSnap.data() as Discussion;
           const docId = data.id || docSnap.id;
-          if (!deletedIds.includes(docId)) {
+          if (!deletedIds.includes(docId) && !["d1", "d2"].includes(docId)) {
             cloudMap.set(docId, {
               ...data,
               id: docId
@@ -263,9 +209,14 @@ export function subscribeDiscussions(onUpdate: (discussions: Discussion[]) => vo
 
         onUpdate(updatedList);
       },
-      (err) => console.warn("Discussions snapshot warning:", err)
+      (err) => {
+        console.warn("Discussions snapshot warning:", err);
+        onUpdate(getStoredDiscussions());
+      }
     );
-  } catch (e) {}
+  } catch (e) {
+    onUpdate(getStoredDiscussions());
+  }
 
   return () => {
     if (unsubDiscussions) unsubDiscussions();

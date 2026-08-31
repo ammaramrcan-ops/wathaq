@@ -9,7 +9,7 @@ import {
   signInWithPopup,
   signInAnonymously
 } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc } from "firebase/firestore";
 import { auth, db, isFirebaseConfigured } from "@/lib/firebase";
 import { saveIDBUser, clearLocalUserSessionData } from "@/lib/contentService";
 
@@ -58,6 +58,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Listen for Firebase auth state changes
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       if (fbUser && !fbUser.isAnonymous) {
+        // Check if user account is banned in Cloud Firestore
+        try {
+          const bannedRef = doc(db, "banned_users", fbUser.uid);
+          const bannedSnap = await getDoc(bannedRef).catch(() => null);
+
+          const userRef = doc(db, "users", fbUser.uid);
+          const userSnap = await getDoc(userRef).catch(() => null);
+
+          if ((bannedSnap && bannedSnap.exists()) || (userSnap && userSnap.exists() && userSnap.data()?.banned === true)) {
+            alert("تم حظر هذا الحساب من استخدام منصة وثاق. للتواصل مع الإدارة يرجى مراسلة الدعم الفني.");
+            await signOut(auth);
+            await clearLocalUserSessionData();
+            setUser(null);
+            setLoading(false);
+            return;
+          }
+        } catch (bErr) {
+          console.warn("Banned user check warning:", bErr);
+        }
+
         const u = {
           uid: fbUser.uid,
           email: fbUser.email,

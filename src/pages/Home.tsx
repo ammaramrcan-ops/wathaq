@@ -45,14 +45,14 @@ export default function Home() {
   return (
     <div className="flex-grow flex flex-col items-center justify-center py-section-padding px-4">
       {/* Brand / Logo Area */}
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, scale: 0.9, y: -20 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
         className="mb-stack-lg flex flex-col items-center text-center"
         id="home-brand"
       >
-        <motion.div 
+        <motion.div
           whileHover={{ rotate: 90, scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
           transition={{ type: "spring", stiffness: 300, damping: 15 }}
@@ -62,7 +62,7 @@ export default function Home() {
             <div className="w-4 h-4 bg-primary rounded-full animate-pulse"></div>
           </div>
         </motion.div>
-        
+
         <h1 className="text-display-ar font-display-ar text-on-surface tracking-wide flex items-center gap-2">
           <span>وثاق</span>
           <Sparkles className="w-6 h-6 text-primary animate-bounce" />
@@ -70,7 +70,7 @@ export default function Home() {
       </motion.div>
 
       {/* Central Interactive Action Cards */}
-      <motion.div 
+      <motion.div
         variants={container}
         initial="hidden"
         animate="show"
@@ -79,11 +79,11 @@ export default function Home() {
       >
         {modules.map((mod) => (
           <motion.div key={mod.path} variants={item}>
-            <Link 
+            <Link
               to={mod.path}
               id={mod.id}
             >
-              <motion.div 
+              <motion.div
                 whileHover={{ y: -8, scale: 1.02 }}
                 whileTap={{ scale: 0.97 }}
                 transition={{ type: "spring", stiffness: 400, damping: 20 }}
@@ -111,7 +111,7 @@ export default function Home() {
       </motion.div>
 
       {/* Intro Text */}
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.6, duration: 0.8 }}

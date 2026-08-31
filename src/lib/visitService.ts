@@ -87,18 +87,63 @@ export function getLocalVisitsAnalytics(): VisitAnalytics {
   } catch {}
 
   return {
-    totalVisits: 1,
+    totalVisits: 7,
     dailyVisits: 1,
-    weeklyVisits: 1,
+    weeklyVisits: 7,
     recurringVisits: 0,
-    uniqueVisitorsCount: 1,
+    uniqueVisitorsCount: 7,
     repeatVisitorRate: 0,
     lastVisitTimestamp: new Date().toLocaleTimeString("ar-SA")
   };
 }
 
 /**
- * Track a page visit accurately with Session Throttling and Date Reset Logic
+ * Reset visits analytics in Cloud Firestore, LocalStorage & IndexedDB to a clean baseline (e.g. 7 visits)
+ */
+export async function resetVisitsAnalytics(newTotal: number = 7): Promise<VisitAnalytics> {
+  const todayDate = new Date().toISOString().split("T")[0];
+  const resetData: VisitAnalytics = {
+    totalVisits: newTotal,
+    dailyVisits: 1,
+    weeklyVisits: newTotal,
+    recurringVisits: 0,
+    uniqueVisitorsCount: newTotal,
+    repeatVisitorRate: 0,
+    lastVisitTimestamp: new Date().toLocaleTimeString("ar-SA")
+  };
+
+  try {
+    localStorage.setItem(LOCAL_STORAGE_VISITS, JSON.stringify(resetData));
+    await saveIDBAnalytics(resetData);
+  } catch (e) {}
+
+  try {
+    const analyticsDocRef = doc(db, "analytics_summary", "general");
+    await setDoc(
+      analyticsDocRef,
+      {
+        totalVisits: newTotal,
+        dailyVisits: 1,
+        weeklyVisits: newTotal,
+        recurringVisits: 0,
+        uniqueVisitorsCount: newTotal,
+        repeatVisitorRate: 0,
+        lastDate: todayDate,
+        lastVisitTimestamp: resetData.lastVisitTimestamp
+      },
+      { merge: false } // Overwrite inflated numbers
+    );
+  } catch (err) {
+    console.warn("Firestore reset analytics warning:", err);
+  }
+
+  return resetData;
+}
+
+/**
+ * Track a page visit accurately:
+ * - Session Throttled (15 mins)
+ * - Recurring visits do NOT increment totalVisits
  */
 export async function trackVisit(): Promise<VisitAnalytics> {
   const now = Date.now();
@@ -110,7 +155,6 @@ export async function trackVisit(): Promise<VisitAnalytics> {
     if (lastSession) {
       const elapsed = now - parseInt(lastSession, 10);
       if (elapsed < SESSION_THROTTLE_MS) {
-        // Return existing analytics without incrementing total visits on every subpage click
         return getLocalVisitsAnalytics();
       }
     }
@@ -145,36 +189,37 @@ export async function trackVisit(): Promise<VisitAnalytics> {
     }
   } catch {}
 
-  // Atomically increment metrics in Cloud Firestore
+  // Atomically update metrics in Cloud Firestore
   try {
     const analyticsDocRef = doc(db, "analytics_summary", "general");
     
     const currentSnap = await getDoc(analyticsDocRef);
-    let prevTotal = 0;
+    let prevTotal = 7;
     let prevRecurring = 0;
-    let prevUnique = 0;
-    let prevDaily = 0;
+    let prevUnique = 7;
+    let prevDaily = 1;
     let storedCloudDate = "";
 
     if (currentSnap.exists()) {
       const data = currentSnap.data();
-      prevTotal = data.totalVisits || 0;
+      prevTotal = data.totalVisits || 7;
       prevRecurring = data.recurringVisits || 0;
-      prevUnique = data.uniqueVisitorsCount || 1;
+      prevUnique = data.uniqueVisitorsCount || 7;
       storedCloudDate = data.lastDate || "";
-      prevDaily = storedCloudDate === todayDate ? (data.dailyVisits || 0) : 0;
+      prevDaily = storedCloudDate === todayDate ? (data.dailyVisits || 1) : 1;
     }
 
-    const newTotal = prevTotal + 1;
+    // Do NOT increment totalVisits for recurring visits
+    const newTotal = isRecurring ? prevTotal : prevTotal + 1;
     const newRecurring = prevRecurring + (isRecurring ? 1 : 0);
     const newUnique = isRecurring ? prevUnique : prevUnique + 1;
-    const newDaily = prevDaily + 1;
+    const newDaily = isRecurring ? prevDaily : (prevDaily + 1);
     const repeatVisitorRate = newTotal > 0 ? Math.round((newRecurring / newTotal) * 100) : 0;
 
     const updatedAnalytics: VisitAnalytics = {
       totalVisits: newTotal,
       dailyVisits: newDaily,
-      weeklyVisits: newDaily,
+      weeklyVisits: newTotal,
       recurringVisits: newRecurring,
       uniqueVisitorsCount: newUnique,
       repeatVisitorRate,
@@ -185,9 +230,9 @@ export async function trackVisit(): Promise<VisitAnalytics> {
     await setDoc(
       analyticsDocRef,
       {
-        totalVisits: increment(1),
-        dailyVisits: storedCloudDate === todayDate ? increment(1) : 1,
-        weeklyVisits: increment(1),
+        totalVisits: isRecurring ? increment(0) : increment(1),
+        dailyVisits: storedCloudDate === todayDate ? (isRecurring ? increment(0) : increment(1)) : 1,
+        weeklyVisits: isRecurring ? increment(0) : increment(1),
         recurringVisits: increment(isRecurring ? 1 : 0),
         uniqueVisitorsCount: isRecurring ? increment(0) : increment(1),
         repeatVisitorRate,
@@ -224,10 +269,8 @@ export async function trackVisit(): Promise<VisitAnalytics> {
  * Subscribe to visit analytics snapshot from Cloud Firestore & IndexedDB
  */
 export function subscribeVisitsAnalytics(onUpdate: (analytics: VisitAnalytics) => void): () => void {
-  // Emit current local state
   onUpdate(getLocalVisitsAnalytics());
 
-  // Restore from IndexedDB backup if LocalStorage was cleared
   loadIDBAnalytics().then((idbAnalytics) => {
     if (idbAnalytics) {
       try {
@@ -245,7 +288,7 @@ export function subscribeVisitsAnalytics(onUpdate: (analytics: VisitAnalytics) =
       (snap) => {
         if (snap.exists()) {
           const data = snap.data() as VisitAnalytics;
-          const totalVisits = data.totalVisits || 1;
+          const totalVisits = data.totalVisits || 7;
           const recurringVisits = data.recurringVisits || 0;
           const repeatVisitorRate = totalVisits > 0 ? Math.round((recurringVisits / totalVisits) * 100) : 0;
 

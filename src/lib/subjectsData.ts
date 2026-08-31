@@ -34,8 +34,8 @@ export const DEFAULT_CURRICULUM: Record<string, string[]> = {
 const LOCAL_STORAGE_ACADEMIC_PROFILE = "wathaq_student_academic_profile";
 
 export const DEFAULT_ACADEMIC_PROFILE: StudentAcademicProfile = {
-  system: "general",
-  branch: "science",
+  system: "azhar",
+  branch: "scientific",
   grade: "3rd"
 };
 
@@ -70,21 +70,20 @@ export async function saveStoredStudentProfile(
   profile: StudentAcademicProfile,
   userId?: string
 ): Promise<void> {
-  // 1. LocalStorage update
+  // 1. LocalStorage update (لكافة المستخدمين والضيوف)
   try {
     localStorage.setItem(LOCAL_STORAGE_ACADEMIC_PROFILE, JSON.stringify(profile));
   } catch (e) {}
 
-  // 2. Firestore Cloud sync
+  // 2. Firestore Cloud sync (فقط إذا وجد حساب مستخدم مسجل معزول بـ userId)
+  if (!userId) return;
+
   try {
-    const effectiveUid = userId || "guest_academic_profile";
-    const profileDocRef = doc(db, "academic_profiles", effectiveUid);
+    const profileDocRef = doc(db, "academic_profiles", userId);
     await setDoc(profileDocRef, { ...profile, updatedAt: new Date().toISOString() }, { merge: true });
 
-    if (userId) {
-      const userDocRef = doc(db, "users", userId);
-      await setDoc(userDocRef, { academicProfile: profile }, { merge: true });
-    }
+    const userDocRef = doc(db, "users", userId);
+    await setDoc(userDocRef, { academicProfile: profile }, { merge: true });
   } catch (err) {
     console.warn("Firestore academic profile save warning:", err);
   }
@@ -100,13 +99,15 @@ export function subscribeStudentProfile(
   // Emit current local state
   onUpdate(getStoredStudentProfile());
 
+  if (!userId) {
+    return () => {};
+  }
+
   let unsubGlobal: (() => void) | null = null;
   let unsubUser: (() => void) | null = null;
 
-  const effectiveUid = userId || "guest_academic_profile";
-
   try {
-    const profileDocRef = doc(db, "academic_profiles", effectiveUid);
+    const profileDocRef = doc(db, "academic_profiles", userId);
     unsubGlobal = onSnapshot(
       profileDocRef,
       (snap) => {
@@ -128,25 +129,23 @@ export function subscribeStudentProfile(
       (err) => console.warn("Firestore academic profile listener warning:", err)
     );
 
-    if (userId) {
-      const userDocRef = doc(db, "users", userId);
-      unsubUser = onSnapshot(
-        userDocRef,
-        (snap) => {
-          if (snap.exists()) {
-            const data = snap.data();
-            if (data.academicProfile) {
-              const prof = data.academicProfile as StudentAcademicProfile;
-              try {
-                localStorage.setItem(LOCAL_STORAGE_ACADEMIC_PROFILE, JSON.stringify(prof));
-              } catch {}
-              onUpdate(prof);
-            }
+    const userDocRef = doc(db, "users", userId);
+    unsubUser = onSnapshot(
+      userDocRef,
+      (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data.academicProfile) {
+            const prof = data.academicProfile as StudentAcademicProfile;
+            try {
+              localStorage.setItem(LOCAL_STORAGE_ACADEMIC_PROFILE, JSON.stringify(prof));
+            } catch {}
+            onUpdate(prof);
           }
-        },
-        (err) => console.warn("User document profile listener warning:", err)
-      );
-    }
+        }
+      },
+      (err) => console.warn("User document profile listener warning:", err)
+    );
   } catch (e) {}
 
   return () => {

@@ -3,7 +3,7 @@ import { motion } from "motion/react";
 import { useSearchParams } from "react-router-dom";
 import { 
   BookOpen, Atom, Compass, FileText, LayoutList, Share2, Layers, 
-  ArrowRight, Sparkles, ChevronLeft, ExternalLink, Trash2, Plus 
+  ArrowRight, Sparkles, ChevronLeft, ExternalLink, Trash2, Plus, CheckCircle2 
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { AddContentModal } from "@/components/AddContentModal";
@@ -20,6 +20,9 @@ import {
   filterSubjectsForProfile, 
   StudentAcademicProfile 
 } from "@/lib/subjectsData";
+import { subscribeLessons, subscribeUnits, SubjectUnitsMap, SubjectUnit } from "@/lib/lessonsData";
+import { subscribeLessonResources, LessonResourcesMap } from "@/lib/lessonResourcesService";
+import { subscribeSubjectNotebookLmMap, SubjectNotebookLmMap } from "@/lib/subjectNotebookLmService";
 
 interface MainCategory {
   id: string;
@@ -96,15 +99,16 @@ const bookFilters: FilterType[] = [
   { id: "school", label: "كتب مدرسية", subtitle: "الكتب الرسمية المقررة وزارياً وأزهرياً", icon: BookOpen },
   { id: "notes", label: "ملازم دراسية", subtitle: "ملازم وشروحات الأساتذة وأسئلة التدريب", icon: FileText },
   { id: "summaries", label: "ملخصات مراجعة", subtitle: "كبسولات وملخصات سريعة قبل الامتحانات", icon: LayoutList },
-  { id: "mindmaps", label: "خرائط ذهنية", subtitle: "مخططات بصرية لتسهيل الحفظ والفهم", icon: Share2 },
-  { id: "flashcards", label: "فلاش كارد", subtitle: "بطاقات التكرار المتباعد للمراجعة", icon: Layers }
+  { id: "mindmaps", label: "خرائط ذهنية", subtitle: "مخططات بصرية لمادة الشرح لتسهيل الفهم", icon: Share2 },
+  { id: "notebooklm", label: "معلّم AI (NotebookLM 🤖)", subtitle: "المساعد الذكي لإنشاء خرائط وملاحظات صوتية لمادة الشرح", icon: Sparkles },
+  { id: "flashcards", label: "فلاش كارد", subtitle: "بطاقات التكرار المتباعد للمراجعة والتدريب", icon: Layers }
 ];
 
 const defaultBooks: BookResource[] = [
   {
     id: "b1",
-    title: "ملزمة الفيزياء العميقة الشاملة",
-    subtitle: "الفصل الدراسي الأول - الكهربية والفيزياء الحديثة",
+    title: "مذكرة الفيزياء الشاملة - الكهربية",
+    subtitle: "شرح قانون أوم وقوانين كيرشوف وتطبيقات الامتحان",
     subjectId: "physics",
     category: "notes",
     author: "أ. محمد عبدالسلام",
@@ -156,7 +160,16 @@ export default function Books() {
   const [selectedFilter, setSelectedFilter] = useState<FilterType | null>(null);
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
 
+  // Interactive Curriculum & Lesson Scope Wizard
+  const [unitsMap, setUnitsMap] = useState<SubjectUnitsMap>({});
+  const [interactiveStep, setInteractiveStep] = useState<"section" | "scope" | "unit" | "lesson">("section");
+  const [selectedUnit, setSelectedUnit] = useState<SubjectUnit | null>(null);
+  const [selectedLessonScope, setSelectedLessonScope] = useState<string>("all");
+
   const [academicProfile, setAcademicProfile] = useState<StudentAcademicProfile | null>(null);
+  const [lessonsMap, setLessonsMap] = useState<Record<string, string[]>>({});
+
+  const [lessonResourcesMap, setLessonResourcesMap] = useState<LessonResourcesMap>({});
 
   useEffect(() => {
     const unsubProf = subscribeStudentProfile(user?.uid, (prof) => {
@@ -174,10 +187,25 @@ export default function Books() {
       setCustomBooks(approved);
     });
 
+    const unsubLessons = subscribeLessons((map) => {
+      setLessonsMap(map);
+    });
+
+    const unsubUnits = subscribeUnits((uMap) => {
+      setUnitsMap(uMap);
+    });
+
+    const unsubResources = subscribeLessonResources((resMap) => {
+      setLessonResourcesMap(resMap);
+    });
+
     return () => {
       unsubProf();
       unsubDeleted();
       unsubCustom();
+      unsubLessons();
+      unsubUnits();
+      unsubResources();
     };
   }, [user?.uid]);
 
@@ -205,6 +233,7 @@ export default function Books() {
     const categoryParam = searchParams.get("category");
     const subjectParam = searchParams.get("subject");
     const filterParam = searchParams.get("filter");
+    const lessonParam = searchParams.get("lesson");
 
     let cat: MainCategory | null = null;
     let sub: SubjectItem | null = null;
@@ -223,168 +252,148 @@ export default function Books() {
       filterItem = bookFilters.find((f) => f.id === filterParam) || null;
     }
 
-    setSelectedCategory(cat);
-    setSelectedSubject(sub);
-    setSelectedFilter(filterItem);
-
-    if (sub && filterItem) {
-      setStep(4);
-    } else if (sub) {
-      setStep(3);
-    } else if (cat) {
-      setStep(2);
-    } else {
-      setStep(1);
+    if (lessonParam) {
+      setSelectedLessonScope(lessonParam);
     }
+
+    setSelectedCategory((prev) => (prev?.id === cat?.id ? prev : cat));
+    setSelectedSubject((prev) => (prev?.id === sub?.id ? prev : sub));
+    setSelectedFilter((prev) => (prev?.id === filterItem?.id ? prev : filterItem));
+
+    const targetStep = (sub && (filterItem || lessonParam)) ? 4 : sub ? 3 : cat ? 2 : 1;
+    setStep((prev) => (prev === targetStep ? prev : targetStep));
   }, [searchParams]);
+
+  const [subjectNotebookLmMap, setSubjectNotebookLmMap] = useState<SubjectNotebookLmMap>({});
+
+  useEffect(() => {
+    const unsubNb = subscribeSubjectNotebookLmMap((map) => {
+      setSubjectNotebookLmMap(map);
+    });
+    return () => unsubNb();
+  }, []);
 
   const handleSelectCategory = (cat: MainCategory) => {
     setSearchParams({ category: cat.id });
   };
 
   const handleSelectSubject = (sub: SubjectItem) => {
+    setSelectedSubject(sub);
+    setInteractiveStep("section");
     setSearchParams({ category: sub.categoryId, subject: sub.id });
   };
 
   const handleSelectFilterType = (filterItem: FilterType) => {
-    if (!selectedSubject) {
-      setSearchParams({ filter: filterItem.id });
+    if (filterItem.id === "notebooklm") {
+      const customUrl = selectedSubject ? subjectNotebookLmMap[selectedSubject.id] : null;
+      window.open(customUrl || "https://notebooklm.google.com/", "_blank", "noopener,noreferrer");
       return;
     }
-    setSearchParams({
-      category: selectedSubject.categoryId,
-      subject: selectedSubject.id,
-      filter: filterItem.id
-    });
-  };
-
-  const handleGoBack = () => {
-    if (step === 4) {
+    setSelectedFilter(filterItem);
+    setInteractiveStep("scope");
+    if (selectedSubject) {
       setSearchParams({
-        category: selectedCategory?.id || "",
-        subject: selectedSubject?.id || ""
+        category: selectedSubject.categoryId,
+        subject: selectedSubject.id,
+        filter: filterItem.id
       });
-    } else if (step === 3) {
-      setSearchParams({ category: selectedCategory?.id || "" });
-    } else if (step === 2) {
-      setSearchParams({});
     }
   };
 
-  const handleResetAll = () => {
+  const handleResetFilters = () => {
+    setSelectedCategory(null);
+    setSelectedSubject(null);
+    setSelectedFilter(null);
+    setSelectedLessonScope("all");
+    setInteractiveStep("section");
     setSearchParams({});
   };
 
-  const handleDeleteBook = async (id: string, e: any) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (window.confirm("هل أنت تأكد من رغبتك في حذف هذا الكتاب/الملزمة نهائياً؟")) {
-      await markItemAsDeleted(id, "book", user?.uid, true);
+  const handleDeleteBook = async (bookId: string) => {
+    if (!user?.uid) return;
+    try {
+      await markItemAsDeleted(bookId, "book", user.uid);
+      setDeletedBookIds((prev) => [...prev, bookId]);
+    } catch (e) {
+      console.error("Error deleting book item:", e);
     }
   };
 
-  // Filter books matching current selection
-  const finalFilteredBooks = allBooks.filter((b) => {
-    const matchesSubject =
-      !selectedSubject ||
-      b.subjectId === selectedSubject.id ||
-      b.subjectId === selectedSubject.title ||
-      (selectedSubject.id === "physics" && (b.subjectId === "الفيزياء" || b.subjectId === "physics")) ||
-      (selectedSubject.id === "chemistry" && (b.subjectId === "الكيمياء" || b.subjectId === "chemistry")) ||
-      (selectedSubject.id === "math" && (b.subjectId === "الرياضيات" || b.subjectId === "math")) ||
-      (selectedSubject.id === "biology" && (b.subjectId === "الأحياء" || b.subjectId === "biology")) ||
-      (selectedSubject.id === "grammar" && (b.subjectId === "النحو" || b.subjectId === "grammar"));
-
-    const matchesFilter = !selectedFilter || b.category === selectedFilter.id || selectedFilter.id === "school";
-
-    return matchesSubject && matchesFilter;
+  const filteredBooks = allBooks.filter((book) => {
+    const matchesSubject = selectedSubject ? book.subjectId === selectedSubject.id : true;
+    const matchesCategory = selectedFilter ? book.category === selectedFilter.id : true;
+    const matchesLesson = selectedLessonScope && selectedLessonScope !== "all"
+      ? book.title.includes(selectedLessonScope) || book.subtitle.includes(selectedLessonScope)
+      : true;
+    return matchesSubject && matchesCategory && matchesLesson;
   });
 
   return (
-    <div className="flex flex-col gap-stack-lg min-h-[75vh]">
-      {/* Header & Step Wizard Indicator */}
-      <div className="flex justify-between items-center flex-wrap gap-4 border-b border-outline-variant/10 pb-4">
+    <div className="flex flex-col gap-8 min-h-[80vh] text-right">
+      {/* Top Header */}
+      <div className="flex justify-between items-center flex-wrap gap-4 border-b border-outline-variant/10 pb-6">
         <div>
-          <h1 className="text-headline-lg font-headline-lg text-on-surface flex items-center gap-2">
-            <BookOpen className="w-8 h-8 text-primary" />
-            <span>مكتبة وثاق للكتب والملازم والخرائط الذهنية</span>
-          </h1>
+          <div className="flex items-center gap-2 bg-primary/10 border border-primary/20 text-primary px-3 py-1 rounded-full text-xs font-bold w-fit mb-2">
+            <BookOpen className="w-4 h-4" />
+            <span>مكتبة وثاق الرقمية والملازم 📚</span>
+          </div>
+          <h1 className="text-display-ar font-bold text-on-surface">مكتبة الكتب، الملازم، والخرائط الذهنية</h1>
           <p className="text-body-md text-on-surface-variant font-light mt-1">
-            استعرض الكتب الرسمية والملازم والخرائط الذهنية حسب شعبتك ومادتك الدراسية.
+            استعرض المراجع الرسمية، ملازم المعلمين المعتمدين، والخرائط الذهنية حسب شعبتك ومادتك الدراسية.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          {step > 1 && (
-            <button
-              onClick={handleGoBack}
-              className="bg-surface-container-high border border-outline-variant/30 text-on-surface hover:text-primary transition-colors px-3 py-2 rounded-xl text-label-sm font-medium flex items-center gap-1.5 cursor-pointer"
-            >
-              <ArrowRight className="w-4 h-4" />
-              <span>رجوع للخطوة السابقة</span>
-            </button>
-          )}
-
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="bg-primary text-on-primary hover:bg-primary/90 transition-all px-4 py-2.5 rounded-xl text-label-sm font-medium flex items-center gap-1.5 cursor-pointer shadow-lg shadow-primary/20"
-          >
-            <Plus className="w-4 h-4" />
-            <span>إضافة كتاب / ملزمة جديدة</span>
-          </button>
-        </div>
+        <button
+          onClick={() => setIsAddModalOpen(true)}
+          className="bg-primary text-on-primary hover:bg-primary/90 px-5 py-3 rounded-2xl font-bold text-label-sm flex items-center gap-2 transition-all shadow-lg shadow-primary/20 cursor-pointer"
+        >
+          <Plus className="w-5 h-5" />
+          <span>إضافة كتاب / ملزمة جديدة ➕</span>
+        </button>
       </div>
 
-      {/* Step Breadcrumbs Progress */}
-      <div className="flex items-center gap-2 overflow-x-auto py-1 text-label-sm">
-        <button
-          onClick={handleResetAll}
-          className={`hover:text-primary transition-colors flex items-center gap-1 cursor-pointer ${
-            step === 1 ? "text-primary font-bold" : "text-on-surface-variant"
-          }`}
-        >
-          <BookOpen className="w-4 h-4" />
-          <span>الأقسام الأكاديمية</span>
+      {/* Dynamic Breadcrumbs */}
+      <div className="flex items-center gap-2 text-xs font-medium text-on-surface-variant flex-wrap bg-surface-container-low p-3 rounded-2xl border border-outline-variant/20">
+        <button onClick={handleResetFilters} className="hover:text-primary transition-colors cursor-pointer font-bold">
+          المكتبة الرئيسية
         </button>
-
         {selectedCategory && (
           <>
             <ChevronLeft className="w-4 h-4 text-outline-variant shrink-0" />
             <button
               onClick={() => setSearchParams({ category: selectedCategory.id })}
-              className={`hover:text-primary transition-colors cursor-pointer ${
-                step === 2 ? "text-primary font-bold" : "text-on-surface-variant"
-              }`}
+              className="hover:text-primary transition-colors cursor-pointer"
             >
               {selectedCategory.title}
             </button>
           </>
         )}
-
         {selectedSubject && (
           <>
             <ChevronLeft className="w-4 h-4 text-outline-variant shrink-0" />
             <button
-              onClick={() => setSearchParams({ category: selectedCategory?.id || "", subject: selectedSubject.id })}
-              className={`hover:text-primary transition-colors cursor-pointer ${
-                step === 3 ? "text-primary font-bold" : "text-on-surface-variant"
-              }`}
+              onClick={() => setSearchParams({ category: selectedSubject.categoryId, subject: selectedSubject.id })}
+              className="hover:text-primary transition-colors cursor-pointer"
             >
-              مادة: {selectedSubject.title}
+              {selectedSubject.title}
             </button>
           </>
         )}
-
         {selectedFilter && (
           <>
             <ChevronLeft className="w-4 h-4 text-outline-variant shrink-0" />
             <span className="text-primary font-bold">{selectedFilter.label}</span>
           </>
         )}
+        {selectedLessonScope && selectedLessonScope !== "all" && (
+          <>
+            <ChevronLeft className="w-4 h-4 text-outline-variant shrink-0" />
+            <span className="text-emerald-400 font-bold">الدرس: {selectedLessonScope}</span>
+          </>
+        )}
       </div>
 
-      {/* STEP 1: Main Category Selection (العلمية، العربية، الشرعية) */}
+      {/* STEP 1: Main Category Selection */}
       {step === 1 && (
         <div className="flex flex-col gap-6 my-auto">
           <div className="text-center max-w-xl mx-auto">
@@ -431,7 +440,7 @@ export default function Books() {
         </div>
       )}
 
-      {/* STEP 2: Subject Selection (الفيزياء، الكيمياء، النحو...) */}
+      {/* STEP 2: Subject Selection */}
       {step === 2 && selectedCategory && (
         <div className="flex flex-col gap-6">
           <div className="bg-surface-container-low border border-outline-variant/30 rounded-3xl p-6 flex flex-col gap-2">
@@ -477,49 +486,255 @@ export default function Books() {
         </div>
       )}
 
-      {/* STEP 3: Reference Type Selection (كتب، ملازم، ملخصات، خرائط ذهنية، فلاش كارد) */}
+      {/* STEP 3: Reference Type & Interactive Curriculum/Lesson Scope Wizard */}
       {step === 3 && selectedSubject && (
         <div className="flex flex-col gap-6">
-          <div className="bg-surface-container-low border border-outline-variant/30 rounded-3xl p-6 flex flex-col gap-2">
-            <h2 className="text-headline-md font-bold text-on-surface">قسم المراجع والملازم لمادة ({selectedSubject.title})</h2>
-            <p className="text-body-md text-on-surface-variant font-light">اختر نوع المصدر الأكاديمي المطلوب لتصفح الملفات.</p>
-          </div>
+          {/* Sub-step 1: Select Section Type */}
+          {interactiveStep === "section" && (
+            <div className="flex flex-col gap-6">
+              <div className="bg-surface-container-low border border-outline-variant/30 rounded-3xl p-6 flex flex-col gap-2">
+                <h2 className="text-headline-md font-bold text-on-surface">قسم المراجع والملازم لمادة ({selectedSubject.title})</h2>
+                <p className="text-body-md text-on-surface-variant font-light">اختر نوع المصدر الأكاديمي المطلوب لتصفح الملفات.</p>
+              </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-            {bookFilters.map((filter, idx) => {
-              const Icon = filter.icon;
-              return (
-                <motion.div
-                  key={filter.id}
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.25, delay: idx * 0.05 }}
-                  onClick={() => handleSelectFilterType(filter)}
-                  className="group bg-surface-container border border-outline-variant/30 hover:border-primary rounded-2xl p-6 flex flex-col justify-between gap-4 cursor-pointer hover:shadow-xl transition-all"
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                {bookFilters.map((filter, idx) => {
+                  const Icon = filter.icon;
+                  return (
+                    <motion.div
+                      key={filter.id}
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.25, delay: idx * 0.05 }}
+                      onClick={() => handleSelectFilterType(filter)}
+                      className={`group border rounded-2xl p-6 flex flex-col justify-between gap-4 cursor-pointer hover:shadow-xl transition-all ${
+                        filter.id === "notebooklm"
+                          ? "bg-gradient-to-br from-emerald-500/10 via-primary/10 to-blue-500/10 border-primary/40 hover:border-primary shadow-lg"
+                          : "bg-surface-container border-outline-variant/30 hover:border-primary"
+                      }`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center border group-hover:scale-110 transition-transform ${
+                          filter.id === "notebooklm" ? "bg-primary text-on-primary border-primary shadow-md" : "bg-primary/10 text-primary border-primary/20"
+                        }`}>
+                          <Icon className="w-6 h-6" />
+                        </div>
+
+                        {filter.id === "notebooklm" && (
+                          <span className="bg-primary text-on-primary text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm">
+                            Google AI 🤖
+                          </span>
+                        )}
+                      </div>
+
+                      <div>
+                        <h3 className="font-bold text-body-lg text-on-surface group-hover:text-primary transition-colors">
+                          {filter.label}
+                        </h3>
+                        <p className="text-xs text-on-surface-variant mt-1 font-light">
+                          {filter.subtitle}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center justify-between text-xs text-primary pt-3 border-t border-outline-variant/10 font-bold">
+                        <span>{filter.id === "notebooklm" ? "افتح معلّم AI 🚀" : "تصفح الملفات"}</span>
+                        <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Sub-step 2: Question: Full Curriculum or Specific Lesson */}
+          {interactiveStep === "scope" && selectedFilter && (
+            <div className="flex flex-col gap-6 max-w-3xl mx-auto w-full">
+              <div className="text-center">
+                <span className="text-xs font-bold text-primary bg-primary/10 px-3 py-1 rounded-full border border-primary/20">
+                  السؤال التفاعلي 🎯
+                </span>
+                <h2 className="text-headline-lg font-bold text-on-surface mt-3 mb-1">
+                  نطاق مادة ({selectedSubject.title}) - قسم ({selectedFilter.label})
+                </h2>
+                <p className="text-body-md text-on-surface-variant font-light">
+                  هل تريد تصفح كامل ملفات المنهج الشامل أم الاستعراض حسب درس وباب معين؟
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-2">
+                <button
+                  onClick={() => {
+                    setSelectedLessonScope("all");
+                    setStep(4);
+                  }}
+                  className="group p-8 rounded-3xl bg-surface-container-low border border-outline-variant/30 hover:border-primary hover:bg-surface-container transition-all cursor-pointer shadow-xl text-right flex flex-col justify-between h-[200px]"
                 >
                   <div className="flex justify-between items-start">
-                    <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center border border-primary/20 group-hover:scale-110 transition-transform">
-                      <Icon className="w-6 h-6" />
-                    </div>
+                    <span className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center text-xl font-bold border border-primary/20">
+                      🌐
+                    </span>
+                    <CheckCircle2 className="w-5 h-5 text-primary opacity-40 group-hover:opacity-100 transition-opacity" />
                   </div>
 
                   <div>
-                    <h3 className="font-bold text-body-lg text-on-surface group-hover:text-primary transition-colors">
-                      {filter.label}
+                    <h3 className="text-headline-md font-bold text-on-surface group-hover:text-primary transition-colors">
+                      كامل المنهج الشامل
                     </h3>
                     <p className="text-xs text-on-surface-variant mt-1 font-light">
-                      {filter.subtitle}
+                      عرض جميع الملازم والكتب الخاصة بهذه المادة دفعة واحدة دون تقييد بدرس
                     </p>
                   </div>
+                </button>
 
-                  <div className="flex items-center justify-between text-xs text-primary pt-3 border-t border-outline-variant/10 font-bold">
-                    <span>تصفح الملفات</span>
-                    <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                <button
+                  onClick={() => setInteractiveStep("unit")}
+                  className="group p-8 rounded-3xl bg-surface-container-low border border-outline-variant/30 hover:border-primary hover:bg-surface-container transition-all cursor-pointer shadow-xl text-right flex flex-col justify-between h-[200px]"
+                >
+                  <div className="flex justify-between items-start">
+                    <span className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-xl font-bold border border-emerald-500/20">
+                      🎯
+                    </span>
+                    <ChevronLeft className="w-5 h-5 text-emerald-400 group-hover:-translate-x-1 transition-transform" />
                   </div>
-                </motion.div>
-              );
-            })}
-          </div>
+
+                  <div>
+                    <h3 className="text-headline-md font-bold text-on-surface group-hover:text-emerald-400 transition-colors">
+                      تحديد درس وباب معين
+                    </h3>
+                    <p className="text-xs text-on-surface-variant mt-1 font-light">
+                      استعراض الأبواب والفصول الأكاديمية لاختيار الدرس المطلوب بتركيز
+                    </p>
+                  </div>
+                </button>
+              </div>
+
+              <button
+                onClick={() => setInteractiveStep("section")}
+                className="text-xs text-on-surface-variant hover:text-primary mx-auto flex items-center gap-1 font-bold mt-2"
+              >
+                <span>العودة لاختيار قسم آخر</span>
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {/* Sub-step 3: Select Unit / Chapter */}
+          {interactiveStep === "unit" && selectedSubject && (
+            <div className="flex flex-col gap-6">
+              <div className="flex justify-between items-center border-b border-outline-variant/10 pb-4">
+                <div>
+                  <span className="text-xs font-bold text-primary bg-primary/10 px-3 py-1 rounded-full border border-primary/20">
+                    الخطوة 3.1: تحديد الباب
+                  </span>
+                  <h2 className="text-headline-lg font-bold text-on-surface mt-2">
+                    اختر الباب الأكاديمي لمادة ({selectedSubject.title})
+                  </h2>
+                </div>
+
+                <button
+                  onClick={() => setInteractiveStep("scope")}
+                  className="text-label-sm text-primary hover:underline flex items-center gap-1 font-bold cursor-pointer"
+                >
+                  <span>رجوع للخيارات</span>
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {(unitsMap[selectedSubject.id] || []).map((unit) => (
+                  <button
+                    key={unit.id}
+                    onClick={() => {
+                      setSelectedUnit(unit);
+                      setInteractiveStep("lesson");
+                    }}
+                    className="group text-right p-6 rounded-2xl bg-surface-container-low border border-outline-variant/30 hover:border-primary hover:bg-surface-container transition-all cursor-pointer shadow-lg flex justify-between items-center"
+                  >
+                    <div>
+                      <h3 className="text-headline-md font-bold text-on-surface group-hover:text-primary transition-colors mb-1">
+                        {unit.unitTitle}
+                      </h3>
+                      <p className="text-label-sm text-on-surface-variant font-light">
+                        يحتوي على {(unit.lessons || []).length} دروس مقررة
+                      </p>
+                    </div>
+                    <ChevronLeft className="w-5 h-5 text-primary group-hover:-translate-x-1 transition-transform" />
+                  </button>
+                ))}
+              </div>
+
+              {(!unitsMap[selectedSubject.id] || unitsMap[selectedSubject.id].length === 0) && (
+                <div className="p-8 text-center bg-surface-container rounded-2xl border border-outline-variant/20 text-on-surface-variant text-sm font-light flex flex-col items-center gap-3">
+                  <p>لم يتم إضافة أبواب أو دروس لـ ({selectedSubject.title}) من لوحة التحكم بعد.</p>
+                  <button
+                    onClick={() => {
+                      setSelectedLessonScope("all");
+                      setStep(4);
+                    }}
+                    className="bg-primary text-on-primary px-5 py-2.5 rounded-xl font-bold text-xs"
+                  >
+                    عرض كامل المنهج المتاح الآن 🌐
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Sub-step 4: Select Specific Lesson */}
+          {interactiveStep === "lesson" && selectedUnit && (
+            <div className="flex flex-col gap-6">
+              <div className="flex justify-between items-center border-b border-outline-variant/10 pb-4">
+                <div>
+                  <span className="text-xs font-bold text-primary bg-primary/10 px-3 py-1 rounded-full border border-primary/20">
+                    الخطوة 3.2: تحديد الدرس
+                  </span>
+                  <h2 className="text-headline-lg font-bold text-on-surface mt-2">
+                    اختر الدرس المحدد في ({selectedUnit.unitTitle})
+                  </h2>
+                </div>
+
+                <button
+                  onClick={() => setInteractiveStep("unit")}
+                  className="text-label-sm text-primary hover:underline flex items-center gap-1 font-bold cursor-pointer"
+                >
+                  <span>العودة لاختيار باب آخر</span>
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {selectedUnit.lessons.map((lesson, idx) => (
+                  <button
+                    key={lesson + idx}
+                    onClick={() => {
+                      setSelectedLessonScope(lesson);
+                      setStep(4);
+                      if (selectedSubject && selectedFilter) {
+                        setSearchParams({
+                          category: selectedSubject.categoryId,
+                          subject: selectedSubject.id,
+                          filter: selectedFilter.id,
+                          lesson: lesson
+                        });
+                      }
+                    }}
+                    className="group text-right p-6 rounded-2xl bg-surface-container-low border border-outline-variant/30 hover:border-primary hover:bg-surface-container transition-all cursor-pointer shadow-lg flex justify-between items-center"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="w-8 h-8 rounded-xl bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0 border border-primary/20">
+                        {idx + 1}
+                      </span>
+                      <h3 className="text-headline-md font-bold text-on-surface group-hover:text-primary transition-colors">
+                        {lesson}
+                      </h3>
+                    </div>
+                    <ChevronLeft className="w-5 h-5 text-primary group-hover:-translate-x-1 transition-transform" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -536,62 +751,174 @@ export default function Books() {
                 <h3 className="text-headline-md font-bold text-on-surface">
                   {selectedFilter?.label || "جميع الملازم والكتب"} - مادة {selectedSubject?.title}
                 </h3>
-                <p className="text-xs text-on-surface-variant mt-1">اضغط على أي ملف لفتحه مباشرة عبر Google Drive.</p>
+                <p className="text-xs text-on-surface-variant mt-1">
+                  نطاق المحتوى: {selectedLessonScope === "all" ? "كامل المنهج الشامل 🌐" : `الدرس: ${selectedLessonScope} 🎯`}
+                </p>
               </div>
+
+              <button
+                onClick={() => {
+                  setStep(3);
+                  setInteractiveStep("section");
+                }}
+                className="text-label-sm text-primary hover:underline flex items-center gap-1 font-bold cursor-pointer"
+              >
+                <span>تغيير القسم أو الدرس</span>
+                <ChevronLeft className="w-4 h-4" />
+              </button>
             </div>
 
-            {finalFilteredBooks.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {finalFilteredBooks.map((book, idx) => (
-                  <motion.a
-                    key={book.id || idx}
-                    href={book.linkUrl || "https://drive.google.com"}
-                    target="_blank"
-                    rel="noreferrer"
-                    initial={{ opacity: 0, y: 15 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: idx * 0.05 }}
-                    className="group flex flex-col bg-surface-container-low rounded-2xl border border-outline-variant/30 overflow-hidden hover:border-primary transition-all shadow-lg relative"
+            {/* Lesson Specific Attachments Banners (PDF Summary, Mindmap Image, Flashcards CSV) */}
+            {(() => {
+              const lessonKey = selectedSubject && selectedLessonScope !== "all" ? `${selectedSubject.id}__${selectedLessonScope}` : null;
+              const lessonRes = lessonKey ? lessonResourcesMap[lessonKey] : null;
+
+              if (!lessonRes) return null;
+
+              return (
+                <div className="flex flex-col gap-4">
+                  {lessonRes.pdfUrl && (selectedFilter?.id === "summaries" || !selectedFilter) && (
+                    <div className="bg-amber-500/10 border border-amber-500/30 rounded-3xl p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-xl text-right">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-xl shrink-0">
+                          📄
+                        </div>
+                        <div>
+                          <h4 className="text-headline-md font-bold text-on-surface">ملخص الـ PDF المباشر لدرس ({selectedLessonScope})</h4>
+                          <p className="text-xs text-on-surface-variant font-light mt-0.5">تم اعتماده وربطه بدرس المنهج من لوحة التحكم</p>
+                        </div>
+                      </div>
+                      <a
+                        href={lessonRes.pdfUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-amber-500 text-black hover:bg-amber-400 px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shadow-md shrink-0 cursor-pointer"
+                      >
+                        <span>فتح ملف الـ PDF</span>
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                    </div>
+                  )}
+
+                  {lessonRes.mindmapImageUrl && (selectedFilter?.id === "mindmaps" || !selectedFilter) && (
+                    <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-3xl p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-xl text-right">
+                      <div className="flex items-center gap-4">
+                        <img src={lessonRes.mindmapImageUrl} alt="خريطة ذهنية" className="w-20 h-20 rounded-2xl object-cover border border-emerald-500/30 shrink-0" />
+                        <div>
+                          <h4 className="text-headline-md font-bold text-on-surface">الخريطة الذهنية البصرية لدرس ({selectedLessonScope})</h4>
+                          <p className="text-xs text-on-surface-variant font-light mt-0.5">مخطط بصري تفاعلي يجمع كافة نقاط وقوانين الدرس</p>
+                        </div>
+                      </div>
+                      <a
+                        href={lessonRes.mindmapImageUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-emerald-500 text-black hover:bg-emerald-400 px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shadow-md shrink-0 cursor-pointer"
+                      >
+                        <span>عرض الصورة بالحجم الكامل</span>
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                    </div>
+                  )}
+
+                  {lessonRes.flashcardsCsvUrl && (selectedFilter?.id === "flashcards" || !selectedFilter) && (
+                    <div className="bg-blue-500/10 border border-blue-500/30 rounded-3xl p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-xl text-right">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-2xl bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-xl shrink-0">
+                          📊
+                        </div>
+                        <div>
+                          <h4 className="text-headline-md font-bold text-on-surface">ملف الـ CSV للفلاش كارد لدرس ({selectedLessonScope})</h4>
+                          <p className="text-xs text-on-surface-variant font-light mt-0.5">ملف مفاهيم وأسئلة الفلاش كارد الجاهز للتحميل والمراجعة</p>
+                        </div>
+                      </div>
+                      <a
+                        href={lessonRes.flashcardsCsvUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-blue-500 text-white hover:bg-blue-400 px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shadow-md shrink-0 cursor-pointer"
+                      >
+                        <span>تحميل ملف الـ CSV</span>
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {filteredBooks.length === 0 ? (
+              <div className="bg-surface-container-low border border-outline-variant/30 rounded-3xl p-12 text-center flex flex-col items-center gap-4">
+                <FileText className="w-12 h-12 text-on-surface-variant/40" />
+                <div>
+                  <h4 className="text-headline-md font-bold text-on-surface">لا توجد ملفات مرفوعة حالياً</h4>
+                  <p className="text-body-md text-on-surface-variant font-light mt-1">
+                    {selectedLessonScope !== "all"
+                      ? `لم يتم رفع كتب أو ملازم مخصصة لدرس (${selectedLessonScope}) بعد.`
+                      : "لم يتم رفع ملفات لهذا التخصص بعد. كن أول من يشارك ملزمة أو كتاباً!"}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsAddModalOpen(true)}
+                  className="bg-primary text-on-primary px-6 py-2.5 rounded-xl font-bold text-xs shadow-lg cursor-pointer"
+                >
+                  إضافة أول ملف لهذا الدرس الآن ➕
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredBooks.map((book) => (
+                  <motion.div
+                    key={book.id}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="group bg-surface-container border border-outline-variant/30 hover:border-primary/50 rounded-3xl overflow-hidden shadow-lg flex flex-col justify-between transition-all"
                   >
-                    <div className="aspect-[4/3] overflow-hidden relative">
+                    <div className="relative h-44 overflow-hidden bg-surface-container-high">
                       <img
                         src={book.image}
                         alt={book.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
-                      <span className="absolute top-3 left-3 bg-black/60 backdrop-blur-md text-white px-2 py-1 rounded-lg text-xs flex items-center gap-1">
-                        <ExternalLink className="w-3.5 h-3.5" /> Google Drive
-                      </span>
-
-                      {/* Direct Delete Button */}
-                      <button
-                        onClick={(e) => handleDeleteBook(book.id, e)}
-                        className="absolute top-3 right-3 bg-error/90 text-white p-2 rounded-xl shadow-lg hover:bg-error transition-all z-20 cursor-pointer"
-                        title="حذف هذا الكتاب أو الملزمة نهائياً"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-end p-4">
+                        <span className="bg-primary/90 text-on-primary text-[11px] font-bold px-3 py-1 rounded-full backdrop-blur-md">
+                          {book.author || "مصدر معتمد"}
+                        </span>
+                      </div>
                     </div>
 
-                    <div className="p-4 flex flex-col gap-1 text-right">
-                      <h3 className="text-body-lg font-bold text-on-surface group-hover:text-primary transition-colors">
+                    <div className="p-5 flex flex-col gap-2 flex-grow">
+                      <h4 className="text-headline-md font-bold text-on-surface line-clamp-1 group-hover:text-primary transition-colors">
                         {book.title}
-                      </h3>
-                      <p className="text-xs text-on-surface-variant opacity-80">{book.subtitle}</p>
-                      {book.author && (
-                        <span className="text-[11px] text-primary mt-1 font-medium">المصدر / الكاتب: {book.author}</span>
+                      </h4>
+                      <p className="text-xs text-on-surface-variant font-light line-clamp-2 leading-relaxed">
+                        {book.subtitle}
+                      </p>
+                    </div>
+
+                    <div className="p-5 pt-0 flex items-center justify-between gap-3 border-t border-outline-variant/10 mt-auto">
+                      <a
+                        href={book.linkUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-grow bg-surface-container-high hover:bg-primary hover:text-on-primary border border-outline-variant/30 p-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                      >
+                        <span>فتح الملف مباشرة</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+
+                      {userCustomBooks.some((cb) => cb.id === book.id) && (
+                        <button
+                          onClick={() => handleDeleteBook(book.id)}
+                          className="p-2.5 text-error hover:bg-error/10 border border-error/20 rounded-xl transition-colors cursor-pointer"
+                          title="حذف هذا الملف"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       )}
                     </div>
-                  </motion.a>
+                  </motion.div>
                 ))}
-              </div>
-            ) : (
-              <div className="py-16 flex flex-col items-center justify-center text-center gap-3 border border-dashed border-outline-variant/30 rounded-2xl bg-surface-container">
-                <BookOpen className="w-12 h-12 text-primary/40 mb-1" />
-                <h4 className="text-headline-md text-on-surface font-bold">لا يوجد ملازم أو كتب في هذا القسم حالياً</h4>
-                <p className="text-body-md text-on-surface-variant max-w-md">
-                  يمكنك إضافة كتاب أو ملزمة جديدة لهذه المادة عبر زر "+ إضافة كتاب / ملزمة جديدة" أعلى الصفحة.
-                </p>
               </div>
             )}
           </div>
@@ -602,8 +929,6 @@ export default function Books() {
       <AddContentModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
-        defaultContentType="book"
-        defaultSubject={selectedSubject?.id || "physics"}
       />
     </div>
   );

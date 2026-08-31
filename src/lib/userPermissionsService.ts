@@ -123,14 +123,15 @@ export function getUserPermissions(uid: string, email: string): UserPermissions 
   const map = getPermissionsMap();
   const key = email.toLowerCase();
   if (map[key]) {
-    const cached = map[key];
+    const cached = map[key] as UserPermissions;
     const isAdminRole = cached.role === "admin" || cached.canAccessAdmin === true;
+    const isTrustedPublisher = cached.role === "trusted_publisher" || cached.canDirectPublish === true;
     return {
       uid: cached.uid || uid,
       email: cached.email || email,
-      role: isAdminRole ? "admin" : (cached.role || "student"),
-      canDirectPublish: isAdminRole ? true : !!cached.canDirectPublish,
-      canAccessAdmin: isAdminRole ? true : !!cached.canAccessAdmin
+      role: isAdminRole ? "admin" : isTrustedPublisher ? "trusted_publisher" : "student",
+      canDirectPublish: isAdminRole || isTrustedPublisher,
+      canAccessAdmin: isAdminRole
     };
   }
 
@@ -159,23 +160,24 @@ export async function updateUserPermissions(
     email: email || current.email
   };
 
-  // 1. LocalStorage & IndexedDB
-  try {
-    const map = getPermissionsMap();
-    map[email.toLowerCase()] = updated;
-    savePermissionsMap(map);
-  } catch (err) {}
-
-  // 2. Cloud Firestore sync
+  // 1. Cloud Firestore sync FIRST (ensures server authorization)
   try {
     const userDocRef = doc(db, "users", uid || email);
     await setDoc(userDocRef, { permissions: updated, role: updated.role, canDirectPublish: updated.canDirectPublish, canAccessAdmin: updated.canAccessAdmin }, { merge: true });
 
     const globalUserDocRef = doc(db, "global_registered_users", uid || email);
     await setDoc(globalUserDocRef, { permissions: updated, role: updated.role, canDirectPublish: updated.canDirectPublish, canAccessAdmin: updated.canAccessAdmin }, { merge: true });
-  } catch (err) {
-    console.warn("Firestore permissions update warning:", err);
+  } catch (err: any) {
+    console.error("Firestore permissions update error:", err);
+    throw new Error("فشل تعديل الصلاحيات سحابياً (تتطلب صلاحية الأدمن المصرح له).");
   }
+
+  // 2. Save to LocalStorage & IndexedDB ONLY after Cloud Firestore succeeds
+  try {
+    const map = getPermissionsMap();
+    map[email.toLowerCase()] = updated;
+    savePermissionsMap(map);
+  } catch (err) {}
 
   return updated;
 }
@@ -224,10 +226,12 @@ export function subscribeUserPermissions(
               };
             }
             if (perm && email) {
+              const isServerAdmin = perm.role === "admin" || perm.canAccessAdmin === true;
+              const permToStore = { ...perm, isVerifiedServerAdmin: isServerAdmin };
               const map = getPermissionsMap();
-              map[email.toLowerCase()] = perm;
+              map[email.toLowerCase()] = permToStore;
               savePermissionsMap(map);
-              onUpdate(perm);
+              onUpdate(permToStore);
             }
           }
         },

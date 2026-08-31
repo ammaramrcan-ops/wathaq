@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { 
   User, Mail, Calendar, Award, BookOpen, Video, Layers, 
   MessageSquare, Trash2, ExternalLink, Plus, CheckCircle, Clock, 
-  LogOut, Edit3, Save, ShieldCheck, GraduationCap, Sparkles, Check
+  LogOut, Edit3, Save, ShieldCheck, GraduationCap, Sparkles, Check, Sun, Moon
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { 
@@ -38,6 +38,32 @@ export default function Profile() {
   const [isEditingName, setIsEditingName] = useState(false);
   const [newName, setNewName] = useState(user?.displayName || "");
   const [isWizardOpen, setIsWizardOpen] = useState(false);
+
+  // Theme State (Dark vs Light mode)
+  const [theme, setTheme] = useState<"dark" | "light">(() => {
+    try {
+      const saved = localStorage.getItem("wathaq_theme");
+      return (saved === "light" || saved === "dark") ? saved : "dark";
+    } catch {
+      return "dark";
+    }
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    if (theme === "light") {
+      document.documentElement.classList.add("light");
+    } else {
+      document.documentElement.classList.remove("light");
+    }
+    try {
+      localStorage.setItem("wathaq_theme", theme);
+    } catch (e) {}
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
+  };
 
   // Academic Profile State (Azhar vs General & Branch Selection)
   const [academicProfile, setAcademicProfile] = useState<StudentAcademicProfile>(getStoredStudentProfile());
@@ -183,7 +209,25 @@ export default function Profile() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 w-full md:w-auto">
+        <div className="flex items-center gap-3 w-full md:w-auto flex-wrap">
+          <button
+            onClick={toggleTheme}
+            className="bg-surface-container-high border border-outline-variant/30 text-on-surface hover:text-primary px-3.5 py-2.5 rounded-xl text-label-sm font-medium flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm"
+            title={theme === "dark" ? "التحويل للوضع الفاتح" : "التحويل للوضع الداكن"}
+          >
+            {theme === "dark" ? (
+              <>
+                <Sun className="w-4 h-4 text-amber-400" />
+                <span className="hidden sm:inline">الوضع الفاتح</span>
+              </>
+            ) : (
+              <>
+                <Moon className="w-4 h-4 text-indigo-500" />
+                <span className="hidden sm:inline">الوضع الداكن</span>
+              </>
+            )}
+          </button>
+
           {isAdminUser && (
             <Link
               to="/admin"

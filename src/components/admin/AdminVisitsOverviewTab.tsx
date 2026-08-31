@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { 
   Eye, Calendar, Activity, Repeat, Users, TrendingUp, Sparkles, RefreshCw, HardDrive, Clock 
 } from "lucide-react";
-import { subscribeVisitsAnalytics, VisitAnalytics } from "@/lib/visitService";
+import { subscribeVisitsAnalytics, resetVisitsAnalytics, VisitAnalytics } from "@/lib/visitService";
 
 interface AdminVisitsOverviewTabProps {
   approvedCount: number;
@@ -41,9 +41,25 @@ export function AdminVisitsOverviewTab({ approvedCount, pendingCount }: AdminVis
           </p>
         </div>
 
-        <div className="flex items-center gap-2 bg-primary/10 border border-primary/20 text-primary px-4 py-2 rounded-2xl text-xs font-bold">
-          <Sparkles className="w-4 h-4" />
-          <span>آخر تحديث: {analytics.lastVisitTimestamp || "الآن"}</span>
+        <div className="flex items-center gap-3 flex-wrap">
+          <button
+            onClick={async () => {
+              if (window.confirm("هل ترغب في إعادة تصفية عداد الزيارات الإجمالية إلى 7 زيارات؟")) {
+                const resetData = await resetVisitsAnalytics(7);
+                setAnalytics(resetData);
+              }
+            }}
+            className="bg-surface-container-high border border-outline-variant/30 text-on-surface hover:text-primary px-3.5 py-2 rounded-2xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+            title="تعديل وتصفير إجمالي الزيارات"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>تصفير العداد (7)</span>
+          </button>
+
+          <div className="flex items-center gap-2 bg-primary/10 border border-primary/20 text-primary px-4 py-2 rounded-2xl text-xs font-bold">
+            <Sparkles className="w-4 h-4" />
+            <span>آخر تحديث: {analytics.lastVisitTimestamp || "الآن"}</span>
+          </div>
         </div>
       </div>
 
