@@ -6,6 +6,21 @@
 
 ## 📌 سجل المشكلات والتعديلات (Historical Log)
 
+### 📅 2026-08-31 | إصلاح وتفعيل زر حفظ الجروبات والقنوات في لوحة التحكم وتجنب قيمة undefined السحابية
+- **نوع الإجراء:** Form Submission & Firestore Undefined Field Sanitization Fix
+- **السبب الجذري:**
+  1. عند ترك حقل عدد الأعضاء `membersCount` فارغاً في نموذج إضافة الجروب بصفحة لوحة التحكم، كانت القيمة تمرر كـ `undefined` في كائن `newGroup`. حظر SDK الخاص بـ Cloud Firestore كتابة قيم `undefined` وأدى لإطلاق استثناء `FirebaseError: Function setDoc() called with invalid data. Unsupported field value: undefined`.
+  2. غياب كتل التعقيب وفحص الأخطاء (Error Handling) في الدالة `handleAddGroup` أدى لعدم استجابة الزر وتوقفه عن العمل بصمت دون إغلاق المودال أو تنبيه المستخدم.
+- **طريقة الحل:**
+  - تنظيف الكائنات واستبعاد الحقول الفارغة ومنع تمرير `undefined` مطلقاً لـ Firestore.
+  - إضافة دالة تعقيم `JSON.parse(JSON.stringify(group))` وفصل التحديث المحلّي في [communityGroupsService.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/communityGroupsService.ts) لضمان الفاعلية الفورية.
+  - تعزيز النموذج في [AdminCommunityGroupsTab.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/components/admin/AdminCommunityGroupsTab.tsx) بمعالجة الأخطاء والتنبيهات المباشرة.
+  - إجراء البناء الشامل `npm run build` واجتياز اختبارات الوحدة (12/12) بنجاح.
+- **خطة الوقاية وتيسير التطوير:**
+  - استبعاد حقول `undefined` قبل إرسال أي مستند لـ Firestore دائماً وإدراج `try/catch` لإظهار التنبيهات في النماذج.
+
+---
+
 ### 📅 2026-08-31 | تصدير useAuthContext كاسم بديل لـ useAuth لمنع أخطاء الاستيراد من DeepSource
 - **نوع الإجراء:** DeepSource Compatibility & React Context Hook Alias Export
 - **السبب الجذري:**

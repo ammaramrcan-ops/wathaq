@@ -33,9 +33,12 @@ export function AdminCommunityGroupsTab() {
         title: title.trim(),
         platform,
         linkUrl: linkUrl.trim(),
-        description: description.trim() || "جروب وقناة دراسية موصى بها للطلاب.",
-        membersCount: membersCount.trim() || undefined
+        description: description.trim() || "جروب وقناة دراسية موصى بها للطلاب."
       };
+
+      if (membersCount.trim()) {
+        newGroup.membersCount = membersCount.trim();
+      }
 
       await addCommunityGroup(newGroup);
       setTitle("");
@@ -43,6 +46,9 @@ export function AdminCommunityGroupsTab() {
       setDescription("");
       setMembersCount("");
       setIsModalOpen(false);
+    } catch (err: unknown) {
+      console.error("Error adding community group:", err);
+      alert("حدث خطأ أثناء حفظ الجروب. يرجى المحاولة مرة أخرى.");
     } finally {
       setIsSubmitting(false);
     }
@@ -172,7 +178,7 @@ export function AdminCommunityGroupsTab() {
                 <label className="text-xs font-bold text-on-surface">منصة الجروب:</label>
                 <select
                   value={platform}
-                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setPlatform(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setPlatform(e.target.value as "telegram" | "whatsapp" | "facebook" | "discord" | "other")}
                   className="bg-surface-container-high border border-outline-variant/40 rounded-xl p-3 text-body-md text-on-surface font-bold"
                 >
                   <option value="telegram">تليجرام 📡</option>

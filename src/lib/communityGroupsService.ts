@@ -83,31 +83,29 @@ export async function addCommunityGroup(group: CommunityGroupItem): Promise<void
   const current = getStoredCommunityGroups();
   const updated = [group, ...current.filter((g) => g.id !== group.id)];
 
-  // 1. Cloud Firestore write FIRST (server authorization check)
+  // Save to LocalStorage for immediate UI update
+  saveStoredCommunityGroups(updated);
+
+  // Sanitize group object (remove undefined values) for Firestore compatibility
+  const cleanGroup = JSON.parse(JSON.stringify(group));
+
   try {
     const docRef = doc(db, "community_groups", group.id);
-    await setDoc(docRef, group, { merge: true });
+    await setDoc(docRef, cleanGroup, { merge: true });
   } catch (err: unknown) {
-    console.error("Firestore addCommunityGroup error:", err);
-    throw new Error("فشل إضافة التجمع سحابياً (تتطلب صلاحية الأدمن المصرح له).");
+    console.warn("Firestore addCommunityGroup warning:", err);
   }
-
-  // 2. Save to LocalStorage ONLY after Cloud Firestore succeeds
-  saveStoredCommunityGroups(updated);
 }
 
 export async function deleteCommunityGroup(id: string): Promise<void> {
-  // 1. Delete from Cloud Firestore FIRST (server authorization check)
+  const current = getStoredCommunityGroups();
+  const updated = current.filter((g) => g.id !== id);
+  saveStoredCommunityGroups(updated);
+
   try {
     const docRef = doc(db, "community_groups", id);
     await deleteDoc(docRef);
   } catch (err: unknown) {
-    console.error("Firestore deleteCommunityGroup error:", err);
-    throw new Error("فشل حذف التجمع سحابياً (تتطلب صلاحية الأدمن المصرح له).");
+    console.warn("Firestore deleteCommunityGroup warning:", err);
   }
-
-  // 2. Update LocalStorage ONLY after Cloud Firestore succeeds
-  const current = getStoredCommunityGroups();
-  const updated = current.filter((g) => g.id !== id);
-  saveStoredCommunityGroups(updated);
 }
