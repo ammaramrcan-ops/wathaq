@@ -230,12 +230,9 @@ interface DeleteRecord {
 }
 
 const isPermissionError = (err: unknown): boolean => {
-  if (err && typeof err === "object") {
-    const code = "code" in err ? String((err as { code?: unknown }).code) : "";
-    const msg = "message" in err ? String((err as { message?: unknown }).message) : "";
-    return code === "permission-denied" || msg.includes("permission");
-  }
-  return false;
+  const e = err as { code?: string; message?: string } | null | undefined;
+  const str = `${e?.code ?? ""}:${e?.message ?? ""}`;
+  return str.includes("permission");
 };
 
 // Helper: Cloud Firestore sync for global deleted item
