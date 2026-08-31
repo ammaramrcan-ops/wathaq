@@ -24,11 +24,14 @@ const IDB_NAME = "wathaq_durable_storage";
 const IDB_STORE = "deleted_items_store";
 const IDB_USERS_STORE = "users_store";
 
-function openIDB(): Promise<IDBDatabase> {
+const openIDB = (): Promise<IDBDatabase> => {
   return new Promise((resolve, reject) => {
-    if (!window.indexedDB) return reject("No IndexedDB");
+    if (!window.indexedDB) {
+      reject(new Error("No IndexedDB"));
+      return;
+    }
     const req = window.indexedDB.open(IDB_NAME, 2);
-    req.onupgradeneeded = (e: IDBVersionChangeEvent) => {
+    req.onupgradeneeded = () => {
       const idb = req.result;
       if (!idb.objectStoreNames.contains(IDB_STORE)) {
         idb.createObjectStore(IDB_STORE, { keyPath: "itemId" });
@@ -38,21 +41,21 @@ function openIDB(): Promise<IDBDatabase> {
       }
     };
     req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onerror = () => reject(req.error || new Error("IndexedDB request failed"));
   });
-}
+};
 
-export async function saveIDBDeletedItem(itemId: string, itemType: "video" | "book"): Promise<void> {
+export const saveIDBDeletedItem = async (itemId: string, itemType: "video" | "book"): Promise<void> => {
   try {
     const idb = await openIDB();
     const tx = idb.transaction(IDB_STORE, "readwrite");
     tx.objectStore(IDB_STORE).put({ itemId, itemType, timestamp: Date.now() });
-  } catch (e) {
-    // empty
+  } catch {
+    /* ignore IDB storage error */
   }
-}
+};
 
-export async function loadIDBDeletedItems(itemType: "video" | "book"): Promise<string[]> {
+export const loadIDBDeletedItems = async (itemType: "video" | "book"): Promise<string[]> => {
   try {
     const idb = await openIDB();
     return new Promise((resolve) => {
@@ -67,23 +70,23 @@ export async function loadIDBDeletedItems(itemType: "video" | "book"): Promise<s
       };
       req.onerror = () => resolve([]);
     });
-  } catch (e) {
+  } catch {
     return [];
   }
-}
+};
 
-export async function saveIDBUser(userRec: { uid: string; displayName: string; email: string; photoURL?: string | null; provider: string; lastLogin?: string }): Promise<void> {
+export const saveIDBUser = async (userRec: { uid: string; displayName: string; email: string; photoURL?: string | null; provider: string; lastLogin?: string }): Promise<void> => {
   try {
     if (!userRec.email) return;
     const idb = await openIDB();
     const tx = idb.transaction(IDB_USERS_STORE, "readwrite");
     tx.objectStore(IDB_USERS_STORE).put({ ...userRec, emailKey: userRec.email.toLowerCase() });
-  } catch (e) {
-    // empty
+  } catch {
+    /* ignore IDB user save error */
   }
-}
+};
 
-export async function loadIDBUsers(): Promise<unknown[]> {
+export const loadIDBUsers = async (): Promise<unknown[]> => {
   try {
     const idb = await openIDB();
     return new Promise((resolve) => {
@@ -92,23 +95,23 @@ export async function loadIDBUsers(): Promise<unknown[]> {
       req.onsuccess = () => resolve(req.result || []);
       req.onerror = () => resolve([]);
     });
-  } catch (e) {
+  } catch {
     return [];
   }
-}
+};
 
-export async function deleteIDBUser(email: string): Promise<void> {
+export const deleteIDBUser = async (email: string): Promise<void> => {
   try {
     if (!email) return;
     const idb = await openIDB();
     const tx = idb.transaction(IDB_USERS_STORE, "readwrite");
     tx.objectStore(IDB_USERS_STORE).delete(email.toLowerCase());
-  } catch (e) {
-    // empty
+  } catch {
+    /* ignore IDB user delete error */
   }
-}
+};
 
-export async function clearLocalUserSessionData(): Promise<void> {
+export const clearLocalUserSessionData = async (): Promise<void> => {
   try {
     localStorage.removeItem(LOCAL_STORAGE_CUSTOM);
     localStorage.removeItem(LOCAL_STORAGE_DELETED_VIDEOS);
@@ -118,8 +121,8 @@ export async function clearLocalUserSessionData(): Promise<void> {
     localStorage.removeItem("wathaq_users_permissions_map");
     localStorage.removeItem("wathaq_persisted_user");
     localStorage.removeItem("wathaq_registered_google_users");
-  } catch (e) {
-    // empty
+  } catch {
+    /* ignore storage cleanup error */
   }
 
   try {
@@ -127,8 +130,8 @@ export async function clearLocalUserSessionData(): Promise<void> {
     const tx = idb.transaction([IDB_STORE, IDB_USERS_STORE], "readwrite");
     tx.objectStore(IDB_STORE).clear();
     tx.objectStore(IDB_USERS_STORE).clear();
-  } catch (e) {
-    // empty
+  } catch {
+    /* ignore IDB cleanup error */
   }
 
   // Notify UI subscribers to immediately reset active state upon logout
@@ -136,10 +139,10 @@ export async function clearLocalUserSessionData(): Promise<void> {
     notifyDeletedSubscribers("video");
     notifyDeletedSubscribers("book");
     notifyCustomSubscribers();
-  } catch (e) {
-    // empty
+  } catch {
+    /* ignore notification error */
   }
-}
+};
 
 // In-memory UI subscriber registry for instant local updates
 type DeletedSubscriber = (ids: string[]) => void;
@@ -151,60 +154,60 @@ const deletedSubscribers = {
 };
 const customSubscribers = new Set<CustomSubscriber>();
 
-function notifyDeletedSubscribers(itemType: "video" | "book") {
+const notifyDeletedSubscribers = (itemType: "video" | "book"): void => {
   const currentIds = getLocalDeletedIds(itemType);
   deletedSubscribers[itemType].forEach((cb) => {
     try {
       cb(currentIds);
     } catch {
-      // empty
+      /* ignore subscriber error */
     }
   });
-}
+};
 
-function notifyCustomSubscribers() {
+const notifyCustomSubscribers = (): void => {
   const currentItems = getLocalCustomContent();
   customSubscribers.forEach((cb) => {
     try {
       cb(currentItems);
     } catch {
-      // empty
+      /* ignore subscriber error */
     }
   });
-}
+};
 
 /**
  * Get locally stored deleted IDs for quick initial render
  */
-export function getLocalDeletedIds(itemType: "video" | "book"): string[] {
+export const getLocalDeletedIds = (itemType: "video" | "book"): string[] => {
   try {
     const key = itemType === "video" ? LOCAL_STORAGE_DELETED_VIDEOS : LOCAL_STORAGE_DELETED_BOOKS;
     return JSON.parse(localStorage.getItem(key) || "[]");
   } catch {
     return [];
   }
-}
+};
 
 /**
  * Get locally stored custom content items
  */
-export function getLocalCustomContent(): CustomContentItem[] {
+export const getLocalCustomContent = (): CustomContentItem[] => {
   try {
     return JSON.parse(localStorage.getItem(LOCAL_STORAGE_CUSTOM) || "[]");
   } catch {
     return [];
   }
-}
+};
 
 /**
  * Save a deleted item (video or book) to Firestore & IndexedDB & LocalStorage
  */
-export async function markItemAsDeleted(
+export const markItemAsDeleted = async (
   itemId: string,
   itemType: "video" | "book",
   userId?: string,
-  isAdmin: boolean = false
-): Promise<void> {
+  _isAdmin = false
+): Promise<void> => {
   // 1. Update LocalStorage & IndexedDB durable storage & notify UI state instantly
   try {
     const key = itemType === "video" ? LOCAL_STORAGE_DELETED_VIDEOS : LOCAL_STORAGE_DELETED_BOOKS;
@@ -246,9 +249,10 @@ export async function markItemAsDeleted(
       const globalDeletedRef = doc(db, "global_deleted_items", itemId);
       await setDoc(globalDeletedRef, deleteRecord);
     } catch (gErr: unknown) {
-      const errCode = (gErr as any)?.code;
-      const errMessage = (gErr as any)?.message;
-      if (errCode === "permission-denied" || (typeof errMessage === "string" && errMessage.includes("permission"))) {
+      const errObj = gErr instanceof Error ? (gErr as Error & { code?: string }) : null;
+      const errCode = errObj?.code;
+      const errMessage = errObj?.message || (typeof gErr === "string" ? gErr : "");
+      if (errCode === "permission-denied" || errMessage.includes("permission")) {
         console.warn("🔒 عملية الحذف العام متوقفة للضيوف وغير المسؤولين (تتطلب صلاحية الأدمن في Firestore Rules).");
       } else {
         console.warn("Global deleted Firestore write error:", gErr);
@@ -265,20 +269,20 @@ export async function markItemAsDeleted(
 
     // If custom content, attempt to remove from custom_content collection
     const customDocRef = doc(db, "custom_content", itemId);
-    await deleteDoc(customDocRef).catch(() => {});
+    await deleteDoc(customDocRef).catch(() => undefined);
   } catch (err: unknown) {
     console.warn("Firestore sync markItemAsDeleted warning:", err);
   }
-}
+};
 
 /**
  * Subscribe to deleted IDs from Firestore & IndexedDB & LocalStorage
  */
-export function subscribeDeletedItems(
+export const subscribeDeletedItems = (
   itemType: "video" | "book",
   userId: string | undefined,
   onUpdate: (deletedIds: string[]) => void
-): () => void {
+): (() => void) => {
   const key = itemType === "video" ? LOCAL_STORAGE_DELETED_VIDEOS : LOCAL_STORAGE_DELETED_BOOKS;
 
   // Register in-memory subscriber
@@ -306,7 +310,7 @@ export function subscribeDeletedItems(
       try {
         localStorage.setItem(key, JSON.stringify(combined));
       } catch {
-        // empty
+        /* ignore storage write error */
       }
       onUpdate(combined);
     }
@@ -332,7 +336,9 @@ export function subscribeDeletedItems(
         const combined = Array.from(collectedIds);
         try {
           localStorage.setItem(key, JSON.stringify(combined));
-        } catch { /* empty */ }
+        } catch {
+          /* ignore storage write error */
+        }
         onUpdate(combined);
       },
       (err) => console.warn("Firestore global deleted listener warning:", err)
@@ -355,7 +361,7 @@ export function subscribeDeletedItems(
           try {
             localStorage.setItem(key, JSON.stringify(combined));
           } catch {
-            // empty
+            /* ignore storage write error */
           }
           onUpdate(combined);
         },
@@ -371,15 +377,15 @@ export function subscribeDeletedItems(
     if (unsubGlobal) unsubGlobal();
     if (unsubUser) unsubUser();
   };
-}
+};
 
 /**
  * Add custom content to Firestore & LocalStorage & notify subscribers
  */
-export async function addCustomContent(
+export const addCustomContent = async (
   item: CustomContentItem,
   userId?: string
-): Promise<void> {
+): Promise<void> => {
   const effectiveUid = userId || auth.currentUser?.uid;
   const itemWithUser: CustomContentItem = {
     ...item,
@@ -409,15 +415,15 @@ export async function addCustomContent(
   } catch (err) {
     console.warn("LocalStorage custom content write warning:", err);
   }
-}
+};
 
 /**
  * Subscribe to custom content from Firestore & LocalStorage with instant local updates
  */
-export function subscribeCustomContent(
+export const subscribeCustomContent = (
   userId: string | undefined,
   onUpdate: (items: CustomContentItem[]) => void
-): () => void {
+): (() => void) => {
   // Register in-memory subscriber
   customSubscribers.add(onUpdate);
 
@@ -442,7 +448,7 @@ export function subscribeCustomContent(
         try {
           localStorage.setItem(LOCAL_STORAGE_CUSTOM, JSON.stringify(resultList));
         } catch {
-          // empty
+          /* ignore storage write error */
         }
         onUpdate(resultList);
       },
@@ -456,12 +462,12 @@ export function subscribeCustomContent(
     customSubscribers.delete(onUpdate);
     if (unsub) unsub();
   };
-}
+};
 
 /**
  * Approve a pending custom content item in Firestore & LocalStorage
  */
-export async function approveCustomContent(id: string): Promise<void> {
+export const approveCustomContent = async (id: string): Promise<void> => {
   // 1. Persist status: "approved" to Firestore Cloud FIRST
   try {
     const docRef = doc(db, "custom_content", id);
@@ -480,12 +486,12 @@ export async function approveCustomContent(id: string): Promise<void> {
   } catch (err: unknown) {
     console.warn("LocalStorage approveCustomContent warning:", err);
   }
-}
+};
 
 /**
  * Delete a custom content item from Firestore & LocalStorage
  */
-export async function deleteCustomContent(id: string): Promise<void> {
+export const deleteCustomContent = async (id: string): Promise<void> => {
   // 1. Delete document from Firestore Cloud FIRST
   try {
     const docRef = doc(db, "custom_content", id);
@@ -504,4 +510,4 @@ export async function deleteCustomContent(id: string): Promise<void> {
   } catch (err: unknown) {
     console.warn("LocalStorage deleteCustomContent warning:", err);
   }
-}
+};

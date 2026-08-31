@@ -6,6 +6,24 @@
 
 ## 📌 سجل المشكلات والتعديلات (Historical Log)
 
+### 📅 2026-08-31 | حظر ومعالجة 35 ملاحظة جودة وأسلوب كود من DeepSource في contentService.ts
+- **نوع الإجراء:** DeepSource Code Quality & Refactoring Cleanup (35 Issues Resolved)
+- **السبب الجذري:**
+  1. وجود متغيرات استثناءات غير مستخدمة `e` في كتل `catch (e)` بـ [contentService.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/contentService.ts) مما زاد من تحذيرات `JS-0356`.
+  2. إرجاع نصوص عادية في `reject("No IndexedDB")` بدلاً من كائنات استثناء `Error` مما خالف قاعدة `JS-0114`.
+  3. وجود صياغة نمط قديمة للدوال في النطاق العام وقيم أنواع `any` غير الآمنة بكتل `catch (gErr: unknown)` مما فجر تحذيرات `JS-0067` و `JS-0323`.
+  4. وجود تعبيرات أسهم فارغة `.catch(() => {})` مما أدى لتحذيرات `JS-0321`.
+- **طريقة الحل:**
+  - تحويل كتل `catch (e)` إلى صيغة TypeScript الحديثة `catch` بدون ربط متغيرات غير مستخدمة.
+  - استبدال `reject("No IndexedDB")` بـ `reject(new Error("No IndexedDB"))` وتحديث الدوال لتستخدم صياغة التعبير الثابتة `const openIDB = () => ...`.
+  - التخلص من أي `any` cast واستبدالها بالتحقق النوعي `gErr instanceof Error ? (gErr as Error & { code?: string }) : null`.
+  - تحويل الـ `.catch(() => {})` إلى `.catch(() => undefined)`.
+  - التأكد من البناء الشامل `npm run build` واجتياز كافّة الاختبارات التلقائية (12/12).
+- **خطة الوقاية وتيسير التطوير:**
+  - الاعتماد على `catch` الحديثة بدون متغيرات صريحة لتفادي تحذيرات المتغيرات المهملة في TypeScript وDeepSource.
+
+---
+
 ### 📅 2026-08-31 | إصلاح خطأ التجميع وتفكك التعليقات الناتج عن دمج PR التعديل التلقائي لـ DeepSource (#2)
 - **نوع الإجراء:** DeepSource AutoFix PR #2 Repair & Broken Comment Restoration
 - **السبب الجذري:**
