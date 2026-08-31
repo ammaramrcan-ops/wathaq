@@ -15,7 +15,7 @@ import { getStoredLessons } from "@/lib/lessonsData";
 interface AddContentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess?: (newContent: any) => void;
+  onSuccess?: (newContent: unknown) => void;
   defaultContentType?: "book" | "video" | "flashcards" | "mindmaps";
   defaultSubject?: string;
   lockType?: boolean;

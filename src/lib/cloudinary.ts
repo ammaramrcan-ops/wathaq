@@ -38,8 +38,9 @@ export async function uploadImageToCloudinary(file: File): Promise<CloudinaryUpl
 
     const data: CloudinaryUploadResponse = await response.json();
     return data;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Cloudinary Upload Error:", error);
-    throw new Error(error.message || "حدث خطأ غير متوقع أثناء رفع الصورة");
+    const message = error instanceof Error ? error.message : "حدث خطأ غير متوقع أثناء رفع الصورة";
+    throw new Error(message);
   }
 }

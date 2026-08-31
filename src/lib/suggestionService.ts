@@ -21,7 +21,7 @@ function openIDBSuggestions(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     if (!window.indexedDB) return reject("No IndexedDB");
     const req = window.indexedDB.open(IDB_NAME, 6);
-    req.onupgradeneeded = (e: any) => {
+    req.onupgradeneeded = (e: IDBVersionChangeEvent) => {
       const idb = req.result;
       if (!idb.objectStoreNames.contains(IDB_SUGGESTIONS_STORE)) {
         idb.createObjectStore(IDB_SUGGESTIONS_STORE, { keyPath: "id" });
@@ -104,7 +104,7 @@ export async function addSuggestion(suggestion: SuggestionItem): Promise<Suggest
   try {
     const docRef = doc(db, "suggestions", suggestion.id);
     await setDoc(docRef, { ...suggestion, createdAt: new Date().toISOString() }, { merge: true });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Firestore add suggestion error:", err);
     throw new Error("فشل إرسال الاقتراح سحابياً. يرجى إعادة المحاولة.");
   }
@@ -115,7 +115,7 @@ export async function addSuggestion(suggestion: SuggestionItem): Promise<Suggest
     const updated = [suggestion, ...current.filter((s) => s.id !== suggestion.id)];
     localStorage.setItem(LOCAL_STORAGE_SUGGESTIONS, JSON.stringify(updated));
     await saveIDBSuggestion(suggestion);
-  } catch (e) {
+  } catch (e: unknown) {
     console.warn("LocalStorage suggestion write warning:", e);
   }
 
@@ -137,7 +137,7 @@ export async function deleteSuggestion(id: string): Promise<void> {
     }, { merge: true }).catch(() => {
       // empty
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Firestore delete suggestion error:", err);
     throw new Error("فشل حذف الاقتراح سحابياً (تتطلب صلاحية الأدمن المصرح له).");
   }

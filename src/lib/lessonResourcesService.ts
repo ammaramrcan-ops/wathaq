@@ -76,7 +76,7 @@ export async function saveLessonResource(resource: LessonResourceAttachment): Pr
   try {
     const docRef = doc(db, "curriculum_meta", "lesson_resources");
     await setDoc(docRef, { resourcesMap: updatedMap, updatedAt: new Date().toISOString() }, { merge: true });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Firestore saveLessonResource error:", err);
     throw new Error("فشل حفظ مرفقات الدرس سحابياً (تتطلب صلاحية الأدمن المصرح له).");
   }

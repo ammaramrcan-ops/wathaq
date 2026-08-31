@@ -3,7 +3,7 @@ import { motion } from "motion/react";
 import { useSearchParams } from "react-router-dom";
 import { 
   Atom, BookOpen, Compass, PlayCircle, ListVideo, 
-  ArrowRight, Sparkles, Clock, ChevronLeft, Play, User, Plus
+  ArrowRight, Sparkles, Clock, ChevronLeft, Play, User, Plus, type LucideIcon
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { AddContentModal } from "@/components/AddContentModal";
@@ -29,7 +29,7 @@ interface MainCategory {
   id: string;
   title: string;
   subtitle: string;
-  icon: any;
+  icon: LucideIcon;
   color: string;
 }
 
@@ -38,14 +38,14 @@ interface SubjectItem {
   title: string;
   categoryId: string;
   description: string;
-  icon: any;
+  icon: LucideIcon;
 }
 
 interface ContentType {
   id: string;
   title: string;
   subtitle: string;
-  icon: any;
+  icon: LucideIcon;
 }
 
 const mainCategories: MainCategory[] = [
@@ -271,7 +271,12 @@ export default function Videos() {
   };
 
   const handleSelectVideo = (vid: VideoResourceItem) => {
-    const targetUrl = (vid as any).videoUrl || (vid as any).linkUrl || `https://www.youtube.com/results?search_query=${encodeURIComponent(vid.title)}`;
+    const vidExt = vid as unknown as { videoUrl?: unknown; linkUrl?: unknown };
+    const targetUrl = typeof vidExt.videoUrl === 'string'
+      ? vidExt.videoUrl
+      : typeof vidExt.linkUrl === 'string'
+        ? vidExt.linkUrl
+        : `https://www.youtube.com/results?search_query=${encodeURIComponent(vid.title)}`;
     window.open(targetUrl, "_blank", "noopener,noreferrer");
   };
 
@@ -332,8 +337,8 @@ export default function Videos() {
     const matchesType =
       !selectedContentType ||
       v.type === selectedContentType.id ||
-      (v.type as string) === "single" ||
-      (selectedContentType.id === "video" && (v.type === "video" || (v as any).type === "single")) ||
+      v.type === "single" ||
+      (selectedContentType.id === "video" && (v.type === "video" || v.type === "single")) ||
       (selectedContentType.id === "playlist" && v.type === "playlist");
 
     return matchesSubject && matchesType;

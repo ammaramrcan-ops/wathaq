@@ -91,7 +91,7 @@ export async function addTeacher(teacher: TeacherEvaluation): Promise<void> {
   try {
     const docRef = doc(db, "teacher_evaluations", teacher.id);
     await setDoc(docRef, teacher, { merge: true });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Firestore addTeacher error:", err);
     throw new Error("فشل إضافة المدرس سحابياً (تتطلب صلاحية الأدمن المصرح له).");
   }
@@ -107,7 +107,7 @@ export async function deleteTeacher(id: string): Promise<void> {
   try {
     const docRef = doc(db, "teacher_evaluations", id);
     await deleteDoc(docRef);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Firestore deleteTeacher error:", err);
     throw new Error("فشل حذف المدرس سحابياً (تتطلب صلاحية الأدمن المصرح له).");
   }

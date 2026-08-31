@@ -1,24 +1,37 @@
 import { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { useSearchParams } from "react-router-dom";
-import { 
-  BookOpen, Atom, Compass, FileText, LayoutList, Share2, Layers, 
-  ArrowRight, Sparkles, ChevronLeft, ExternalLink, Trash2, Plus, CheckCircle2 
+import {
+  BookOpen,
+  Atom,
+  Compass,
+  FileText,
+  LayoutList,
+  Share2,
+  Layers,
+  ArrowRight,
+  Sparkles,
+  ChevronLeft,
+  ExternalLink,
+  Trash2,
+  Plus,
+  CheckCircle2,
+  LucideIcon
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { AddContentModal } from "@/components/AddContentModal";
 import Flashcards from "@/pages/Flashcards";
-import { 
-  subscribeDeletedItems, 
-  subscribeCustomContent, 
-  markItemAsDeleted, 
-  CustomContentItem 
+import {
+  subscribeDeletedItems,
+  subscribeCustomContent,
+  markItemAsDeleted,
+  CustomContentItem
 } from "@/lib/contentService";
-import { 
-  subscribeStudentProfile, 
-  filterCategoriesForProfile, 
-  filterSubjectsForProfile, 
-  StudentAcademicProfile 
+import {
+  subscribeStudentProfile,
+  filterCategoriesForProfile,
+  filterSubjectsForProfile,
+  StudentAcademicProfile
 } from "@/lib/subjectsData";
 import { subscribeLessons, subscribeUnits, SubjectUnitsMap, SubjectUnit } from "@/lib/lessonsData";
 import { subscribeLessonResources, LessonResourcesMap } from "@/lib/lessonResourcesService";
@@ -28,7 +41,7 @@ interface MainCategory {
   id: string;
   title: string;
   subtitle: string;
-  icon: any;
+  icon: LucideIcon;
   color: string;
 }
 
@@ -37,14 +50,14 @@ interface SubjectItem {
   title: string;
   categoryId: string;
   description: string;
-  icon: any;
+  icon: React.ReactNode;
 }
 
 interface FilterType {
   id: string;
   label: string;
   subtitle: string;
-  icon: any;
+  icon: LucideIcon;
 }
 
 interface BookResource {

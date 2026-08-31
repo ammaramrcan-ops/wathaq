@@ -63,8 +63,8 @@ export async function saveSubjectNotebookLmLink(subjectId: string, url: string):
   try {
     const docRef = doc(db, "curriculum_meta", "subject_notebooklm_links");
     await setDoc(docRef, { notebookLmMap: updatedMap, updatedAt: new Date().toISOString() }, { merge: true });
-  } catch (err: any) {
-    console.error("Firestore saveSubjectNotebookLmLink error:", err);
+  } catch (error: unknown) {
+    console.error("Firestore saveSubjectNotebookLmLink error:", error);
     throw new Error("فشل حفظ رابط معلّم AI للمادة سحابياً (تتطلب صلاحية الأدمن المصرح له).");
   }
 

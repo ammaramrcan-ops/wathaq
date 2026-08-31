@@ -20,7 +20,7 @@ function openIDBPermissions(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     if (!window.indexedDB) return reject("No IndexedDB");
     const req = window.indexedDB.open(IDB_NAME, 3);
-    req.onupgradeneeded = (e: any) => {
+    req.onupgradeneeded = (e: IDBVersionChangeEvent) => {
       const idb = req.result;
       if (!idb.objectStoreNames.contains(IDB_PERM_STORE)) {
         idb.createObjectStore(IDB_PERM_STORE, { keyPath: "emailKey" });
@@ -51,7 +51,14 @@ export async function loadIDBPermissions(): Promise<Record<string, UserPermissio
       req.onsuccess = () => {
         const records = req.result || [];
         const map: Record<string, UserPermissions> = {};
-        records.forEach((r: any) => {
+        records.forEach((r: {
+          emailKey?: string;
+          uid: string;
+          email: string;
+          role?: string;
+          canDirectPublish?: boolean;
+          canAccessAdmin?: boolean;
+        }) => {
           if (r.emailKey) {
             map[r.emailKey] = {
               uid: r.uid,
@@ -171,7 +178,7 @@ export async function updateUserPermissions(
 
     const globalUserDocRef = doc(db, "global_registered_users", uid || email);
     await setDoc(globalUserDocRef, { permissions: updated, role: updated.role, canDirectPublish: updated.canDirectPublish, canAccessAdmin: updated.canAccessAdmin }, { merge: true });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Firestore permissions update error:", err);
     throw new Error("فشل تعديل الصلاحيات سحابياً (تتطلب صلاحية الأدمن المصرح له).");
   }
@@ -181,7 +188,7 @@ export async function updateUserPermissions(
     const map = getPermissionsMap();
     map[email.toLowerCase()] = updated;
     savePermissionsMap(map);
-  } catch (err) {
+  } catch (err: unknown) {
     // empty
   }
 

@@ -87,7 +87,7 @@ export async function addCommunityGroup(group: CommunityGroupItem): Promise<void
   try {
     const docRef = doc(db, "community_groups", group.id);
     await setDoc(docRef, group, { merge: true });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Firestore addCommunityGroup error:", err);
     throw new Error("فشل إضافة التجمع سحابياً (تتطلب صلاحية الأدمن المصرح له).");
   }
@@ -101,7 +101,7 @@ export async function deleteCommunityGroup(id: string): Promise<void> {
   try {
     const docRef = doc(db, "community_groups", id);
     await deleteDoc(docRef);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Firestore deleteCommunityGroup error:", err);
     throw new Error("فشل حذف التجمع سحابياً (تتطلب صلاحية الأدمن المصرح له).");
   }
