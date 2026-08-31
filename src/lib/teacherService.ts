@@ -43,13 +43,15 @@ export function saveStoredTeachers(list: TeacherEvaluation[]): void {
   try {
     const clean = list.filter((t) => !["t-phys-1", "t-chem-1", "t-arb-1"].includes(t.id));
     localStorage.setItem(LOCAL_STORAGE_TEACHERS, JSON.stringify(clean));
-  } catch (e) {}
+  } catch (e) {
+    // empty
+  }
 }
 
 export function subscribeTeachers(onUpdate: (teachers: TeacherEvaluation[]) => void): () => void {
   try {
     localStorage.removeItem("wathaq_teacher_evaluations_list");
-  } catch (e) {}
+  } catch (e) { // empty }
 
   onUpdate(getStoredTeachers());
 

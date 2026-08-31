@@ -54,7 +54,9 @@ export async function saveStoredSubjectUnits(unitsMap: SubjectUnitsMap): Promise
   // 2. Save to LocalStorage ONLY after Cloud Firestore succeeds
   try {
     localStorage.setItem(LOCAL_STORAGE_UNITS_MAP, JSON.stringify(unitsMap));
-  } catch (e) {}
+  } catch (e) {
+    // empty
+  }
 }
 
 export async function addUnitToSubject(subjectId: string, unitTitle: string): Promise<SubjectUnitsMap> {
@@ -128,7 +130,7 @@ export function subscribeUnits(onUpdate: (unitsMap: SubjectUnitsMap) => void): (
           const cloudUnitsMap = snap.data().unitsMap as SubjectUnitsMap;
           try {
             localStorage.setItem(LOCAL_STORAGE_UNITS_MAP, JSON.stringify(cloudUnitsMap));
-          } catch (e) {}
+          } catch (e) { // empty }
           onUpdate(cloudUnitsMap);
         } else {
           onUpdate(getStoredSubjectUnits());
@@ -136,7 +138,7 @@ export function subscribeUnits(onUpdate: (unitsMap: SubjectUnitsMap) => void): (
       },
       (err) => console.warn("Units snapshot warning:", err)
     );
-  } catch (e) {}
+  } catch (e) { // empty }
 
   return () => {
     if (unsub) unsub();

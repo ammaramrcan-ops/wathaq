@@ -31,7 +31,9 @@ export function getStoredLessonResources(): LessonResourcesMap {
 export function saveStoredLessonResources(map: LessonResourcesMap): void {
   try {
     localStorage.setItem(LOCAL_STORAGE_LESSON_RESOURCES, JSON.stringify(map));
-  } catch (e) {}
+  } catch (e) {
+    // empty
+  }
 }
 
 export function subscribeLessonResources(onUpdate: (map: LessonResourcesMap) => void): () => void {
@@ -53,7 +55,9 @@ export function subscribeLessonResources(onUpdate: (map: LessonResourcesMap) => 
       },
       (err) => console.warn("Lesson resources snapshot warning:", err)
     );
-  } catch (err) {}
+  } catch (err) {
+    // empty
+  }
 
   return () => {
     if (unsub) unsub();

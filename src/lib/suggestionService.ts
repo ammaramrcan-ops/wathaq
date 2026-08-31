@@ -37,7 +37,7 @@ export async function saveIDBSuggestion(item: SuggestionItem): Promise<void> {
     const idb = await openIDBSuggestions();
     const tx = idb.transaction(IDB_SUGGESTIONS_STORE, "readwrite");
     tx.objectStore(IDB_SUGGESTIONS_STORE).put(item);
-  } catch (e) {}
+  } catch (e) { /* empty */ }
 }
 
 export async function deleteIDBSuggestion(id: string): Promise<void> {
@@ -45,7 +45,9 @@ export async function deleteIDBSuggestion(id: string): Promise<void> {
     const idb = await openIDBSuggestions();
     const tx = idb.transaction(IDB_SUGGESTIONS_STORE, "readwrite");
     tx.objectStore(IDB_SUGGESTIONS_STORE).delete(id);
-  } catch (e) {}
+  } catch (e) {
+    // empty
+  }
 }
 
 export async function loadIDBSuggestions(): Promise<SuggestionItem[]> {
@@ -78,7 +80,9 @@ export function markSuggestionAsDeleted(id: string): void {
       const updated = [...deleted, id];
       localStorage.setItem(LOCAL_STORAGE_DELETED_SUGGESTIONS, JSON.stringify(updated));
     }
-  } catch (e) {}
+  } catch (e) {
+    // empty
+  }
 }
 
 export function getStoredSuggestions(): SuggestionItem[] {
@@ -130,7 +134,9 @@ export async function deleteSuggestion(id: string): Promise<void> {
       suggestionId: id,
       itemType: "suggestion",
       deletedAt: new Date().toISOString()
-    }, { merge: true }).catch(() => {});
+    }, { merge: true }).catch(() => {
+      // empty
+    });
   } catch (err: any) {
     console.error("Firestore delete suggestion error:", err);
     throw new Error("فشل حذف الاقتراح سحابياً (تتطلب صلاحية الأدمن المصرح له).");
@@ -144,7 +150,9 @@ export async function deleteSuggestion(id: string): Promise<void> {
     const current = getStoredSuggestions();
     const updated = current.filter((s) => s.id !== id);
     localStorage.setItem(LOCAL_STORAGE_SUGGESTIONS, JSON.stringify(updated));
-  } catch (e) {}
+  } catch (e) {
+    // empty
+  }
 }
 
 /**
@@ -165,7 +173,9 @@ export function subscribeSuggestions(onUpdate: (list: SuggestionItem[]) => void)
       const finalArr = Array.from(map.values());
       try {
         localStorage.setItem(LOCAL_STORAGE_SUGGESTIONS, JSON.stringify(finalArr));
-      } catch (e) {}
+      } catch (e) {
+        // empty
+      }
       onUpdate(finalArr);
     }
   });
@@ -211,13 +221,17 @@ export function subscribeSuggestions(onUpdate: (list: SuggestionItem[]) => void)
         try {
           localStorage.setItem(LOCAL_STORAGE_SUGGESTIONS, JSON.stringify(updatedList));
           updatedList.forEach((s) => saveIDBSuggestion(s));
-        } catch (e) {}
+        } catch (e) {
+          // empty
+        }
 
         onUpdate(updatedList);
       },
       (err) => console.warn("Suggestions snapshot warning:", err)
     );
-  } catch (e) {}
+  } catch (e) {
+    // empty
+  }
 
   return () => {
     if (unsubSuggestions) unsubSuggestions();

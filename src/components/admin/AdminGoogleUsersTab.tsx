@@ -39,7 +39,9 @@ export function markUserEmailAsDeleted(email: string): void {
       const updated = [...deleted, key];
       localStorage.setItem(LOCAL_STORAGE_DELETED_USERS, JSON.stringify(updated));
     }
-  } catch {}
+  } catch {
+    // empty
+  }
 }
 
 export function AdminGoogleUsersTab() {
@@ -72,7 +74,9 @@ export function AdminGoogleUsersTab() {
           userMap.set(u.email.toLowerCase(), u);
         }
       });
-    } catch {}
+    } catch {
+      // empty
+    }
 
     // Restore durable IndexedDB backups if LocalStorage was cleared
     loadIDBPermissions().then((idbPerms) => {
@@ -125,7 +129,9 @@ export function AdminGoogleUsersTab() {
 
       try {
         localStorage.setItem("wathaq_registered_google_users", JSON.stringify(list));
-      } catch {}
+      } catch {
+        // empty
+      }
 
       setLoading(false);
     };
@@ -184,7 +190,9 @@ export function AdminGoogleUsersTab() {
           (err) => console.warn(`Snapshot listener for ${colName} warning:`, err)
         );
         unsubs.push(unsub);
-      } catch (e) {}
+      } catch (e) {
+        // empty
+      }
     });
 
     // Subscriptions to deleted users markers
@@ -205,7 +213,9 @@ export function AdminGoogleUsersTab() {
         if (changed) updateUserList();
       });
       unsubs.push(unsubDel);
-    } catch (e) {}
+    } catch (e) {
+      // empty
+    }
 
     const timer = setTimeout(() => setLoading(false), 2000);
 
@@ -233,7 +243,9 @@ export function AdminGoogleUsersTab() {
       const currentDeleted = getLocalDeletedUserEmails();
       const updatedDeleted = currentDeleted.filter((item) => item !== email.toLowerCase());
       localStorage.setItem(LOCAL_STORAGE_DELETED_USERS, JSON.stringify(updatedDeleted));
-    } catch {}
+    } catch {
+      // empty
+    }
 
     const updated = [newUser, ...googleUsers.filter((u) => u.email.toLowerCase() !== email.toLowerCase())];
     setGoogleUsers(updated);
@@ -243,7 +255,9 @@ export function AdminGoogleUsersTab() {
       setDoc(doc(db, "global_registered_users", newUser.uid), newUser, { merge: true });
       setDoc(doc(db, "google_registered_users", newUser.uid), newUser, { merge: true });
       setDoc(doc(db, "users", newUser.uid), newUser, { merge: true });
-    } catch (err) {}
+    } catch (err) {
+      // empty
+    }
 
     setNewEmailInput("");
     setIsAddManualOpen(false);

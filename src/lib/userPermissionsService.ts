@@ -37,7 +37,9 @@ export async function saveIDBPermission(perm: UserPermissions): Promise<void> {
     const idb = await openIDBPermissions();
     const tx = idb.transaction(IDB_PERM_STORE, "readwrite");
     tx.objectStore(IDB_PERM_STORE).put({ ...perm, emailKey: perm.email.toLowerCase() });
-  } catch (e) {}
+  } catch (e) {
+    // empty
+  }
 }
 
 export async function loadIDBPermissions(): Promise<Record<string, UserPermissions>> {
@@ -87,7 +89,9 @@ export function getPermissionsMap(): Record<string, UserPermissions> {
 export function savePermissionsMap(map: Record<string, UserPermissions>): void {
   try {
     localStorage.setItem(LOCAL_STORAGE_PERMISSIONS, JSON.stringify(map));
-  } catch (e) {}
+  } catch (e) {
+    // empty
+  }
 
   Object.values(map).forEach((perm) => {
     saveIDBPermission(perm);
@@ -177,7 +181,9 @@ export async function updateUserPermissions(
     const map = getPermissionsMap();
     map[email.toLowerCase()] = updated;
     savePermissionsMap(map);
-  } catch (err) {}
+  } catch (err) {
+    // empty
+  }
 
   return updated;
 }
@@ -237,7 +243,9 @@ export function subscribeUserPermissions(
         },
         (err) => console.warn("User permissions snapshot warning:", err)
       );
-    } catch (e) {}
+    } catch (e) {
+      // empty
+    }
   }
 
   return () => {
