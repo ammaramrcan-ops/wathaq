@@ -107,7 +107,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const filtered = saved.filter((item: any) => item.email !== fbUser.email);
             localStorage.setItem("wathaq_registered_google_users", JSON.stringify([userRec, ...filtered]));
             await saveIDBUser(userRec);
-          } catch (e) {}
+          } catch (e) {
+            // empty
+          }
 
           // Cloud Firestore persistence (Isolated so local cache works even if rules fail)
           try {
@@ -194,13 +196,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const filtered = saved.filter((item: any) => item.email !== res.user.email);
           localStorage.setItem("wathaq_registered_google_users", JSON.stringify([userRec, ...filtered]));
           await saveIDBUser(userRec);
-        } catch (e) {}
+        } catch (e) { // empty }
 
         try {
           await setDoc(doc(db, "google_registered_users", res.user.uid), userRec, { merge: true });
           await setDoc(doc(db, "users", res.user.uid), userRec, { merge: true });
           await setDoc(doc(db, "global_registered_users", res.user.uid), userRec, { merge: true });
-        } catch (e) {}
+        } catch (e) { // empty }
       }
     } catch (err: any) {
       console.error("Google Auth Error:", err.message);

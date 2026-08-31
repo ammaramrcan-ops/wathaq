@@ -41,7 +41,9 @@ async function saveIDBAnalytics(data: VisitAnalytics): Promise<void> {
     const idb = await openIDBVisits();
     const tx = idb.transaction(IDB_VISITS_STORE, "readwrite");
     tx.objectStore(IDB_VISITS_STORE).put({ key: "general_analytics", ...data });
-  } catch (e) {}
+  } catch (e) {
+    // empty
+  }
 }
 
 async function loadIDBAnalytics(): Promise<VisitAnalytics | null> {
@@ -63,7 +65,9 @@ async function saveIDBVisitorId(id: string): Promise<void> {
     const idb = await openIDBVisits();
     const tx = idb.transaction(IDB_VISITS_STORE, "readwrite");
     tx.objectStore(IDB_VISITS_STORE).put({ key: "visitor_id", id });
-  } catch (e) {}
+  } catch (e) {
+    // empty
+  }
 }
 
 async function loadIDBVisitorId(): Promise<string | null> {
@@ -84,7 +88,9 @@ export function getLocalVisitsAnalytics(): VisitAnalytics {
   try {
     const saved = localStorage.getItem(LOCAL_STORAGE_VISITS);
     if (saved) return JSON.parse(saved);
-  } catch {}
+  } catch {
+    // empty
+  }
 
   return {
     totalVisits: 7,
@@ -115,7 +121,9 @@ export async function resetVisitsAnalytics(newTotal: number = 7): Promise<VisitA
   try {
     localStorage.setItem(LOCAL_STORAGE_VISITS, JSON.stringify(resetData));
     await saveIDBAnalytics(resetData);
-  } catch (e) {}
+  } catch (e) {
+    // empty
+  }
 
   try {
     const analyticsDocRef = doc(db, "analytics_summary", "general");
@@ -158,13 +166,17 @@ export async function trackVisit(): Promise<VisitAnalytics> {
         return getLocalVisitsAnalytics();
       }
     }
-  } catch {}
+  } catch {
+    // empty
+  }
 
   // Update session timestamp & date
   try {
     localStorage.setItem(LOCAL_STORAGE_SESSION_TIME, now.toString());
     localStorage.setItem(LOCAL_STORAGE_VISIT_DATE, todayDate);
-  } catch {}
+  } catch {
+    // empty
+  }
 
   let visitorId = "";
   let isRecurring = false;
@@ -187,7 +199,9 @@ export async function trackVisit(): Promise<VisitAnalytics> {
         isRecurring = false;
       }
     }
-  } catch {}
+  } catch {
+    // empty
+  }
 
   // Atomically update metrics in Cloud Firestore
   try {
@@ -246,7 +260,9 @@ export async function trackVisit(): Promise<VisitAnalytics> {
     try {
       localStorage.setItem(LOCAL_STORAGE_VISITS, JSON.stringify(updatedAnalytics));
       await saveIDBAnalytics(updatedAnalytics);
-    } catch {}
+    } catch {
+      // empty
+    }
 
     return updatedAnalytics;
   } catch (err) {
@@ -258,7 +274,9 @@ export async function trackVisit(): Promise<VisitAnalytics> {
   if (idbAnalytics) {
     try {
       localStorage.setItem(LOCAL_STORAGE_VISITS, JSON.stringify(idbAnalytics));
-    } catch {}
+    } catch {
+      // empty
+    }
     return idbAnalytics;
   }
 
@@ -275,7 +293,9 @@ export function subscribeVisitsAnalytics(onUpdate: (analytics: VisitAnalytics) =
     if (idbAnalytics) {
       try {
         localStorage.setItem(LOCAL_STORAGE_VISITS, JSON.stringify(idbAnalytics));
-      } catch {}
+      } catch {
+        // empty
+      }
       onUpdate(idbAnalytics);
     }
   });
@@ -300,14 +320,17 @@ export function subscribeVisitsAnalytics(onUpdate: (analytics: VisitAnalytics) =
           try {
             localStorage.setItem(LOCAL_STORAGE_VISITS, JSON.stringify(updated));
             saveIDBAnalytics(updated);
-          } catch {}
-
+          } catch {
+            // intentionally left empty
+          }
           onUpdate(updated);
         }
       },
       (err) => console.warn("Visits snapshot warning:", err)
     );
-  } catch (err) {}
+  } catch (err) {
+    // empty
+  }
 
   return () => {
     if (unsub) unsub();

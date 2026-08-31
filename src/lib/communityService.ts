@@ -45,7 +45,9 @@ async function saveIDBDiscussion(post: Discussion): Promise<void> {
     const idb = await openIDBCommunity();
     const tx = idb.transaction(IDB_DISCUSSIONS_STORE, "readwrite");
     tx.objectStore(IDB_DISCUSSIONS_STORE).put(post);
-  } catch (e) {}
+  } catch (e) {
+    // empty
+  }
 }
 
 async function deleteIDBDiscussion(id: string): Promise<void> {
@@ -53,7 +55,8 @@ async function deleteIDBDiscussion(id: string): Promise<void> {
     const idb = await openIDBCommunity();
     const tx = idb.transaction(IDB_DISCUSSIONS_STORE, "readwrite");
     tx.objectStore(IDB_DISCUSSIONS_STORE).delete(id);
-  } catch (e) {}
+  } catch (e) { // empty
+  }
 }
 
 export function getStoredDeletedDiscussions(): string[] {
@@ -72,7 +75,9 @@ export function markDiscussionAsDeleted(id: string): void {
       const updated = [...current, id];
       localStorage.setItem(LOCAL_STORAGE_DELETED_DISCUSSIONS, JSON.stringify(updated));
     }
-  } catch (e) {}
+  } catch (e) {
+    // empty
+  }
 }
 
 /**
@@ -137,7 +142,7 @@ export async function deleteDiscussion(id: string): Promise<void> {
     }
   } catch (err: any) {
     console.error("Firestore delete discussion error:", err);
-    throw new Error("فشل حذف المنشور سحابياً (تتطلب ملكية المنشور أو صلاحية الأدمن).");
+    throw new Error("فشل حذف المنشور سحابياً (تتطلب ملكية المنشور أو صلاحية الأدمن).\");
   }
 
   // 2. Update LocalStorage & IndexedDB ONLY after Cloud deletion succeeds
@@ -148,7 +153,9 @@ export async function deleteDiscussion(id: string): Promise<void> {
     const current = getStoredDiscussions();
     const updated = current.filter((d) => d.id !== id);
     localStorage.setItem(LOCAL_STORAGE_DISCUSSIONS, JSON.stringify(updated));
-  } catch (e) {}
+  } catch (e) {
+    // empty
+  }
 }
 
 /**
@@ -157,7 +164,9 @@ export async function deleteDiscussion(id: string): Promise<void> {
 export function subscribeDiscussions(onUpdate: (discussions: Discussion[]) => void): () => void {
   try {
     localStorage.removeItem("wathaq_community_discussions");
-  } catch (e) {}
+  } catch (e) {
+    // empty
+  }
 
   onUpdate(getStoredDiscussions());
 
@@ -205,7 +214,9 @@ export function subscribeDiscussions(onUpdate: (discussions: Discussion[]) => vo
         try {
           localStorage.setItem(LOCAL_STORAGE_DISCUSSIONS, JSON.stringify(updatedList));
           updatedList.forEach((d) => saveIDBDiscussion(d));
-        } catch (e) {}
+        } catch (e) {
+          // empty
+        }
 
         onUpdate(updatedList);
       },

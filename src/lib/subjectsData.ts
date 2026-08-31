@@ -51,7 +51,9 @@ export function getStoredCurriculum(): Record<string, string[]> {
 export function saveStoredCurriculum(data: Record<string, string[]>) {
   try {
     localStorage.setItem("wathaq_curriculum_subjects", JSON.stringify(data));
-  } catch (e) {}
+  } catch (e) {
+    // empty
+  }
 }
 
 export function getStoredStudentProfile(): StudentAcademicProfile {
@@ -73,7 +75,9 @@ export async function saveStoredStudentProfile(
   // 1. LocalStorage update (لكافة المستخدمين والضيوف)
   try {
     localStorage.setItem(LOCAL_STORAGE_ACADEMIC_PROFILE, JSON.stringify(profile));
-  } catch (e) {}
+  } catch (e) {
+    // empty
+  }
 
   // 2. Firestore Cloud sync (فقط إذا وجد حساب مستخدم مسجل معزول بـ userId)
   if (!userId) return;
@@ -121,7 +125,9 @@ export function subscribeStudentProfile(
             };
             try {
               localStorage.setItem(LOCAL_STORAGE_ACADEMIC_PROFILE, JSON.stringify(prof));
-            } catch {}
+            } catch {
+              // empty
+            }
             onUpdate(prof);
           }
         }
@@ -139,14 +145,18 @@ export function subscribeStudentProfile(
             const prof = data.academicProfile as StudentAcademicProfile;
             try {
               localStorage.setItem(LOCAL_STORAGE_ACADEMIC_PROFILE, JSON.stringify(prof));
-            } catch {}
+            } catch {
+              // intentionally left empty
+            }
             onUpdate(prof);
           }
         }
       },
       (err) => console.warn("User document profile listener warning:", err)
     );
-  } catch (e) {}
+  } catch (e) {
+    // empty
+  }
 
   return () => {
     if (unsubGlobal) unsubGlobal();

@@ -47,7 +47,9 @@ export async function saveIDBDeletedItem(itemId: string, itemType: "video" | "bo
     const idb = await openIDB();
     const tx = idb.transaction(IDB_STORE, "readwrite");
     tx.objectStore(IDB_STORE).put({ itemId, itemType, timestamp: Date.now() });
-  } catch (e) {}
+  } catch (e) {
+    // empty
+  }
 }
 
 export async function loadIDBDeletedItems(itemType: "video" | "book"): Promise<string[]> {
@@ -76,7 +78,9 @@ export async function saveIDBUser(userRec: { uid: string; displayName: string; e
     const idb = await openIDB();
     const tx = idb.transaction(IDB_USERS_STORE, "readwrite");
     tx.objectStore(IDB_USERS_STORE).put({ ...userRec, emailKey: userRec.email.toLowerCase() });
-  } catch (e) {}
+  } catch (e) {
+    // empty
+  }
 }
 
 export async function loadIDBUsers(): Promise<any[]> {
@@ -99,7 +103,9 @@ export async function deleteIDBUser(email: string): Promise<void> {
     const idb = await openIDB();
     const tx = idb.transaction(IDB_USERS_STORE, "readwrite");
     tx.objectStore(IDB_USERS_STORE).delete(email.toLowerCase());
-  } catch (e) {}
+  } catch (e) {
+    // empty
+  }
 }
 
 export async function clearLocalUserSessionData(): Promise<void> {
@@ -112,21 +118,27 @@ export async function clearLocalUserSessionData(): Promise<void> {
     localStorage.removeItem("wathaq_users_permissions_map");
     localStorage.removeItem("wathaq_persisted_user");
     localStorage.removeItem("wathaq_registered_google_users");
-  } catch (e) {}
+  } catch (e) {
+    // empty
+  }
 
   try {
     const idb = await openIDB();
     const tx = idb.transaction([IDB_STORE, IDB_USERS_STORE], "readwrite");
     tx.objectStore(IDB_STORE).clear();
     tx.objectStore(IDB_USERS_STORE).clear();
-  } catch (e) {}
+  } catch (e) {
+    // empty
+  }
 
   // Notify UI subscribers to immediately reset active state upon logout
   try {
     notifyDeletedSubscribers("video");
     notifyDeletedSubscribers("book");
     notifyCustomSubscribers();
-  } catch (e) {}
+  } catch (e) {
+    // empty
+  }
 }
 
 // In-memory UI subscriber registry for instant local updates
@@ -144,7 +156,9 @@ function notifyDeletedSubscribers(itemType: "video" | "book") {
   deletedSubscribers[itemType].forEach((cb) => {
     try {
       cb(currentIds);
-    } catch {}
+    } catch {
+      // empty
+    }
   });
 }
 
@@ -153,7 +167,9 @@ function notifyCustomSubscribers() {
   customSubscribers.forEach((cb) => {
     try {
       cb(currentItems);
-    } catch {}
+    } catch {
+      // empty
+    }
   });
 }
 
@@ -287,7 +303,9 @@ export function subscribeDeletedItems(
       const combined = Array.from(collectedIds);
       try {
         localStorage.setItem(key, JSON.stringify(combined));
-      } catch {}
+      } catch {
+        // empty
+      }
       onUpdate(combined);
     }
   });
@@ -312,7 +330,7 @@ export function subscribeDeletedItems(
         const combined = Array.from(collectedIds);
         try {
           localStorage.setItem(key, JSON.stringify(combined));
-        } catch {}
+        } catch { /* empty */ }
         onUpdate(combined);
       },
       (err) => console.warn("Firestore global deleted listener warning:", err)
@@ -334,7 +352,9 @@ export function subscribeDeletedItems(
           const combined = Array.from(collectedIds);
           try {
             localStorage.setItem(key, JSON.stringify(combined));
-          } catch {}
+          } catch {
+            // empty
+          }
           onUpdate(combined);
         },
         (err) => console.warn("Firestore user deleted listener warning:", err)
@@ -419,7 +439,9 @@ export function subscribeCustomContent(
         const resultList = Array.from(combinedMap.values());
         try {
           localStorage.setItem(LOCAL_STORAGE_CUSTOM, JSON.stringify(resultList));
-        } catch {}
+        } catch {
+          // empty
+        }
         onUpdate(resultList);
       },
       (err) => console.warn("Firestore custom content listener warning:", err)

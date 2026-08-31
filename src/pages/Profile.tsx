@@ -58,7 +58,9 @@ export default function Profile() {
     }
     try {
       localStorage.setItem("wathaq_theme", theme);
-    } catch (e) {}
+    } catch (e) {
+      // empty
+    }
   }, [theme]);
 
   const toggleTheme = () => {

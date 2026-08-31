@@ -34,14 +34,18 @@ export function saveStoredCommunityGroups(list: CommunityGroupItem[]): void {
   try {
     const cleanList = list.filter((g) => !["g-tg-1", "g-wa-1", "g-tg-2"].includes(g.id));
     localStorage.setItem(LOCAL_STORAGE_COMMUNITY_GROUPS, JSON.stringify(cleanList));
-  } catch (e) {}
+  } catch (e) {
+    // empty
+  }
 }
 
 export function subscribeCommunityGroups(onUpdate: (groups: CommunityGroupItem[]) => void): () => void {
   // Clear legacy local storage key if it exists
   try {
     localStorage.removeItem("wathaq_community_groups_list");
-  } catch (e) {}
+  } catch (e) {
+    // empty
+  }
 
   onUpdate(getStoredCommunityGroups());
 
