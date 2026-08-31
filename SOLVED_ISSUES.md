@@ -6,6 +6,18 @@
 
 ## 📌 سجل المشكلات والتعديلات (Historical Log)
 
+### 📅 2026-08-31 | تصدير useAuthContext كاسم بديل لـ useAuth لمنع أخطاء الاستيراد من DeepSource
+- **نوع الإجراء:** DeepSource Compatibility & React Context Hook Alias Export
+- **السبب الجذري:**
+  1. أظهر تقرير Autofix لـ DeepSource محاولة آلية مكسورة لاستبدال `useAuth` بـ `useAuthContext` مع إضافة مسارات ملفات غير موجودة بالمشروع مثل `@/lib/user`.
+- **طريقة الحل:**
+  - تصدير `export const useAuthContext = useAuth;` مستقر في [AuthContext.tsx](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/context/AuthContext.tsx) لدعم اسمي الـ Hook بسلاسة وبشكل آمن مع الحفاظ على قواعد React Hooks وعدم كسر أي مكونات.
+  - إجراء البناء الشامل `npm run build` واجتياز كافّة الاختبارات التلقائية (12/12).
+- **خطة الوقاية وتيسير التطوير:**
+  - دعم الأسماء الشائعة للـ Context Hooks كـ Aliases لمنع أي تضارب مع أدوات التقييم والتفتيش الآلية.
+
+---
+
 ### 📅 2026-08-31 | تصحيح مفاتيح React JSX المستقرة ومنع استخدام الفهارس الرقمية المباشرة في 8 ملفات
 - **نوع الإجراء:** JSX React Key Optimization & DeepSource Anti-Pattern Cleanup
 - **السبب الجذري:**
