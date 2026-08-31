@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { 
   MessageSquare, User, Plus, Sparkles, Lightbulb, 
   HelpCircle, Award, ChevronLeft, ArrowRight, Atom, 
-  BookOpen, Compass, CheckCircle2, Star, ThumbsUp, Send, Trash2, ExternalLink
+  BookOpen, Compass, CheckCircle2, Star, ThumbsUp, Send, Trash2, ExternalLink, Film, Youtube
 } from "lucide-react";
 import Teachers from "@/pages/Teachers";
 import { useAuth } from "@/context/AuthContext";
@@ -22,6 +22,7 @@ import {
 } from "@/lib/subjectsData";
 import { addSuggestion } from "@/lib/suggestionService";
 import { subscribeCommunityGroups, CommunityGroupItem } from "@/lib/communityGroupsService";
+import { subscribeCommunityMedia, subscribeCommunityCategories, getYouTubeThumbnail, CommunityMediaItem } from "@/lib/communityMediaService";
 
 const mainCategories = [
   { id: "scientific", title: "مواد علمية", icon: Atom },
@@ -34,17 +35,20 @@ const subjects = [
   { id: "chemistry", title: "الكيمياء", categoryId: "scientific" },
   { id: "biology", title: "الأحياء", categoryId: "scientific" },
   { id: "math", title: "الرياضيات", categoryId: "scientific" },
+  { id: "english", title: "اللغة الإنجليزية", categoryId: "scientific" },
   { id: "grammar", title: "النحو والصرف", categoryId: "arabic" },
   { id: "literature", title: "الأدب والنصوص", categoryId: "arabic" },
-  { id: "english", title: "اللغة الإنجليزية", categoryId: "arabic" },
+  { id: "rhetoric", title: "البلاغة والتعبير", categoryId: "arabic" },
   { id: "tawheed", title: "التوحيد والعقيدة", categoryId: "islamic" },
-  { id: "fiqh", title: "الفقه وأصوله", categoryId: "islamic" }
+  { id: "fiqh", title: "الفقه وأصوله", categoryId: "islamic" },
+  { id: "tafseer", title: "التفسير وعلوم القرآن", categoryId: "islamic" },
+  { id: "hadith", title: "الحديث الشريف", categoryId: "islamic" }
 ];
 
 export default function Community() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [mode, setMode] = useState<"select" | "advice" | "question_wizard" | "teachers">("select");
+  const [mode, setMode] = useState<"select" | "advice" | "question_wizard" | "teachers" | "entertainment_select" | "entertainment">("select");
   const [wizardStep, setWizardStep] = useState<number>(1);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
@@ -63,6 +67,9 @@ export default function Community() {
   const availableSubjects = filterSubjectsForProfile(academicProfile, subjects);
 
   const [communityGroups, setCommunityGroups] = useState<CommunityGroupItem[]>([]);
+  const [mediaItems, setMediaItems] = useState<CommunityMediaItem[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [selectedMediaCategory, setSelectedMediaCategory] = useState<string>("all");
 
   useEffect(() => {
     const unsub = subscribeDiscussions((list) => {
@@ -71,9 +78,17 @@ export default function Community() {
     const unsubGroups = subscribeCommunityGroups((list) => {
       setCommunityGroups(list);
     });
+    const unsubMedia = subscribeCommunityMedia((list) => {
+      setMediaItems(list);
+    });
+    const unsubCats = subscribeCommunityCategories((cats) => {
+      setCategories(cats);
+    });
     return () => {
       unsub();
       unsubGroups();
+      unsubMedia();
+      unsubCats();
     };
   }, []);
 
@@ -81,21 +96,26 @@ export default function Community() {
     const modeParam: string | null = searchParams.get("mode");
     const catParam = searchParams.get("category");
     const subParam = searchParams.get("subject");
+    const mediaCatParam = searchParams.get("mediaCat");
 
-    if (modeParam && ["select", "advice", "question_wizard", "teachers"].includes(modeParam)) {
-      setMode(modeParam);
+    if (modeParam && ["select", "advice", "question_wizard", "teachers", "entertainment_select", "entertainment"].includes(modeParam)) {
+      setMode(modeParam as any);
     } else {
       setMode("select");
     }
 
     if (catParam) setSelectedCategory(catParam);
+    if (mediaCatParam) setSelectedMediaCategory(mediaCatParam);
     if (subParam) {
       setSelectedSubject(subParam);
       setWizardStep(3);
     }
   }, [searchParams]);
 
-  const updateUrlMode = (newMode: "select" | "advice" | "question_wizard" | "teachers", extraParams?: Record<string, string>) => {
+  const updateUrlMode = (
+    newMode: "select" | "advice" | "question_wizard" | "teachers" | "entertainment_select" | "entertainment",
+    extraParams?: Record<string, string>
+  ) => {
     setMode(newMode);
     if (newMode === "select") {
       setSearchParams({});
@@ -115,6 +135,8 @@ export default function Community() {
   const [isSuggestionModalOpen, setIsSuggestionModalOpen] = useState(false);
   const [suggestionTitle, setSuggestionTitle] = useState("");
   const [suggestionDetails, setSuggestionDetails] = useState("");
+  const [guestName, setGuestName] = useState("");
+  const [guestContact, setGuestContact] = useState("");
   const [isSubmittingSuggestion, setIsSubmittingSuggestion] = useState(false);
 
   const handleAddSuggestionSubmit = async (e: FormEvent) => {
@@ -123,12 +145,15 @@ export default function Community() {
 
     setIsSubmittingSuggestion(true);
     try {
+      const finalName = user?.displayName || user?.email?.split("@")[0] || guestName.trim() || "طالب / زائر منصة وثاق 💡";
+      const finalEmail = user?.email || guestContact.trim() || undefined;
+
       await addSuggestion({
         id: "sug-" + Date.now(),
         title: suggestionTitle.trim(),
         details: suggestionDetails.trim(),
-        userName: user?.displayName || user?.email?.split("@")[0] || "طالب وثاق",
-        userEmail: user?.email || undefined,
+        userName: finalName,
+        userEmail: finalEmail,
         createdAt: new Date().toISOString(),
         status: "new"
       });
@@ -136,6 +161,8 @@ export default function Community() {
       setIsSuggestionModalOpen(false);
       setSuggestionTitle("");
       setSuggestionDetails("");
+      setGuestName("");
+      setGuestContact("");
     } finally {
       setIsSubmittingSuggestion(false);
     }
@@ -191,33 +218,30 @@ export default function Community() {
   return (
     <div className="flex flex-col gap-stack-lg min-h-[75vh]">
       {/* Header Banner */}
-      <section className="bg-surface-container-low border border-outline-variant/30 rounded-3xl p-6 sm:p-8 shadow-xl">
-        <div className="flex justify-between items-center flex-wrap gap-4">
-          <div className="flex items-center gap-3 sm:gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center">
-              <MessageSquare className="w-6 h-6" />
+      {mode === "select" && (
+        <section className="bg-surface-container-low border border-outline-variant/30 rounded-3xl p-6 sm:p-8 shadow-xl">
+          <div className="flex justify-between items-center flex-wrap gap-4">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center">
+                <MessageSquare className="w-6 h-6" />
+              </div>
+              <div>
+                <h1 className="text-display-ar font-display-ar text-on-surface">مجتمع وثاق والنقاشات الأكاديمية</h1>
+                <p className="text-body-md text-on-surface-variant font-light mt-1">
+                  مساحة مخصصة للتركيز الأكاديمي، تبادل النصائح، وطرح أسئلة المنهج بعيداً عن المشتتات.
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-display-ar font-display-ar text-on-surface">مجتمع وثاق والنقاشات الأكاديمية</h1>
-              <p className="text-body-md text-on-surface-variant font-light mt-1">
-                مساحة مخصصة للتركيز الأكاديمي، تبادل النصائح، وطرح أسئلة المنهج بعيداً عن المشتتات.
-              </p>
-            </div>
-          </div>
 
-          {mode !== "select" ? (
+            <div className="flex items-center gap-2 flex-wrap">
               <button
-                onClick={() => {
-                  setMode("select");
-                  setWizardStep(1);
-                  setSelectedCategory(null);
-                  setSelectedSubject(null);
-                }}
-                className="text-label-sm font-label-sm text-on-surface-variant hover:text-primary border border-outline-variant/30 px-4 py-2 rounded-xl transition-colors cursor-pointer"
+                onClick={() => updateUrlMode("entertainment_select")}
+                className="bg-purple-500/10 border border-purple-500/30 text-purple-400 hover:bg-purple-500/20 px-4 py-2 rounded-xl text-label-sm font-bold flex items-center gap-2 transition-all cursor-pointer shadow-sm"
               >
-                ← العودة للخيارات الرئيسية
+                <Film className="w-4 h-4" />
+                <span>ترفيه وثقافة وثانوية 🍿🎬</span>
               </button>
-            ) : (
+
               <button
                 onClick={() => setIsSuggestionModalOpen(true)}
                 className="bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 px-4 py-2 rounded-xl text-label-sm font-bold flex items-center gap-2 transition-all cursor-pointer shadow-sm"
@@ -225,9 +249,10 @@ export default function Community() {
                 <Lightbulb className="w-4 h-4" />
                 <span>لديك اقتراح لتحسين المنصة؟</span>
               </button>
-            )}
-        </div>
-      </section>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* MODE SELECTOR: Initial Screen with 3 Distinct Cards */}
       {mode === "select" && (
@@ -581,6 +606,248 @@ export default function Community() {
                   );
                 })}
               </div>
+            </div>
+          )}
+        </motion.div>
+      )}
+
+      {/* MODE 4: Teachers Evaluation Directory */}
+      {mode === "teachers" && <Teachers />}
+
+      {/* MODE 5: Full Page Entertainment Categories Selector */}
+      {mode === "entertainment_select" && (
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col gap-8 w-full max-w-5xl my-auto items-center text-right"
+        >
+          {/* Header Card */}
+          <div className="bg-surface-container-low border border-purple-500/30 rounded-3xl p-6 sm:p-8 w-full flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-xl">
+            <div>
+              <div className="flex items-center gap-2 bg-purple-500/10 border border-purple-500/20 text-purple-400 px-3 py-1 rounded-full text-xs font-bold w-fit mb-2">
+                <Film className="w-4 h-4" />
+                <span>قسم الترفيه والثقافة ونادي القراءة 🍿🎬</span>
+              </div>
+              <h2 className="text-headline-lg font-bold text-on-surface">اختر القسم الترفيهي أو الثقافي الذي تود تصفحه</h2>
+              <p className="text-body-md text-on-surface-variant font-light mt-1">
+                اختر القسم المناسب لشحن طاقتك، تخفيف التوتر أثناء المذاكرة، وتصفح أفضل ترشيحات الكتب والفيديوهات والقنوات.
+              </p>
+            </div>
+
+            <button
+              onClick={() => updateUrlMode("select")}
+              className="text-label-sm font-label-sm text-on-surface-variant hover:text-primary border border-outline-variant/30 px-4 py-2.5 rounded-xl transition-colors cursor-pointer shrink-0"
+            >
+              ← العودة للخيارات الرئيسية
+            </button>
+          </div>
+
+          {/* Large Cards Grid for Each Entertainment Category */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
+            {categories.map((cat) => {
+              const catItemsCount = mediaItems.filter((i) => i.category === cat).length;
+              const isBookCat = cat.includes("قراءة") || cat.includes("كتاب") || cat.includes("رواية");
+              const isYoutubeChannelCat = cat.includes("قنوات") || cat.includes("يوتيوب");
+              const isVideoCat = cat.includes("فيديو") || cat.includes("ذات");
+
+              return (
+                <button
+                  key={cat}
+                  onClick={() => {
+                    setSelectedMediaCategory(cat);
+                    updateUrlMode("entertainment", { mediaCat: cat });
+                  }}
+                  className="group text-right p-6 sm:p-8 rounded-3xl bg-surface-container-low border border-outline-variant/30 hover:border-purple-400 hover:bg-surface-container transition-all duration-300 flex flex-col justify-between h-[260px] cursor-pointer shadow-xl relative overflow-hidden"
+                >
+                  <div className="flex justify-between items-start w-full mb-4">
+                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border group-hover:scale-110 transition-transform ${
+                      isBookCat
+                        ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                        : isYoutubeChannelCat || isVideoCat
+                        ? "bg-red-500/10 text-red-400 border-red-500/20"
+                        : "bg-purple-500/10 text-purple-400 border-purple-500/20"
+                    }`}>
+                      {isBookCat ? (
+                        <BookOpen className="w-7 h-7" />
+                      ) : isYoutubeChannelCat || isVideoCat ? (
+                        <Youtube className="w-7 h-7" />
+                      ) : (
+                        <Film className="w-7 h-7" />
+                      )}
+                    </div>
+
+                    <span className="text-xs bg-surface-container-high text-on-surface-variant font-bold px-3 py-1 rounded-full border border-outline-variant/20">
+                      {catItemsCount} محتوى
+                    </span>
+                  </div>
+
+                  <div>
+                    <h3 className="text-headline-md font-bold text-on-surface group-hover:text-purple-400 transition-colors mb-2">
+                      {cat}
+                    </h3>
+                    <p className="text-body-md text-on-surface-variant font-light leading-relaxed line-clamp-2">
+                      {isBookCat
+                        ? "تصفح ترشيحات الروايات والكتب الممتعة وملخصات الكتب العالمية للترويح عن النفس."
+                        : isYoutubeChannelCat
+                        ? "دليل أفضل القنوات التعليمية والتثقيفية الموصى بها لطلاب الثانوية والأزهر."
+                        : isVideoCat
+                        ? "مقاطع وفيديوهات تطبيقية لتنظيم الوقت والتغلب على التسويف وشحن الطاقة."
+                        : "مساحة ترفيهية خفيفة وثقافية للتجديد والتحفيز الذاتي."}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 text-xs text-purple-400 font-bold pt-3 border-t border-outline-variant/10 group-hover:translate-x-[-4px] transition-transform">
+                    <span>دخول القسم وتصفح المحتوى</span>
+                    <ChevronLeft className="w-4 h-4" />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </motion.div>
+      )}
+
+      {/* MODE 6: Dedicated Entertainment & Reading Club Page */}
+      {mode === "entertainment" && (
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col gap-6 w-full max-w-5xl text-right"
+        >
+          {/* Top Banner */}
+          <div className="bg-surface-container-low border border-purple-500/30 rounded-3xl p-6 sm:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-xl">
+            <div>
+              <div className="flex items-center gap-2 bg-purple-500/10 border border-purple-500/20 text-purple-400 px-3 py-1 rounded-full text-xs font-bold w-fit mb-2">
+                <Film className="w-4 h-4" />
+                <span>قسم الترفيه والثقافة ونادي القراءة 🎬📚</span>
+              </div>
+              <h2 className="text-headline-lg font-bold text-on-surface">فيديوهات يوتيوب ترفيهية، ملخصات روايات، وكتب موصى بها</h2>
+              <p className="text-body-md text-on-surface-variant font-light mt-1">
+                مساحة ترويحية لشحن طاقتك، تخفيف التوتر، والاستفادة من أفضل الترشيحات الثقافية والتطويرية.
+              </p>
+            </div>
+
+            <button
+              onClick={() => updateUrlMode("entertainment_select")}
+              className="text-label-sm font-label-sm text-on-surface-variant hover:text-primary border border-outline-variant/30 px-4 py-2.5 rounded-xl transition-colors cursor-pointer shrink-0 flex items-center gap-1.5"
+            >
+              <ArrowRight className="w-4 h-4" />
+              <span>العودة لأقسام الترفيه والنادي</span>
+            </button>
+          </div>
+
+          {/* Dynamic Categories Filter Pills */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+            <button
+              onClick={() => setSelectedMediaCategory("all")}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                selectedMediaCategory === "all"
+                  ? "bg-primary text-on-primary shadow-md"
+                  : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high border border-outline-variant/20"
+              }`}
+            >
+              عرض الكل ({mediaItems.length})
+            </button>
+
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setSelectedMediaCategory(cat)}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                  selectedMediaCategory === cat
+                    ? "bg-primary text-on-primary shadow-md"
+                    : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high border border-outline-variant/20"
+                }`}
+              >
+                {cat} ({mediaItems.filter((i) => i.category === cat).length})
+              </button>
+            ))}
+          </div>
+
+          {/* Media Items Grid */}
+          {mediaItems.length === 0 ? (
+            <div className="p-12 text-center bg-surface-container rounded-3xl border border-outline-variant/20 text-on-surface-variant flex flex-col items-center gap-3">
+              <Film className="w-12 h-12 text-on-surface-variant/40" />
+              <h4 className="text-headline-md font-bold text-on-surface">لا توجد عناصر مضافة بهذا القسم حالياً 🎬</h4>
+              <p className="text-body-md text-on-surface-variant font-light">
+                يمكن للأدمن إضافة أي فيديو يوتيوب أو كتاب ورواية من لوحة التحكم.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {mediaItems
+                .filter((m) => selectedMediaCategory === "all" || m.category === selectedMediaCategory)
+                .map((item) => {
+                  const displayThumbnail = item.thumbnailUrl || (item.type === "youtube" ? getYouTubeThumbnail(item.linkUrl) : null);
+                  return (
+                    <div
+                      key={item.id}
+                      className="bg-surface-container-low border border-outline-variant/30 hover:border-purple-500/50 p-5 rounded-2xl flex flex-col justify-between gap-4 transition-all shadow-lg text-right overflow-hidden group"
+                    >
+                      {/* Image Thumbnail Banner */}
+                      {displayThumbnail ? (
+                        <div className="relative w-full h-44 rounded-xl overflow-hidden bg-black/40 border border-outline-variant/20">
+                          <img
+                            src={displayThumbnail}
+                            alt={item.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end justify-between p-3">
+                            <span className="text-[10px] bg-black/60 text-white backdrop-blur-md font-bold px-2.5 py-1 rounded-md border border-white/10">
+                              {item.category}
+                            </span>
+                            {item.type === "youtube" && (
+                              <div className="w-8 h-8 rounded-full bg-red-600/90 text-white flex items-center justify-center shadow-lg">
+                                <Youtube className="w-4 h-4" />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      <div className="flex items-start gap-3">
+                        {!displayThumbnail && (
+                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border shrink-0 ${
+                            item.type === "youtube"
+                              ? "bg-red-500/10 text-red-400 border-red-500/30"
+                              : "bg-blue-500/10 text-blue-400 border-blue-500/30"
+                          }`}>
+                            {item.type === "youtube" ? <Youtube className="w-6 h-6 text-red-400" /> : <BookOpen className="w-6 h-6 text-blue-400" />}
+                          </div>
+                        )}
+
+                        <div>
+                          {!displayThumbnail && (
+                            <span className="text-[11px] bg-primary/10 text-primary font-bold px-2.5 py-0.5 rounded-md w-fit mb-1 inline-block">
+                              {item.category}
+                            </span>
+                          )}
+                          <h4 className="font-bold text-body-lg text-on-surface line-clamp-2 leading-snug">{item.title}</h4>
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-on-surface-variant font-light line-clamp-3 leading-relaxed bg-surface-container-high/60 p-3.5 rounded-xl">
+                        "{item.description}"
+                      </p>
+
+                      <div className="pt-3 border-t border-outline-variant/10 flex justify-between items-center text-xs">
+                        <a
+                          href={item.linkUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="bg-purple-500/10 hover:bg-purple-500 text-purple-400 hover:text-white border border-purple-500/20 px-3.5 py-2.5 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm cursor-pointer"
+                        >
+                          <span>{item.type === "youtube" ? "مشاهدة الفيديو على يوتيوب" : "فتح الكتاب / الرواية"}</span>
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+
+                        {item.author && (
+                          <span className="text-on-surface-variant/70 text-[11px] font-medium truncate max-w-[120px]">{item.author}</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
           )}
         </motion.div>

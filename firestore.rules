@@ -125,8 +125,7 @@ service cloud.firestore {
 
     match /suggestions/{document=**} {
       allow read: if isAdmin();
-      allow create: if isSignedIn() &&
-        request.resource.data.keys().hasAny(['title', 'details']) &&
+      allow create: if request.resource.data.keys().hasAny(['title', 'details']) &&
         (!request.resource.data.keys().hasAny(['title']) || (request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 300)) &&
         (!request.resource.data.keys().hasAny(['details']) || (request.resource.data.details is string && request.resource.data.details.size() <= 2000));
       allow update, delete: if isAdmin();

@@ -1,6 +1,8 @@
-import { PlayCircle, BookOpen, MessageSquare, Compass, Sparkles } from "lucide-react";
+import { useState, useEffect } from "react";
+import { PlayCircle, BookOpen, MessageSquare, Sparkles, Lightbulb, RefreshCw } from "lucide-react";
 import { Link } from "react-router-dom";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
+import { subscribeDailyTips, getTodayTip, DailyTipItem } from "@/lib/dailyTipsService";
 
 const modules = [
   {
@@ -42,8 +44,25 @@ const item = {
 };
 
 export default function Home() {
+  const [tips, setTips] = useState<DailyTipItem[]>([]);
+  const [tipOffsetIndex, setTipOffsetIndex] = useState<number>(0);
+  const [isRotating, setIsRotating] = useState<boolean>(false);
+
+  useEffect(() => {
+    const unsub = subscribeDailyTips((list) => setTips(list));
+    return () => unsub();
+  }, []);
+
+  const currentTip = getTodayTip(tips, tipOffsetIndex);
+
+  const handleNextTip = () => {
+    setIsRotating(true);
+    setTipOffsetIndex((prev) => prev + 1);
+    setTimeout(() => setIsRotating(false), 400);
+  };
+
   return (
-    <div className="flex-grow flex flex-col items-center justify-center py-section-padding px-4">
+    <div className="flex-grow flex flex-col items-center justify-center py-section-padding px-4 text-right">
       {/* Brand / Logo Area */}
       <motion.div
         initial={{ opacity: 0, scale: 0.9, y: -20 }}
@@ -110,15 +129,72 @@ export default function Home() {
         ))}
       </motion.div>
 
-      {/* Intro Text */}
+      {/* Professional Daily Tip Card Component */}
       <motion.div
-        initial={{ opacity: 0, y: 15 }}
+        initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.6, duration: 0.8 }}
-        className="mt-16 text-center max-w-lg"
+        transition={{ delay: 0.5, duration: 0.8 }}
+        className="mt-14 w-full max-w-2xl"
       >
-        <h2 className="text-display-ar font-display-ar text-on-surface mb-stack-sm text-[26px]">نقاشات هادئة، أفكار عميقة.</h2>
-        <p className="text-body-lg font-body-lg text-on-surface-variant">مساحة مخصصة للتركيز الأكاديمي وتبادل المعرفة بعيداً عن صخب المشتتات.</p>
+        <div className="relative group bg-gradient-to-b from-surface-container-low to-surface-container border border-amber-500/30 hover:border-amber-500/60 rounded-3xl p-6 sm:p-8 shadow-2xl transition-all duration-300 overflow-hidden text-right">
+          {/* Subtle Ambient Light */}
+          <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="flex justify-between items-center flex-wrap gap-3 border-b border-outline-variant/10 pb-4 mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+                <Lightbulb className="w-5 h-5 animate-pulse" />
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-headline-md font-bold text-on-surface">نصيحة اليوم للطلاب 💡</h3>
+                  {currentTip?.category && (
+                    <span className="text-[10px] bg-amber-500/10 text-amber-400 font-bold px-2.5 py-0.5 rounded-full border border-amber-500/20">
+                      {currentTip.category}
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-on-surface-variant/70 font-light mt-0.5">
+                  إرشادات وإلهام متجدد يومياً لمساعدتك على التركيز والتفوق الدراسي.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={handleNextTip}
+              className="bg-surface-container-high border border-outline-variant/30 hover:border-amber-400/50 text-on-surface hover:text-amber-400 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95"
+              title="عرض نصيحة أخرى من بنك الـ 100 نصيحة"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isRotating ? "animate-spin text-amber-400" : ""}`} />
+              <span>نصيحة أخرى 🔄</span>
+            </button>
+          </div>
+
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentTip?.id || tipOffsetIndex}
+              initial={{ opacity: 0, x: 15 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -15 }}
+              transition={{ duration: 0.3 }}
+              className="my-2"
+            >
+              <p className="text-body-lg font-bold text-on-surface leading-relaxed sm:text-lg">
+                "{currentTip?.content}"
+              </p>
+
+              {currentTip?.author && (
+                <div className="mt-3 pt-3 border-t border-outline-variant/10 text-xs text-on-surface-variant/70 font-light flex justify-between items-center">
+                  <span>المصدر / الكاتب: {currentTip.author}</span>
+                  <span className="text-[10px] bg-surface-container-high px-2 py-0.5 rounded-md border border-outline-variant/20">
+                    من بنك الـ 100 نصيحة 📚
+                  </span>
+                </div>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </div>
       </motion.div>
     </div>
   );

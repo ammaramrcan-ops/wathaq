@@ -100,12 +100,14 @@ const subjects: SubjectItem[] = [
   { id: "chemistry", title: "الكيمياء", categoryId: "scientific", description: "ملخصات وتجارب الكيمياء", icon: Atom },
   { id: "biology", title: "الأحياء", categoryId: "scientific", description: "رسومات وملازم أحياء الثانوية", icon: Atom },
   { id: "math", title: "الرياضيات", categoryId: "scientific", description: "تمارين وتفاضل وتكامل وملازم الشرح", icon: Atom },
+  { id: "english", title: "اللغة الإنجليزية", categoryId: "scientific", description: "قواعد الجرامر والقراءة وشرح الكلمات وترجمة المقاطع", icon: BookOpen },
   { id: "grammar", title: "النحو والصرف", categoryId: "arabic", description: "ملازم إعراب وشرح ألفية ابن مالك", icon: BookOpen },
   { id: "literature", title: "الأدب والنصوص", categoryId: "arabic", description: "ملخصات العصور الأدبية والنصوص", icon: BookOpen },
   { id: "rhetoric", title: "البلاغة والتعبير", categoryId: "arabic", description: "خرائط البديع والبيان والمعاني", icon: BookOpen },
-  { id: "english", title: "اللغة الإنجليزية", categoryId: "arabic", description: "قواعد الجرامر والقراءة وشرح الكلمات وترجمة المقاطع", icon: BookOpen },
   { id: "tawheed", title: "التوحيد والعقيدة", categoryId: "islamic", description: "كتب وأصول التوحيد المقررة", icon: Compass },
-  { id: "fiqh", title: "الفقه وأصوله", categoryId: "islamic", description: "ملازم وأحكام الفقه المذهبي", icon: Compass }
+  { id: "fiqh", title: "الفقه وأصوله", categoryId: "islamic", description: "ملازم وأحكام الفقه المذهبي", icon: Compass },
+  { id: "tafseer", title: "التفسير وعلوم القرآن", categoryId: "islamic", description: "كتب وشروح التفسير لجميع السور المقررة", icon: Compass },
+  { id: "hadith", title: "الحديث الشريف", categoryId: "islamic", description: "شرح أحاديث النبي ﷺ المقررة", icon: Compass }
 ];
 
 const bookFilters: FilterType[] = [
@@ -717,7 +719,7 @@ export default function Books() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {selectedUnit.lessons.map((lesson) => (
+                {selectedUnit.lessons.map((lesson, idx) => (
                   <button
                     key={lesson}
                     onClick={() => {

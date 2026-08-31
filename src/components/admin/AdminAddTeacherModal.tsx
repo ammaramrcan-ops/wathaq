@@ -24,7 +24,7 @@ const masterSubjectsList = [
   { id: "grammar", title: "النحو والصرف", category: "arabic" as const, catName: "عربي", sectors: ["azhar_scientific", "azhar_literary", "all"] },
   { id: "literature", title: "الأدب والنصوص والشعر", category: "arabic" as const, catName: "عربي", sectors: ["azhar_scientific", "azhar_literary", "general_literary", "all"] },
   { id: "rhetoric", title: "البلاغة والتعبير", category: "arabic" as const, catName: "عربي", sectors: ["azhar_scientific", "azhar_literary", "all"] },
-  { id: "english", title: "اللغة الإنجليزية", category: "arabic" as const, catName: "ثقافي", sectors: ["azhar_scientific", "azhar_literary", "general_scientific", "general_math", "general_literary", "all"] },
+  { id: "english", title: "اللغة الإنجليزية", category: "scientific" as const, catName: "علمي / ثقافي", sectors: ["azhar_scientific", "azhar_literary", "general_scientific", "general_math", "general_literary", "all"] },
 
   // المواد الشرعية (أزهر فقط)
   { id: "quran", title: "القرآن الكريم وعلومه", category: "islamic" as const, catName: "شرعي", sectors: ["azhar_scientific", "azhar_literary", "all"] },

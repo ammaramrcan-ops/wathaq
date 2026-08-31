@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { 
   HardDrive, Trash2, ExternalLink, Plus, ShieldCheck, BarChart3, 
-  CheckCircle, Clock, Lock, Award, Users, GraduationCap, Star, Layers, Lightbulb
+  CheckCircle, Clock, Lock, Award, Users, GraduationCap, Star, Layers, Lightbulb, Film
 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -17,6 +17,8 @@ import { AdminSuggestionsTab } from "@/components/admin/AdminSuggestionsTab";
 import { AdminLessonsTab } from "@/components/admin/AdminLessonsTab";
 import { AdminLessonResourcesTab } from "@/components/admin/AdminLessonResourcesTab";
 import { AdminCommunityGroupsTab } from "@/components/admin/AdminCommunityGroupsTab";
+import { AdminCommunityMediaTab } from "@/components/admin/AdminCommunityMediaTab";
+import { AdminDailyTipsTab } from "@/components/admin/AdminDailyTipsTab";
 import { 
   subscribeCustomContent, 
   approveCustomContent, 
@@ -64,7 +66,7 @@ export default function Admin() {
   const [isAddSubjectOpen, setIsAddSubjectOpen] = useState(false);
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const validTabs = ["overview", "pending", "teachers", "subjects", "users", "content", "lessons", "suggestions", "resources", "groups"];
+  const validTabs = ["overview", "pending", "teachers", "subjects", "users", "content", "lessons", "suggestions", "resources", "groups", "media", "tips"];
   const tabParam = searchParams.get("tab");
   const activeTab = (tabParam && validTabs.includes(tabParam)) ? tabParam : "overview";
 
@@ -315,7 +317,33 @@ export default function Admin() {
           <Users className="w-4 h-4 text-emerald-400" />
           <span>10. جروبات تليجرام/واتساب 💬</span>
         </button>
+
+        <button
+          onClick={() => handleTabChange("media")}
+          className={`px-4 sm:px-5 py-2.5 rounded-lg text-label-sm font-medium transition-all flex items-center gap-2 border whitespace-nowrap cursor-pointer ${
+            activeTab === "media" ? "bg-primary text-on-primary border-primary" : "bg-surface-container-low text-on-surface-variant border-outline-variant/30 hover:border-primary/50"
+          }`}
+        >
+          <Film className="w-4 h-4 text-purple-400" />
+          <span>11. فيديوهات ترفيهية وروايات 🎬</span>
+        </button>
+
+        <button
+          onClick={() => handleTabChange("tips")}
+          className={`px-4 sm:px-5 py-2.5 rounded-lg text-label-sm font-medium transition-all flex items-center gap-2 border whitespace-nowrap cursor-pointer ${
+            activeTab === "tips" ? "bg-primary text-on-primary border-primary" : "bg-surface-container-low text-on-surface-variant border-outline-variant/30 hover:border-primary/50"
+          }`}
+        >
+          <Lightbulb className="w-4 h-4 text-amber-400" />
+          <span>12. بنك نصائح اليوم 💡</span>
+        </button>
       </div>
+
+      {/* DAILY TIPS TAB */}
+      {activeTab === "tips" && <AdminDailyTipsTab />}
+
+      {/* COMMUNITY MEDIA TAB */}
+      {activeTab === "media" && <AdminCommunityMediaTab />}
 
       {/* LESSON RESOURCES TAB */}
       {activeTab === "resources" && <AdminLessonResourcesTab />}

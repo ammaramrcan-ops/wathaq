@@ -80,7 +80,7 @@ const subjects: SubjectItem[] = [
   { id: "grammar", title: "النحو والصرف", categoryId: "arabic", description: "قواعد الإعراب والإحكام الصرفي", icon: BookOpen },
   { id: "literature", title: "الأدب والنصوص", categoryId: "arabic", description: "العصور الأدبية وتحليل النصوص الشعرية", icon: BookOpen },
   { id: "rhetoric", title: "البلاغة والتعبير", categoryId: "arabic", description: "البيان، البديع، والمعاني", icon: BookOpen },
-  { id: "english", title: "اللغة الإنجليزية", categoryId: "arabic", description: "شروحات الجرامر والقراءة وشرح الكلمات وتدريبات الامتحانات", icon: BookOpen },
+  { id: "english", title: "اللغة الإنجليزية", categoryId: "scientific", description: "شروحات الجرامر والقراءة وشرح الكلمات وتدريبات الامتحانات", icon: BookOpen },
   { id: "tawheed", title: "التوحيد والعقيدة", categoryId: "islamic", description: "أركان الإيمان وأصول العقيدة الإسلامية", icon: Compass },
   { id: "fiqh", title: "الفقه وأصوله", categoryId: "islamic", description: "أحكام العبادات والمعاملات الشرعية", icon: Compass },
   { id: "tafseer", title: "التفسير وعلوم القرآن", categoryId: "islamic", description: "تدبر الآيات وعلوم نزول القرآن", icon: Compass },
@@ -587,7 +587,7 @@ export default function Videos() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {selectedUnit.lessons.map((lesson) => (
+                {selectedUnit.lessons.map((lesson, idx) => (
                   <button
                     key={lesson}
                     onClick={() => {

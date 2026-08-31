@@ -47,7 +47,7 @@ const teacherSubjects = [
   { id: "grammar", title: "مدرسو النحو والصرف", categoryId: "arabic", description: "قواعد الإعراب والصرف والأساليب" },
   { id: "literature", title: "مدرسو الأدب والنصوص", categoryId: "arabic", description: "شرح المدارس الأدبية والنصوص" },
   { id: "rhetoric", title: "مدرسو البلاغة والتعبير", categoryId: "arabic", description: "البيان، البديع، والمعاني" },
-  { id: "english", title: "مدرسو اللغة الإنجليزية", categoryId: "arabic", description: "الجرامر والمفردات والترجمة والمهارات" },
+  { id: "english", title: "مدرسو اللغة الإنجليزية", categoryId: "scientific", description: "الجرامر والمفردات والترجمة والمهارات" },
   { id: "tawheed", title: "مدرسو التوحيد والعقيدة", categoryId: "islamic", description: "أصول العقيدة الإسلامية والإلهيات" },
   { id: "fiqh", title: "مدرسو الفقه وأصوله", categoryId: "islamic", description: "أحكام المعاملات والعبادات المذهبية" },
   { id: "tafseer", title: "مدرسو التفسير وعلوم القرآن", categoryId: "islamic", description: "تدبر السور وعلوم نزول القرآن" },
