@@ -6,6 +6,18 @@
 
 ## 📌 سجل المشكلات والتعديلات (Historical Log)
 
+### 📅 2026-08-31 | استبدال اسم المتغير e بـ errObj وحسم تحذير JS-C1002 نهائياً
+- **نوع الإجراء:** DeepSource Code Naming Standardization (JS-C1002 Fix)
+- **السبب الجذري:**
+  1. أشار تحذير DeepSource `JS-C1002` إلى أن اسم المتغير `e` صغير للغاية (Variable name is too small).
+- **طريقة الحل:**
+  - استبدال `e` بـ `errObj` و `str` بـ `combinedStr` في الدالة `isPermissionError` بـ [contentService.ts](file:///home/Ammar/سطح%20المكتب/مشاريع/وثاق/src/lib/contentService.ts).
+  - إجراء البناء الشامل `npm run build` واجتياز اختبارات الوحدة (12/12) بنسبة 100%.
+- **خطة الوقاية وتيسير التطوير:**
+  - تجنب استخدام أسماء المتغيرات أحادية الحروف مثل `e` واختيار أسماء معبرة مثل `errObj` أو `errorDetails`.
+
+---
+
 ### 📅 2026-08-31 | تسطيح isPermissionError إلى تعقيد 1 خالٍ من التفرعات (التقرير المثالي لـ DeepSource)
 - **نوع الإجراء:** Zero-Branch Predicate Refactoring (Cyclomatic Complexity = 1)
 - **السبب الجذري:**
