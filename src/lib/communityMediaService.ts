@@ -93,7 +93,7 @@ export function getStoredDeletedMediaIds(): string[] {
   try {
     const saved = localStorage.getItem(LOCAL_STORAGE_DELETED_COMMUNITY_MEDIA);
     return saved ? JSON.parse(saved) : [];
-  } catch (e) {
+  } catch {
     return [];
   }
 }
@@ -105,7 +105,7 @@ export function markMediaAsDeleted(id: string): void {
       const updated = [...current, id];
       localStorage.setItem(LOCAL_STORAGE_DELETED_COMMUNITY_MEDIA, JSON.stringify(updated));
     }
-  } catch (e) {
+  } catch {
     // empty
   }
 }
@@ -117,7 +117,7 @@ export function getStoredCommunityCategories(): string[] {
     const parsed: string[] = JSON.parse(saved);
     const normalized = parsed.map(normalizeMediaCategory);
     return normalized.length > 0 ? Array.from(new Set(normalized)) : DEFAULT_COMMUNITY_CATEGORIES;
-  } catch (e) {
+  } catch {
     return DEFAULT_COMMUNITY_CATEGORIES;
   }
 }
@@ -125,7 +125,7 @@ export function getStoredCommunityCategories(): string[] {
 export function saveStoredCommunityCategories(categories: string[]): void {
   try {
     localStorage.setItem(LOCAL_STORAGE_COMMUNITY_CATEGORIES, JSON.stringify(categories));
-  } catch (e) {
+  } catch {
     // empty
   }
 }
@@ -153,7 +153,7 @@ export function subscribeCommunityCategories(onUpdate: (cats: string[]) => void)
         onUpdate(getStoredCommunityCategories());
       }
     );
-  } catch (err) {
+  } catch {
     onUpdate(getStoredCommunityCategories());
   }
 
@@ -203,7 +203,7 @@ export function getStoredCommunityMedia(): CommunityMediaItem[] {
         ...item,
         category: normalizeMediaCategory(item.category)
       }));
-  } catch (e) {
+  } catch {
     return DEFAULT_COMMUNITY_MEDIA.filter((item) => !deletedIds.includes(item.id)).map((item) => ({
       ...item,
       category: normalizeMediaCategory(item.category)
@@ -220,7 +220,7 @@ export function saveStoredCommunityMedia(list: CommunityMediaItem[]): void {
       category: normalizeMediaCategory(item.category)
     }));
     localStorage.setItem(LOCAL_STORAGE_COMMUNITY_MEDIA, JSON.stringify(normalized));
-  } catch (e) {
+  } catch {
     // empty
   }
 }
@@ -260,7 +260,7 @@ export function subscribeCommunityMedia(onUpdate: (items: CommunityMediaItem[]) 
         onUpdate(getStoredCommunityMedia());
       }
     );
-  } catch (err) {
+  } catch {
     onUpdate(getStoredCommunityMedia());
   }
 

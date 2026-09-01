@@ -29,7 +29,7 @@ export function AdminCommunityGroupsTab() {
     setIsSubmitting(true);
     try {
       const newGroup: CommunityGroupItem = {
-        id: "g-" + Date.now(),
+        id: `g-${Date.now()}`,
         title: title.trim(),
         platform,
         linkUrl: linkUrl.trim(),

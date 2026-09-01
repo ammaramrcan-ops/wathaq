@@ -149,7 +149,7 @@ export default function Community() {
       const finalEmail = user?.email || guestContact.trim() || undefined;
 
       await addSuggestion({
-        id: "sug-" + Date.now(),
+        id: `sug-${Date.now()}`,
         title: suggestionTitle.trim(),
         details: suggestionDetails.trim(),
         userName: finalName,
@@ -175,7 +175,7 @@ export default function Community() {
     const authorName = user?.displayName || user?.email?.split("@")[0] || "طالب وثاق";
 
     const newPost: Discussion = {
-      id: "d-" + Date.now(),
+      id: `d-${Date.now()}`,
       title: newTitle.trim(),
       author: authorName,
       authorEmail: user?.email || undefined,

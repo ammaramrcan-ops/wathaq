@@ -34,7 +34,7 @@ export function getStoredTeachers(): TeacherEvaluation[] {
     const parsed: TeacherEvaluation[] = JSON.parse(saved);
     // Filter out old mock IDs
     return parsed.filter((t) => !["t-phys-1", "t-chem-1", "t-arb-1"].includes(t.id));
-  } catch (e) {
+  } catch {
     return [];
   }
 }
@@ -43,7 +43,7 @@ export function saveStoredTeachers(list: TeacherEvaluation[]): void {
   try {
     const clean = list.filter((t) => !["t-phys-1", "t-chem-1", "t-arb-1"].includes(t.id));
     localStorage.setItem(LOCAL_STORAGE_TEACHERS, JSON.stringify(clean));
-  } catch (e) {
+  } catch {
     // empty
   }
 }
@@ -51,7 +51,7 @@ export function saveStoredTeachers(list: TeacherEvaluation[]): void {
 export function subscribeTeachers(onUpdate: (teachers: TeacherEvaluation[]) => void): () => void {
   try {
     localStorage.removeItem("wathaq_teacher_evaluations_list");
-  } catch (e) {
+  } catch {
     /* ignore storage error */
   }
 
@@ -77,7 +77,7 @@ export function subscribeTeachers(onUpdate: (teachers: TeacherEvaluation[]) => v
         onUpdate(getStoredTeachers());
       }
     );
-  } catch (err) {
+  } catch {
     onUpdate(getStoredTeachers());
   }
 

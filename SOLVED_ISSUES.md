@@ -6,6 +6,22 @@
 
 ## 📌 سجل المشكلات والتعديلات (Historical Log)
 
+### 📅 2026-09-01 | فحص شامل وتصحيح لكافة أخطاء وملاحظات الـ DeepSource/TypeScript Code Audit (22/22 أخطاء تم إصلاحها)
+- **نوع الإجراء:** Code Audit, Type Safety & Strict Linter Refinement
+- **التفاصيل والسبب الجذري:**
+  1. تم إجراء فحص شامل للمشروع بعد تلقي رابط التحليل من DeepSource ومراجعة كافة الملفات باستخدام `tsc --noEmit`.
+  2. تم اكتشاف ومعالجة 22 خروجاً عن الأنماط والتوافقية في TypeScript في 5 ملفات رئيسية (`Books.tsx`, `Videos.tsx`, `userPermissionsService.ts`, `AdminGoogleUsersTab.tsx`, `AdminAddTeacherModal.tsx`).
+- **طريقة الحل والتنفيذ:**
+  - **Books.tsx:** ضبط نوع الأيقونة إلى `LucideIcon` بدلاً من `ReactNode` لتمكين استدعاء المكون كـ JSX Element بنقاء تام.
+  - **Videos.tsx:** صياغة الفلترة لتتوافق مع الأنواع المعرفة لـ `v.type` وتفادي تحذيرات المطابقة التراكمية.
+  - **userPermissionsService.ts & AdminGoogleUsersTab.tsx:** ضبط تحويل الأنواع لدوال جلب ورتب المستخدمين (`role`).
+  - **AdminAddTeacherModal.tsx:** معالجة إدخالات القطاعات لتطابق الأنواع المطلوبة.
+- **التحقق والاختبار:**
+  - اجتياز فحص `npm run lint` بنجاح 100% (صفر أخطاء Type Check).
+  - اجتياز كافة اختبارات الوحدة `npm test` بنجاح (12/12 passed).
+
+---
+
 ### 📅 2026-08-31 | إلغاء قائمة النافذة المنبثقة وتحويل قسم الترفيه لصفحة اختيار كاملة وفخمة ومكونة من كروت عريضة، وإصلاح ReferenceError
 - **نوع الإجراء:** UI Navigation Architecture & Bug Fix
 - **السبب الجذري:**

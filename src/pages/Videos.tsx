@@ -337,8 +337,8 @@ export default function Videos() {
     const matchesType =
       !selectedContentType ||
       v.type === selectedContentType.id ||
-      v.type === "single" ||
-      (selectedContentType.id === "video" && (v.type === "video" || v.type === "single")) ||
+      (v.type as string) === "single" ||
+      (selectedContentType.id === "video" && (v.type === "video" || (v.type as string) === "single")) ||
       (selectedContentType.id === "playlist" && v.type === "playlist");
 
     return matchesSubject && matchesType;

@@ -92,7 +92,7 @@ export function AdminAddTeacherModal({
     setIsSubmitting(true);
     try {
       const newTeacher: TeacherEvaluation = {
-        id: "t-custom-" + Date.now(),
+        id: `t-custom-${Date.now()}`,
         name: tName.trim(),
         subjectId: selectedSubjectId,
         subjectTitle: tSubjectTitle,
@@ -168,7 +168,7 @@ export function AdminAddTeacherModal({
               </label>
               <select
                 value={tSystemCategory}
-                onChange={(e) => setTSystemCategory(e.target.value)}
+                onChange={(e) => setTSystemCategory(e.target.value as any)}
                 className="bg-surface-container-high border border-outline-variant/40 rounded-xl p-3 text-body-md text-on-surface focus:outline-none focus:border-primary font-bold"
               >
                 <option value="azhar_scientific">الأزهر - قسم علمي 🕌</option>
@@ -255,19 +255,37 @@ export function AdminAddTeacherModal({
             </div>
           </div>
 
-          {/* Teacher Avatar Image URL */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-label-sm font-bold text-on-surface flex items-center gap-1.5">
-              <ImageIcon className="w-4 h-4 text-primary" />
-              <span>رابط صورة المدرس الشخصية (Avatar Image URL):</span>
-            </label>
-            <input
-              type="url"
-              value={tAvatar}
-              onChange={(e) => setTAvatar(e.target.value)}
-              placeholder="https://images.unsplash.com/photo-... (رابط الصورة)"
-              className="bg-surface-container-high border border-outline-variant/40 rounded-xl p-3 text-body-md text-on-surface focus:outline-none focus:border-primary"
-            />
+          {/* Teacher Avatar & Rating */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="sm:col-span-2 flex flex-col gap-1.5">
+              <label className="text-label-sm font-bold text-on-surface flex items-center gap-1.5">
+                <ImageIcon className="w-4 h-4 text-primary" />
+                <span>رابط صورة المدرس الشخصية (Avatar Image URL):</span>
+              </label>
+              <input
+                type="url"
+                value={tAvatar}
+                onChange={(e) => setTAvatar(e.target.value)}
+                placeholder="https://images.unsplash.com/photo-... (رابط الصورة)"
+                className="bg-surface-container-high border border-outline-variant/40 rounded-xl p-3 text-body-md text-on-surface focus:outline-none focus:border-primary"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-label-sm font-bold text-on-surface flex items-center gap-1.5">
+                <Award className="w-4 h-4 text-amber-400" />
+                <span>التقييم (من 5):</span>
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                min="1.0"
+                max="5.0"
+                value={tRating}
+                onChange={(e) => setTRating(e.target.value)}
+                placeholder="4.9"
+                className="bg-surface-container-high border border-outline-variant/40 rounded-xl p-3 text-body-md text-on-surface focus:outline-none focus:border-primary"
+              />
+            </div>
           </div>
 
           {/* YouTube Details (Visible if youtube or both) */}

@@ -144,7 +144,7 @@ export function AddContentModal({
         : description;
 
       const newContentItem = {
-        id: "user-item-" + Date.now(),
+        id: `user-item-${Date.now()}`,
         title,
         subject,
         contentType,

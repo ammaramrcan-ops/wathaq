@@ -63,7 +63,7 @@ export async function loadIDBPermissions(): Promise<Record<string, UserPermissio
             map[r.emailKey] = {
               uid: r.uid,
               email: r.email,
-              role: r.role || "student",
+              role: (r.role as "admin" | "trusted_publisher" | "student") || "student",
               canDirectPublish: !!r.canDirectPublish,
               canAccessAdmin: !!r.canAccessAdmin
             };

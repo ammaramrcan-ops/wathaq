@@ -125,7 +125,7 @@ export function AdminCommunityMediaTab() {
       }
 
       const newItem: CommunityMediaItem = {
-        id: editingItem ? editingItem.id : "m-" + Date.now(),
+        id: editingItem ? editingItem.id : `m-${Date.now()}`,
         title: title.trim(),
         category: finalCategory,
         type,

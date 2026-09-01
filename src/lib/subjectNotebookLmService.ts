@@ -11,7 +11,7 @@ export function getStoredSubjectNotebookLmMap(): SubjectNotebookLmMap {
   try {
     const saved = localStorage.getItem(LOCAL_STORAGE_SUBJECT_NOTEBOOKLM_MAP);
     return saved ? JSON.parse(saved) : {};
-  } catch (e) {
+  } catch {
     return {};
   }
 }
@@ -19,7 +19,7 @@ export function getStoredSubjectNotebookLmMap(): SubjectNotebookLmMap {
 export function saveStoredSubjectNotebookLmMap(map: SubjectNotebookLmMap): void {
   try {
     localStorage.setItem(LOCAL_STORAGE_SUBJECT_NOTEBOOKLM_MAP, JSON.stringify(map));
-  } catch (e) {
+  } catch {
     // empty
   }
 }
@@ -43,7 +43,7 @@ export function subscribeSubjectNotebookLmMap(onUpdate: (map: SubjectNotebookLmM
       },
       (err) => console.warn("NotebookLM map snapshot warning:", err)
     );
-  } catch (err) {
+  } catch {
     // empty
   }
 

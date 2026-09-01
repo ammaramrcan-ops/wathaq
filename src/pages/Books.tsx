@@ -50,7 +50,7 @@ interface SubjectItem {
   title: string;
   categoryId: string;
   description: string;
-  icon: React.ReactNode;
+  icon: LucideIcon;
 }
 
 interface FilterType {

@@ -41,7 +41,7 @@ export function AdminDailyTipsTab() {
     setIsSubmitting(true);
     try {
       const newTip: DailyTipItem = {
-        id: "tip-" + Date.now(),
+        id: `tip-${Date.now()}`,
         content: content.trim(),
         category: category.trim() || "عام",
         author: author.trim() || "منصة وثاق 💡",

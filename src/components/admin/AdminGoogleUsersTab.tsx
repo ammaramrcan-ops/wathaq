@@ -97,7 +97,7 @@ export function AdminGoogleUsersTab() {
     loadIDBUsers().then((idbUsers) => {
       let changed = false;
       const currentDeleted = getLocalDeletedUserEmails();
-      idbUsers.forEach((u) => {
+      idbUsers.forEach((u: GoogleRegisteredUser) => {
         const key = u.email ? u.email.toLowerCase() : "";
         if (key && !currentDeleted.includes(key) && !userMap.has(key)) {
           userMap.set(key, u);
@@ -231,8 +231,8 @@ export function AdminGoogleUsersTab() {
 
     const email = newEmailInput.trim();
     const newUser: GoogleRegisteredUser = {
-      uid: "manual-" + Date.now(),
-      displayName: email.split("@")[0] + " (Google)",
+      uid: `manual-${Date.now()}`,
+      displayName: `${email.split("@")[0]} (Google)`,
       email: email,
       provider: "Google 🔵",
       lastLogin: new Date().toLocaleDateString("ar-SA")
@@ -456,7 +456,7 @@ export function AdminGoogleUsersTab() {
                     <span className="text-on-surface-variant font-medium">رتبة الحساب:</span>
                     <select
                       value={perm.role}
-                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleChangeRole(userObj, e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleChangeRole(userObj, e.target.value as any)}
                       className="bg-surface-container-high text-on-surface border border-outline-variant/40 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-primary font-bold"
                     >
                       <option value="student">طالب 🎓</option>

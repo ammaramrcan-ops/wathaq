@@ -530,7 +530,7 @@ export async function addUnitToSubject(subjectId: string, unitTitle: string): Pr
   const current = getStoredSubjectUnits();
   const currentUnits = current[subjectId] || [];
   const newUnit: SubjectUnit = {
-    id: "u-" + Date.now(),
+    id: `u-${Date.now()}`,
     unitTitle,
     lessons: []
   };

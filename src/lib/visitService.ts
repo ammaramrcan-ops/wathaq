@@ -193,7 +193,7 @@ export async function trackVisit(): Promise<VisitAnalytics> {
         isRecurring = true;
         localStorage.setItem(LOCAL_STORAGE_VISITOR_ID, visitorId);
       } else {
-        visitorId = "v-" + Date.now() + "-" + Math.random().toString(36).substring(2, 7);
+        visitorId = `v-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
         localStorage.setItem(LOCAL_STORAGE_VISITOR_ID, visitorId);
         await saveIDBVisitorId(visitorId);
         isRecurring = false;
