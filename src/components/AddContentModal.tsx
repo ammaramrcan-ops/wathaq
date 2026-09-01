@@ -2,8 +2,8 @@ import React, { useState, useEffect, FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { 
-  X, Plus, Link as LinkIcon, FileText, Video, Layers, Share2, 
-  HardDrive, CheckCircle2, ChevronRight, ChevronLeft, HelpCircle, Sparkles, ShieldCheck 
+  X, Plus, Link as LinkIcon, FileText, Video,
+  CheckCircle2, ChevronRight, ChevronLeft, HelpCircle, Sparkles, ShieldCheck 
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { auth } from "@/lib/firebase";
@@ -76,7 +76,7 @@ export function AddContentModal({
         };
       }
       return { isValid: true };
-    } catch (e) {
+    } catch {
       return { isValid: false, reason: "صيغة الرابط غير صحيحة، يرجى كتابة رابط كامل يبدأ بـ http:// أو https://" };
     }
   };
@@ -275,7 +275,6 @@ export function AddContentModal({
                   <input
                     type="text"
                     required
-                    autoFocus
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="مثال: شرح باب النيوتنية والتطبيقات العملية"
@@ -356,7 +355,6 @@ export function AddContentModal({
                   <input
                     type="url"
                     required
-                    autoFocus
                     dir="ltr"
                     value={linkUrl}
                     onChange={(e) => {
